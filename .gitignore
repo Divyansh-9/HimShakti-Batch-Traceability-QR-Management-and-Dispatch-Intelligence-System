@@ -1,0 +1,3 @@
+# Ignore local agent and guide folders
+.agents/
+tbi-guide/

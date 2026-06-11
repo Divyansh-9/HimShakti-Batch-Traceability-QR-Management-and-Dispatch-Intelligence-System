@@ -1,0 +1,21 @@
+# HimShakti Batch Traceability, QR Management, and Dispatch Intelligence System
+
+This repository contains the documentation and phase-wise planning reports for the **Batch Traceability, QR Management, and Dispatch Intelligence System**, developed for HimShakti Food Processing.
+
+## Documentation Structure
+
+The documentation follows the Software Development Life Cycle (SDLC) process and is structured into the following phases:
+
+| Phase | Document | Location | Description |
+| :--- | :--- | :--- | :--- |
+| **Phase 2** | Planning Report | [`intern-2/planning_report.md`](./intern-2/planning_report.md) | Initial problem statement, user personas, and project scope. |
+| **Phase 3** | System Design | [`final_project_report.md`](./final_project_report.md) | System architecture, MongoDB schemas, and AI integration flows. |
+| **Phase 4** | SRS | [`intern-2/srs.md`](./intern-2/srs.md) | Software Requirements Specification, functional & non-functional constraints. |
+| **Phase 5** | Implementation Plan | [`intern-2/implementation_plan.md`](./intern-2/implementation_plan.md) | 6-week step-by-step build schedule, test strategy, and deployment guide. |
+
+### Directory Overview
+- `/intern-2`: Contains intern-specific requirement, planning, and implementation files.
+- `/`: Root directory hosting the system design / final project report.
+
+## Note
+Code implementation for the backend and frontend modules will be organized under `backend/` and `frontend/` directories as per Phase 5 of the Implementation Plan.
