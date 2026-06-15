@@ -28,6 +28,7 @@ The documentation follows the Software Development Life Cycle (SDLC) process and
 ### Directory Overview
 - `/frontend`: The React (Vite) application scaffold.
 - `/backend`: The Express server (stubbed for now).
+- `/shared`: Shared DB contracts and schemas between services.
 - `/intern-2`: Contains intern-specific requirement, planning, and implementation files.
 - `/`: Root directory hosting the system design / final project report.
 
