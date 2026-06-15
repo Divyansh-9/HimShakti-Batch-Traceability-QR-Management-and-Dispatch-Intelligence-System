@@ -1,6 +1,18 @@
 # HimShakti Batch Traceability, QR Management, and Dispatch Intelligence System
 
+![Deliverable 1 Complete](https://img.shields.io/badge/Status-Deliverable%201%20Complete-success)
+
 This repository contains the documentation and phase-wise planning reports for the **Batch Traceability, QR Management, and Dispatch Intelligence System**, developed for HimShakti Food Processing.
+
+## Quick Start (Frontend)
+
+To run the frontend React application locally:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
 ## Documentation Structure
 
@@ -14,8 +26,10 @@ The documentation follows the Software Development Life Cycle (SDLC) process and
 | **Phase 5** | Implementation Plan | [`intern-2/implementation_plan.md`](./intern-2/implementation_plan.md) | 6-week step-by-step build schedule, test strategy, and deployment guide. |
 
 ### Directory Overview
+- `/frontend`: The React (Vite) application scaffold.
+- `/backend`: The Express server (stubbed for now).
 - `/intern-2`: Contains intern-specific requirement, planning, and implementation files.
 - `/`: Root directory hosting the system design / final project report.
 
 ## Note
-Code implementation for the backend and frontend modules will be organized under `backend/` and `frontend/` directories as per Phase 5 of the Implementation Plan.
+Code implementation for the backend and frontend modules is organized under `backend/` and `frontend/` directories as per Phase 5 of the Implementation Plan.
