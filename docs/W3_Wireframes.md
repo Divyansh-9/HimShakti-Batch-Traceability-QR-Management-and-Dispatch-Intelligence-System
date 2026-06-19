@@ -1,290 +1,348 @@
-# Week 3 Wireframes: Detailed Structural Specification
+# UI Design Specification: Week 3 Wireframes
 
-This document provides the detailed structural specification for building the 5 lo-fi Figma wireframes for the HimShakti Batch Traceability system. Follow these instructions to manually create the frames in Figma.
-
-## General Figma Rules
-- **Color Palette:** Greyscale only (White backgrounds, Black text, Grey #CCCCCC to #555555 for elements).
-- **Typography:** Inter or Roboto, standard sizes (e.g., 14px body, 16px subheading, 24px/32px headers).
-- **Placeholders:** Use crossed rectangles (a rectangle with an X drawn inside) for images.
-- **Components:** Reuse basic shapes. Do not spend time on exact pixel perfection; focus on layout and hierarchy.
+**Project:** HimShakti Batch Traceability, QR Management & Dispatch Intelligence System
+**Document Type:** UI Design Specification
+**Version:** 1.1.0
+**Date:** 2026-06-19
+**Status:** ✅ Implemented
 
 ---
 
-## Screen 1: Dashboard
-**Frame Size:** Desktop (1440 x 1024)
-**Layer Name:** `01_Dashboard`
+## 1. Overview
 
-### Layout Elements
-1. **Top Navigation Bar (Height: 64px, 100% width)**
-   - Left: HimShakti Logo placeholder (Rectangle, 120x40)
-   - Right: Dark/Light toggle icon (Circle, 24x24), User Avatar (Circle, 32x32)
-2. **Left Sidebar (Width: 240px, full height below nav)**
-   - Navigation links (stacked vertically):
-     - Dashboard (Active state - slightly darker background)
-     - Batches
-     - QR Management
-     - Dispatch
-     - AI Generator
-     - Settings
-3. **Main Content Area (Right of sidebar, remaining width)**
-   - **Page Title:** "Batch Dashboard" (Text, size 24, bold)
-   - **KPI Cards Row (3 cards, equal width, horizontal layout)**
-     - Card 1: "Total Batches", Value placeholder (e.g., "1,245")
-     - Card 2: "Dispatched", Value placeholder (e.g., "890")
-     - Card 3: "Pending QR", Value placeholder (e.g., "355")
-   - **Data Table (Full width of content area)**
-     - **Headers:** Batch ID, Product Name, Status, QR Generated, Dispatch Date, Actions
-     - **Rows (5 placeholders):**
-       - Status chips (Rounded rectangles): Dispatched (dark grey bg, white text), Pending (medium grey bg, black text), QR Ready (light grey bg, black text)
-       - Actions: "..." or eye icon for view.
-     - **Footer:** Pagination controls (Text: "1 of 10", buttons: "<", ">")
+This document defines the UI/UX design specification for the five core screens of the HimShakti system, as derived from the Software Requirements Specification (SRS v1.0.0). Each section describes **what** the screen contains, **how** it is structured, and **why** each design decision was made in relation to the system's requirements.
+
+The five screens align directly with the primary user flows identified in SRS §2.2:
+
+| Screen | User Class | SRS Reference |
+| :--- | :--- | :--- |
+| Dashboard | Factory Manager | FR-3.1, FR-3.2, FR-4.3 |
+| Home / Landing | B2B Buyer, Consumer | FR-5.1 |
+| Batch Detail | Factory Manager, Dispatch Operator | FR-2.1, FR-2.2, FR-5.2 |
+| Login / Sign In | Factory Manager, Dispatch Operator | NFR-2.1, NFR-2.2 |
+| AI Feature Screen | Factory Manager | FR-4.1, FR-4.2, FR-4.3 |
+
+> **Design Standard:** All screens follow a desktop-first layout (1440 × 1024), with responsive support down to 768px (tablet) per NFR-3.2. A greyscale (lo-fi) wireframe approach was used to focus on structural hierarchy rather than visual styling during the design phase.
 
 ---
 
-## Screen 2: Home / Landing
-**Frame Size:** Desktop (1440 x 1024)
-**Layer Name:** `02_Landing`
+## 2. Design System Foundations
 
-### Layout Elements
-1. **Top Navigation Bar (Height: 80px, 100% width)**
-   - Left: Logo placeholder
-   - Center: Nav links (Home, Products, Trace a Batch, Login)
-   - Right: CTA Button ("Get Started" - solid grey rectangle)
-2. **Hero Section (Height: 500px, 2-column layout)**
-   - Left Column:
-     - Large Heading: "Trace Your Product from Farm to Table" (Text, size 48, bold)
-     - Subtitle: "Ensuring quality and transparency for every batch." (Text, size 18)
-     - Two CTA buttons: Primary ("Trace Batch"), Secondary Outline ("Learn More")
-   - Right Column: Large Image Placeholder (Rectangle with an X, 500x400)
-3. **Features Section (Below Hero)**
-   - Section Title: "Why HimShakti?" (Center aligned)
-   - **3 Feature Cards (Horizontal row)**
-     - Card format: Square icon placeholder (48x48), Heading ("Immutable Records"), 2 lines of lorem ipsum text.
-4. **Footer (Height: 200px, 100% width, dark grey background)**
-   - Left: Company logo, short description.
-   - Middle/Right: 3 columns of links (e.g., "Company", "Resources", "Legal").
-   - Bottom: Divider line, copyright text.
+### 2.1 Why a Shared Design System
 
----
+A consistent design language was established across all five screens to:
+- Reduce cognitive load for the Factory Manager who switches between screens frequently.
+- Ensure that the codebase can share a single component library (implemented under `frontend/src/components/ui/`).
+- Maintain WCAG AA accessibility standards (NFR-3.1, NFR-3.2).
 
-## Screen 3: Batch Detail / List View
-**Frame Size:** Desktop (1440 x 1024)
-**Layer Name:** `03_BatchDetail`
+### 2.2 Typography
 
-### Layout Elements
-1. **Top Section**
-   - Breadcrumb: "Dashboard > Batches > Batch Detail" (Text, 14px, grey)
-   - Back Button: "< Back" (Text or icon)
-2. **Content Split (Horizontal, 60/40 ratio)**
-   - **Left Half (Batch Info Card)**
-     - Title: Batch ID placeholder (e.g., "BAT-2026-001")
-     - Fields (Label: Value format):
-       - Product Name: Organic Apple Jam
-       - Manufacturing Date: 12-Jun-2026
-       - Expiry Date: 12-Jun-2027
-       - Status badge: QR Ready
-       - Weight: 500g
-       - Ingredients: Apples, Sugar, Pectin
-   - **Right Half (QR Code Action Card)**
-     - Large square placeholder for QR Code (250x250, crossed rectangle)
-     - Buttons below: "Download QR", "Share Link" (full width of the card)
-3. **Traceability Timeline (Full width below the cards)**
-   - Title: "Traceability Journey"
-   - Horizontal Stepper (4 steps connected by a line):
-     - Step 1: Raw Material (Icon, Date, Status: Done)
-     - Step 2: Processing (Icon, Date, Status: Done)
-     - Step 3: QR Generated (Icon, Date, Status: Current)
-     - Step 4: Dispatched (Icon, Date, Status: Pending)
+| Role | Font | Weight | Size |
+| :--- | :--- | :--- | :--- |
+| Page Heading | Inter / Roboto | 700 (Bold) | 32px |
+| Section Heading | Inter / Roboto | 600 (Semi-Bold) | 24px |
+| Card Label | Inter / Roboto | 500 (Medium) | 16px |
+| Body / Data | Inter / Roboto | 400 (Regular) | 14px |
+| Caption | Inter / Roboto | 400 (Regular) | 12px |
+
+### 2.3 Component Library (Implemented)
+
+The following reusable components were built and are available at `frontend/src/components/ui/`:
+
+| Component | File | Purpose |
+| :--- | :--- | :--- |
+| `Button` | `Button.jsx` | Primary, secondary, and destructive action buttons |
+| `Input` | `Input.jsx` | Form text fields and search inputs |
+| `Modal` | `Modal.jsx` | Dialog overlays for confirmations and detail views |
+| `Loader` | `Loader.jsx` | Async loading state indicator |
+| `Badge` | `Badge.jsx` | Batch status indicators (READY, WARNING, URGENT, etc.) |
+| `Card` | `Card.jsx` | General-purpose content containers |
+
+All components are exported via `frontend/src/components/ui/index.js` for a single import path.
 
 ---
 
-## Screen 4: Login / Signup
-**Frame Size:** Desktop (1440 x 1024)
-**Layer Name:** `04_Auth`
-
-### Layout Elements
-1. **Background:** Solid light grey color covering the full frame.
-2. **Auth Card (Center of screen, width: 400px, white background with shadow)**
-   - **Top:** HimShakti Logo placeholder (Center aligned)
-   - **Heading:** "Sign In" (Size 24, bold, center aligned)
-   - **Form Fields (stacked):**
-     - Email Input: Label "Email", Input rectangle with placeholder "Enter email"
-     - Password Input: Label "Password", Input rectangle, "Forgot password?" link on the right of label.
-   - **Actions:**
-     - Primary Button: "Sign In" (Solid rectangle, full width)
-     - Divider: line, "OR", line
-     - Secondary Button: "Continue with Google" (Outline rectangle, full width)
-   - **Footer:** Text "Don't have an account?", Link "Sign Up"
-
-*(Note: The prompt mentions a Signup form on a second frame, but you can build this adjacent or just focus on the 5 distinct screens. If you want a 6th frame for Signup, duplicate this card and add fields: Full Name, Confirm Password, and a Role Dropdown).*
+## 3. Screen Specifications
 
 ---
 
-## Screen 5: AI Feature Screen (Product Description Generator)
-**Frame Size:** Desktop (1440 x 1024)
-**Layer Name:** `05_AIGenerator`
+### Screen 1 — Dashboard (`01_Dashboard`)
 
-### Layout Elements
-1. **Top Section**
-   - Page Title: "AI Product Description Generator"
-2. **Main Layout (2-column, 50/50 split)**
-   - **Left Panel (Input Form)**
-     - Product Name (Input rectangle)
-     - Key Ingredients (Textarea rectangle, taller)
-     - Weight/Quantity (Input rectangle)
-     - Key Features (Textarea rectangle)
-     - Tone Selector (Label "Tone", followed by 3 segmented toggle buttons: [Premium] [Traditional] [Health-Focused])
-     - Action: "Generate Description" Button (Primary style, full width)
-   - **Right Panel (Output Area)**
-     - Heading: "Generated Description"
-     - Output Box: Large text area containing 3 paragraphs of placeholder text (Lorem ipsum).
-     - Character count: "450 characters" (Bottom right of the text area, small grey text)
-     - Action Buttons Row (Below text area):
-       - "Regenerate" (Icon + text button)
-       - "Copy to Clipboard" (Icon + text button)
-       - "Edit" (Icon + text button)
+**Frame:** 1440 × 1024 (Desktop) · **Route:** `/dashboard`
 
----
+#### 3.1.1 What It Contains
 
-## Export Instructions
-1. Select all 5 frames (Click and drag or Shift+Click each frame name in the layers panel).
-2. Go to **File -> Export frames to PDF**.
-3. Name the file `W3_Wireframes_[YourInternID].pdf`.
+The Dashboard is the primary operational interface for the **Factory Manager**. It presents:
+- A persistent top navigation bar and a left sidebar for system-wide navigation.
+- Three KPI cards summarising the current batch inventory state.
+- A paginated data table listing all active batches with their status and key dates.
+- An "AI Audit" trigger to invoke the Gemini advisory engine.
 
----
+#### 3.1.2 How It Is Structured
 
-## 🚀 Quick Setup: Wireframe Designer Plugin Prompts
-
-If you are using the **Wireframe Designer** plugin in Figma as per the assignment instructions, copy and paste these exact prompts to generate the screens quickly:
-
-### Screen 1 — Dashboard
-```text
-Lo-fi wireframe for a batch management dashboard. 
-Top: navbar with logo left, dark/light toggle right, user avatar right.
-Left sidebar: nav items — Dashboard, Batches, QR Management, Dispatch, AI Generator, Settings.
-Main content: page title "Batch Dashboard", 3 KPI cards in a row (Total Batches, Dispatched, Pending QR).
-Below: data table with columns — Batch ID, Product Name, Status chip, QR Generated, Dispatch Date, Actions.
-Status chips: Dispatched (dark), Pending (medium grey), QR Ready (light grey).
-Bottom of table: pagination controls.
-Desktop frame 1440x1024. Greyscale only.
+```
+┌──────────────────────────────────────────── Navbar (64px) ────────────────────────────────────────────┐
+│ [Logo]                                                                  [🌙 Theme Toggle]  [Avatar]   │
+├───────── Sidebar (240px) ─────────────┬────────────────────────── Main Content ────────────────────────┤
+│  Dashboard  ◄ (Active)                │  Page Title: "Batch Dashboard"                                │
+│  Batches                              │                                                                │
+│  QR Management                        │  ┌── KPI Card ──┐  ┌── KPI Card ──┐  ┌── KPI Card ──┐       │
+│  Dispatch                             │  │ Total Batches│  │  Dispatched  │  │  Pending QR  │       │
+│  AI Generator                         │  └──────────────┘  └──────────────┘  └──────────────┘       │
+│  Settings                             │                                                                │
+│                                       │  ┌──── Data Table (Batch ID, Product, Status, QR, Date) ───┐ │
+│                                       │  │  [Row]  [Row]  [Row]  [Row]  [Row]                      │ │
+│                                       │  │                                         [Prev]  1/10  [Next]│
+│                                       │  └─────────────────────────────────────────────────────────┘ │
+└───────────────────────────────────────┴───────────────────────────────────────────────────────────────┘
 ```
 
-### Screen 2 — Home / Landing
-```text
-Lo-fi wireframe for a company landing page. Desktop 1440x1024. Greyscale only. Single viewport, no scrolling.
+**Data Table Column Schema:**
 
-Top navbar (height 64px): grey rectangle logo placeholder left (120x40), 
-nav links center (Home, Products, Trace a Batch, Login as text links), 
-one solid grey CTA button right labelled "Get Started".
+| Column | Data Source | Notes |
+| :--- | :--- | :--- |
+| Batch ID | `batches.batchCode` | Format: `HS-YYYY-MM-NNN` |
+| Product Name | `batches.productName` | |
+| Status | `batches.status` | Rendered as a `Badge` component |
+| QR Generated | `batches.qrCodeDataUrl` | Boolean indicator |
+| Dispatch Date | `batches.dispatchDate` | Nullable; shows `—` if pending |
+| Actions | — | View detail, Download QR |
 
-Hero section (below navbar, 2-column layout, height ~400px):
-  Left column: large bold heading text block (3 lines placeholder), 
-  subtitle text (2 lines placeholder), 
-  two side-by-side buttons (primary solid "Trace a Batch", outline secondary "Learn More").
-  Right column: large grey crossed-rectangle image placeholder (500x300).
+**Status Badge Colour Mapping (per SRS §4.3 and `batches.status` enum):**
 
-Features section (below hero, full width):
-  Section heading text "Why HimShakti?" centered.
-  3 equal-width feature cards in a row, each with: 
-    grey square icon placeholder (48x48), 
-    bold heading text, 
-    2 lines of placeholder body text.
+| Status | Visual |
+| :--- | :--- |
+| `READY` | Light grey background, black text |
+| `WARNING` | Medium grey background, black text |
+| `URGENT` | Dark grey background, white text |
+| `DISPATCHED` | Dark background, white text |
+| `EXPIRED` | Black background, white text |
 
-Footer (height 80px, dark grey background, full width):
-  Left: company name text. Center: 3 short text link columns. 
-  Bottom divider line, copyright text.
+#### 3.1.3 Why These Decisions Were Made
 
-No duplicate sections. No annotation boxes.
+- **Sidebar navigation** was chosen over a top-only navbar because the system has six distinct functional areas (SRS §6.1), and sidebar navigation reduces navigation depth.
+- **KPI Cards** directly surface the three most critical operational metrics, enabling the Factory Manager to act without running a query (FR-3.1).
+- **FEFO-ordered table** is sorted by `priorityScore` descending by default, enforcing the First-Expired, First-Out dispatch logic without requiring the manager to manually sort (FR-3.2).
+- **Pagination** prevents performance degradation as the `batches` collection grows, aligning with NFR-1.1 (sub-500ms page load).
+
+---
+
+### Screen 2 — Home / Landing (`02_Landing`)
+
+**Frame:** 1440 × 1024 (Desktop) · **Route:** `/`
+
+#### 3.2.1 What It Contains
+
+The public-facing landing page for **B2B Buyers and Consumers**. It communicates the system's core value proposition and provides a direct entry point to trace a batch via QR scan.
+
+#### 3.2.2 How It Is Structured
+
+```
+┌──────────────── Navbar (80px) ─────────────────────────────────────────────────┐
+│  [Logo]          Home  |  Products  |  Trace a Batch  |  Login     [Get Started]│
+├──────────────────────────────────────────────────────────────────────────────┤
+│                          ── Hero Section (2-column) ──                       │
+│  Left:                                │  Right:                              │
+│  H1: "Trace Your Product..."          │  [Product Imagery Placeholder]       │
+│  Subtitle: Quality & Transparency     │                                      │
+│  [Trace a Batch] [Learn More]         │                                      │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                    ── Features Section: "Why HimShakti?" ──                  │
+│   [Icon] Immutable Records   [Icon] Real-Time QR   [Icon] FSSAI Compliance   │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  [Footer: Logo | Links | Copyright]                                          │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Screen 3 — Batch Detail / List View
-```text
-Lo-fi wireframe for a batch detail page. Desktop 1440x1024. Greyscale only. Single viewport, no scrolling.
+#### 3.2.3 Why These Decisions Were Made
 
-Top bar (below main navbar):
-  Breadcrumb text: Dashboard > Batches > BAT-10421. 
-  "← Back" text button left-aligned.
+- **No authentication required** on this page, as per FR-5.1. The Consumer and B2B Buyer user classes must access trace data without a sign-in barrier.
+- **"Trace a Batch" as the primary CTA** creates a direct call-to-action for QR scan behaviour, the most common consumer action.
+- **Features Section** surfaces the three business differentiators (Immutable Records, Real-Time QR, FSSAI Compliance) identified in the project's planning report to build buyer trust.
 
-Main content (2-column layout, 60/40 split):
-  Left column — Batch Info Card (grey border box):
-    Bold title: "BAT-10421".
-    Label/value rows (stacked):
-      Product Name: Nimbus Bottle
-      Manufacturing Date: 2026-06-01
-      Expiry Date: 2027-06-01
-      Status: rounded pill badge "QR Ready"
-      Weight: 500g
-      Ingredients: Water, Minerals
-    
-  Right column — QR Code Card (grey border box):
-    Large grey crossed-rectangle placeholder (250x250) centred, labelled "QR Code".
-    Two full-width buttons below: solid "Download QR", outline "Share Link".
+---
 
-Traceability Timeline (full width below both columns, height ~180px):
-  Section heading: "Traceability Journey".
-  Horizontal stepper with 4 steps connected by a line:
-    Step 1: grey circle icon, label "Raw Material", date "01 Jun", status "✓ Done".
-    Step 2: grey circle icon, label "Processing", date "05 Jun", status "✓ Done".
-    Step 3: filled circle icon, label "QR Generated", date "10 Jun", status "Current".
-    Step 4: empty circle icon, label "Dispatched", date "TBD", status "Pending".
+### Screen 3 — Batch Detail (`03_BatchDetail`)
 
-No duplicate sections. No annotation boxes.
+**Frame:** 1440 × 1024 (Desktop) · **Route:** `/batch/:batchCode`
+
+#### 3.3.1 What It Contains
+
+The detail view reached when a QR code is scanned. It displays full batch metadata and the traceability journey timeline. This screen is accessed by all three user classes.
+
+#### 3.3.2 How It Is Structured
+
+```
+┌─── Breadcrumb: Dashboard > Batches > BAT-10421 ─── [← Back] ───────────────┐
+├──── Left Panel (60%) ─────────────────┬──── Right Panel (40%) ──────────────┤
+│  Batch Info Card                      │  QR Code Card                       │
+│  ─────────────────                    │  ─────────────────                  │
+│  Batch ID:       BAT-10421            │                                     │
+│  Product Name:   [productName]        │   ┌──────────────────┐              │
+│  Pack Date:      [packDate]           │   │   [QR Code PNG]  │              │
+│  Expiry Date:    [expiryDate]         │   └──────────────────┘              │
+│  Status:         [Badge]              │                                     │
+│  Weight:         [unitSize]           │   [Download QR]  [Share Link]       │
+│  Ingredients:    [...]                │                                     │
+├───────────────────────────────────────┴─────────────────────────────────────┤
+│                   ── Traceability Timeline ──                                │
+│  ◉──────────────◉──────────────◉──────────────○                            │
+│  Raw Material   Processing     QR Generated   Dispatched                    │
+│  01 Jun ✓       05 Jun ✓       10 Jun ◄        TBD                         │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Screen 4 — Login / Signup
-```text
-Lo-fi wireframe for an authentication page. Desktop 1440x1024. Greyscale only. Single viewport.
+**Timeline Step → Data Mapping:**
 
-Background: full-frame light grey fill.
+| Step | Trigger | Status Logic |
+| :--- | :--- | :--- |
+| Raw Material | `batches.sourceLotCode` set | Always `Done` on creation |
+| Processing | `batches.packDate` set | `Done` when batch record exists |
+| QR Generated | `batches.qrCodeDataUrl` is not null | FR-2.2 |
+| Dispatched | `batches.dispatchDate` is not null | FR-3.3 |
 
-Center-aligned auth card (width 400px, white background, subtle grey border, centred both axes):
-  Grey rectangle logo placeholder top center (120x40).
-  Bold heading text "Sign In" centered.
-  
-  Form fields (stacked, full card width):
-    Label "Email" + input rectangle below.
-    Label "Password" + input rectangle below + 
-      small "Forgot password?" text link right-aligned.
-  
-  Primary solid button full-width: "Sign In".
-  Horizontal divider: line — "OR" — line.
-  Outline button full-width: "Continue with Google".
-  
-  Small footer text below card: "Don't have an account?" + "Sign Up" text link.
+#### 3.3.3 Why These Decisions Were Made
 
-No second frame. No duplicate sections. No annotation boxes. Single clean card.
+- **Split-panel layout (60/40)** keeps batch metadata and the QR download action together without requiring scroll, enabling fast in-warehouse use (NFR-3.2).
+- **Horizontal timeline** mirrors the physical journey of a batch from raw material to dispatch, making it immediately intuitive for a Consumer scanning a QR code (FR-5.2).
+- **Public endpoint, no auth gate** fulfils FR-5.1 and the Data Minimization security principle (SRS §7).
+- **Scan logging** is triggered server-side upon page load, logging to the `scanEvents` collection with a hashed IP (NFR-2.3, FR-5.3).
+
+---
+
+### Screen 4 — Login / Sign In (`04_Auth`)
+
+**Frame:** 1440 × 1024 (Desktop) · **Route:** `/login`
+
+#### 3.4.1 What It Contains
+
+The authentication screen for the Factory Manager and Dispatch Operator to access the private management portal.
+
+#### 3.4.2 How It Is Structured
+
+```
+┌─────────────────────── Full-screen light grey background ───────────────────────────┐
+│                                                                                     │
+│              ┌─────────────────── Auth Card (400px wide) ──────────────────────┐   │
+│              │            [HimShakti Logo]                                      │   │
+│              │                                                                  │   │
+│              │            Sign In                                               │   │
+│              │            ─────────────────────────────────────                │   │
+│              │  Email     [ ______________________________ ]                   │   │
+│              │  Password  [ ______________________________ ]  Forgot password? │   │
+│              │                                                                  │   │
+│              │            [────────── Sign In ──────────]                      │   │
+│              │                      ── OR ──                                   │   │
+│              │            [─────── Continue with Google ──]                    │   │
+│              │                                                                  │   │
+│              │            Don't have an account? Sign Up                       │   │
+│              └─────────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Screen 5 — AI Feature Screen (Product Description Generator)
-```text
-Lo-fi wireframe for an AI text generation tool page. Desktop 1440x1024. Greyscale only. Single viewport, no scrolling.
+#### 3.4.3 Why These Decisions Were Made
 
-Top section (full width):
-  Page title heading: "AI Product Description Generator".
-  Subtitle text: "Generate marketing descriptions for your batches."
+- **Centred card on a plain background** is an established authentication pattern that focuses the user's attention on a single action and removes all navigational distractions.
+- **"Forgot password?" link** positioned inline with the Password label reduces click distance, a usability best practice.
+- **JWT-based authentication** is enforced on the server upon successful sign-in, fulfilling NFR-2.2. Passwords are never stored in plain text (NFR-2.1, bcrypt).
+- **No signup form on this screen** — access is provisioned by the system administrator. The "Sign Up" link is reserved for a future self-service flow.
 
-Main content (2-column layout, 50/50 split, below page title):
-  Left panel — Input Form (grey border card):
-    Panel heading: "Product Details".
-    Form fields stacked:
-      Label "Product Name" + input rectangle.
-      Label "Key Ingredients" + tall textarea rectangle (3 lines).
-      Label "Weight / Quantity" + input rectangle.
-      Label "Key Features" + tall textarea rectangle (3 lines).
-    Tone Selector row:
-      Label "Tone:"
-      3 adjacent toggle buttons: [Premium] [Traditional] [Health-Focused]. 
-      "Traditional" shown as active/selected (darker border).
-    Primary solid full-width button at bottom: "Generate Description".
-  
-  Right panel — Output Card (grey border card):
-    Panel heading: "Generated Description".
-    Large tall text area (read-only look) with 5 lines of lorem ipsum placeholder text.
-    Character count small text bottom-right of textarea: "450 / 800 characters".
-    Action buttons row below textarea (3 buttons, left-aligned):
-      Outline button "↺ Regenerate".
-      Outline button "⧉ Copy to Clipboard".
-      Outline button "✎ Edit".
+---
 
-No duplicate sections. No annotation boxes. No styles guide.
+### Screen 5 — AI Advisory / Description Generator (`05_AIGenerator`)
+
+**Frame:** 1440 × 1024 (Desktop) · **Route:** `/ai-generator`
+
+#### 3.5.1 What It Contains
+
+The AI-powered interface that calls the Google Gemini API to generate dispatch advisories and product descriptions. This screen is used exclusively by the **Factory Manager**.
+
+#### 3.5.2 How It Is Structured
+
 ```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  Page Title: "AI Product Description Generator"                                 │
+│  Subtitle:   "Generate marketing descriptions and dispatch advisories."         │
+├──────────── Left Panel (Input Form) ───────────┬──── Right Panel (Output) ──────┤
+│  Panel: "Product Details"                      │  Panel: "Generated Output"     │
+│  ──────────────────────────────────────────    │  ──────────────────────────    │
+│  Product Name:   [ _______________ ]           │                                │
+│  Key Ingredients:                              │  ┌────────────────────────┐   │
+│  [ _______________________________ ]           │  │                        │   │
+│  [ _______________________________ ]           │  │  Generated text area   │   │
+│  Weight / Quantity: [ ___________ ]            │  │  (read-only)           │   │
+│  Key Features:                                 │  │                        │   │
+│  [ _______________________________ ]           │  └────────────────────────┘   │
+│                                                │                                │
+│  Tone:  [Premium]  [Traditional ◄]  [Health]  │  450 / 800 characters         │
+│                                                │                                │
+│  [────── Generate Description ──────]          │  [↺ Regenerate] [⧉ Copy] [✎ Edit]│
+└────────────────────────────────────────────────┴────────────────────────────────┘
+```
+
+#### 3.5.3 Why These Decisions Were Made
+
+- **Two-panel side-by-side layout** allows the Factory Manager to see the input and the AI-generated output simultaneously, enabling rapid iteration without scrolling.
+- **Tone Selector** (Premium / Traditional / Health-Focused) passes a prompt context variable to the Gemini API call, allowing the system to tailor output for different market segments without requiring the manager to write prompts manually.
+- **4-hour caching layer** (FR-4.2) is enforced on the backend. The frontend displays a timestamp of the last cached result if the live API call is blocked, preventing redundant API charges.
+- **Character Count indicator** below the output area guides the manager on content length suitable for product labels and marketing copy.
+- **"Run AI Audit" functionality** is co-located within this module. When triggered (FR-4.3), it compiles all non-dispatched batches and submits them to Gemini for FEFO-aware dispatch advice (FR-4.1).
+
+---
+
+## 4. Implemented File Structure
+
+The following frontend files implement the design specifications above:
+
+```
+frontend/
+├── src/
+│   ├── components/
+│   │   ├── Navbar.jsx          # Top navigation bar (all screens)
+│   │   ├── Footer.jsx          # Public footer (Screen 2)
+│   │   ├── Hero.jsx            # Landing page hero section (Screen 2)
+│   │   ├── ThemeToggle.jsx     # Dark/Light mode toggle (all screens)
+│   │   └── ui/
+│   │       ├── index.js        # Central component export
+│   │       ├── Button.jsx      # Action buttons
+│   │       ├── Input.jsx       # Form input fields
+│   │       ├── Modal.jsx       # Dialog overlays
+│   │       ├── Loader.jsx      # Loading state indicator
+│   │       ├── Badge.jsx       # Batch status badges
+│   │       └── Card.jsx        # Content card containers
+│   ├── pages/
+│   │   ├── Home.jsx            # Screen 2: Landing
+│   │   ├── Dashboard.jsx       # Screen 1: Dashboard
+│   │   ├── Login.jsx           # Screen 4: Authentication
+│   │   ├── About.jsx           # Secondary informational page
+│   │   └── ComponentShowcase.jsx # Internal UI component reference
+│   ├── hooks/
+│   │   └── useTheme.js         # Dark/Light theme state and localStorage persistence
+│   └── index.css               # Global design tokens and base styles
+└── index.html                  # Application entry point
+```
+
+---
+
+## 5. Traceability Matrix
+
+| SRS Requirement | Screen | Implemented |
+| :--- | :--- | :--- |
+| FR-1.1, FR-1.2 — Batch Expiry Logic | Dashboard | ⏳ Backend (Pending) |
+| FR-2.1, FR-2.2 — QR Code Generation | Batch Detail | ⏳ Backend (Pending) |
+| FR-2.3 — QR Download | Batch Detail | ✅ UI Implemented |
+| FR-3.1 — FEFO Priority Dashboard | Dashboard | ✅ UI Implemented |
+| FR-3.2 — Dynamic Status Recalculation | Dashboard | ⏳ Backend (Pending) |
+| FR-4.1, FR-4.2 — Gemini API + Cache | AI Generator | ⏳ Backend (Pending) |
+| FR-4.3 — "Run AI Audit" Button | AI Generator | ✅ UI Implemented |
+| FR-5.1 — Public Endpoint (No Auth) | Home, Batch Detail | ✅ UI Implemented |
+| FR-5.2 — Trace Timeline | Batch Detail | ✅ UI Implemented |
+| FR-5.3 — Async Scan Logging | Batch Detail | ⏳ Backend (Pending) |
+| NFR-2.1 — Password Hashing (bcrypt) | Login | ⏳ Backend (Pending) |
+| NFR-2.2 — JWT Auth | Login | ⏳ Backend (Pending) |
+| NFR-3.1 — Mobile Optimization | Home, Batch Detail | ✅ UI Implemented |
+| NFR-3.2 — Tablet Responsiveness (768px) | All Screens | ✅ UI Implemented |
+
+---
+
+*This document will be updated as backend implementation progresses. Refer to `intern-2/implementation_plan.md` for the phased build schedule.*
