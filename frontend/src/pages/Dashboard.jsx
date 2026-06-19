@@ -1,137 +1,167 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import Navbar from '../components/Navbar';
-import Footer from '../components/Footer';
+import Badge from '../components/ui/Badge';
+import { Package, Truck, QrCode, LayoutDashboard, Settings, ChevronRight, Menu } from 'lucide-react';
 
 export default function Dashboard() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [activeItem, setActiveItem] = useState('Dashboard');
 
   const batches = [
-    { id: 'BAT-001', product: 'Organic Apple Jam', status: 'Dispatched', qr: 'Yes', date: '2026-06-15' },
-    { id: 'BAT-002', product: 'Mango Pickle', status: 'QR Ready', qr: 'Yes', date: '2026-06-16' },
-    { id: 'BAT-003', product: 'Mixed Fruit Jam', status: 'Pending', qr: 'No', date: 'TBD' },
+    { id: 'BAT-001', product: 'Organic Apple Jam', status: 'success', statusText: 'Dispatched', date: '2026-06-15' },
+    { id: 'BAT-002', product: 'Mango Pickle', status: 'warning', statusText: 'QR Ready', date: '2026-06-16' },
+    { id: 'BAT-003', product: 'Mixed Fruit Jam', status: 'pending', statusText: 'Pending', date: 'TBD' },
+    { id: 'BAT-004', product: 'Himalayan Pink Salt', status: 'error', statusText: 'Rejected', date: '2026-06-17' },
+  ];
+
+  const navItems = [
+    { name: 'Dashboard', icon: LayoutDashboard },
+    { name: 'Batches', icon: Package },
+    { name: 'QR Management', icon: QrCode },
+    { name: 'Dispatch', icon: Truck },
+    { name: 'Settings', icon: Settings },
   ];
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-900 transition-colors">
+    <div className="min-h-screen flex flex-col bg-background transition-colors">
       <Navbar />
       
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden h-[calc(100vh-72px)]">
         {/* Mobile Sidebar Overlay */}
         {isSidebarOpen && (
           <div 
-            className="fixed inset-0 bg-black/50 z-20 md:hidden" 
+            className="fixed inset-0 bg-black/50 z-20 md:hidden backdrop-blur-sm" 
             onClick={() => setIsSidebarOpen(false)}
           />
         )}
 
-        {/* Sidebar */}
+        {/* Sidebar Rail */}
         <aside className={`
-          fixed inset-y-0 left-0 z-30 w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transition-transform duration-300 ease-in-out
-          md:relative md:translate-x-0 md:w-20 lg:w-64
+          fixed inset-y-0 left-0 z-30 w-64 bg-surface border-r border-border transition-transform duration-300 ease-in-out
+          md:relative md:translate-x-0 
           ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
         `}>
-          <div className="h-full flex flex-col px-3 py-4 space-y-2">
-            <div className="flex items-center justify-between md:hidden mb-4 px-2">
-              <span className="text-xl font-bold dark:text-white">Menu</span>
-              <button onClick={() => setIsSidebarOpen(false)} className="text-gray-500 dark:text-gray-400">✕</button>
+          <div className="h-full flex flex-col py-6 overflow-y-auto">
+            <div className="flex items-center justify-between md:hidden mb-6 px-6">
+              <span className="text-xl font-bold text-text-primary">Menu</span>
+              <button onClick={() => setIsSidebarOpen(false)} className="text-text-muted p-2 hover:bg-surface-2 rounded-md">✕</button>
             </div>
             
-            {/* Sidebar Links */}
-            {['Dashboard', 'Batches', 'QR Management', 'Settings'].map((item) => (
-              <a key={item} href="#" className="flex items-center px-2 py-3 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg group">
-                <div className="w-6 h-6 bg-gray-300 dark:bg-gray-600 rounded-md flex-shrink-0"></div>
-                <span className="ml-3 lg:block md:hidden block">{item}</span>
-              </a>
-            ))}
+            <nav className="flex-1 space-y-1 px-3">
+              {navItems.map((item) => {
+                const isActive = activeItem === item.name;
+                const Icon = item.icon;
+                return (
+                  <button 
+                    key={item.name} 
+                    onClick={() => { setActiveItem(item.name); setIsSidebarOpen(false); }}
+                    className={`w-full flex items-center px-3 py-2.5 text-sm font-medium rounded-md transition-colors group ${
+                      isActive 
+                        ? 'bg-brand/10 text-brand' 
+                        : 'text-text-muted hover:bg-surface-2 hover:text-text-primary'
+                    }`}
+                  >
+                    <Icon className={`flex-shrink-0 w-5 h-5 mr-3 ${isActive ? 'text-brand' : 'text-text-muted group-hover:text-text-primary'}`} aria-hidden="true" />
+                    {item.name}
+                  </button>
+                );
+              })}
+            </nav>
           </div>
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 overflow-y-auto w-full">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
-            
-            <div className="flex items-center justify-between mb-8">
-              <div className="flex items-center">
-                <button 
-                  onClick={() => setIsSidebarOpen(true)}
-                  className="md:hidden mr-4 text-gray-500 dark:text-gray-400"
-                >
-                  ☰
-                </button>
-                <h2 className="text-2xl font-bold leading-7 text-gray-900 dark:text-white sm:text-3xl sm:truncate">
-                  Batch Dashboard
-                </h2>
-              </div>
-              <button type="button" className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500">
-                New Batch
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+          
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8">
+            <div className="flex items-center mb-4 sm:mb-0">
+              <button 
+                onClick={() => setIsSidebarOpen(true)}
+                className="md:hidden mr-4 p-2 text-text-muted hover:bg-surface-2 rounded-md"
+                aria-label="Open sidebar"
+              >
+                <Menu className="w-5 h-5" aria-hidden="true" />
               </button>
+              <h1 className="text-2xl font-bold text-text-primary tracking-tight">Batch Overview</h1>
             </div>
+            <button type="button" className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-brand hover:bg-brand-hover focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand">
+              + New Batch
+            </button>
+          </div>
 
-            {/* KPI Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-              {['Total Batches: 1,245', 'Dispatched: 890', 'Pending QR: 355'].map((kpi, idx) => (
-                <div key={idx} className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
-                  <p className="text-gray-600 dark:text-gray-400 text-sm font-medium mb-1">{kpi.split(':')[0]}</p>
-                  <p className="text-3xl font-bold text-gray-900 dark:text-white">{kpi.split(':')[1]}</p>
-                </div>
-              ))}
+          {/* KPI Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div className="bg-surface p-6 rounded-xl shadow-sm border border-border">
+              <div className="flex items-center justify-between">
+                <p className="text-text-muted text-sm font-medium">Total Batches</p>
+                <Package className="w-5 h-5 text-text-muted" aria-hidden="true" />
+              </div>
+              <div className="mt-2 flex items-baseline">
+                <p className="text-3xl font-bold text-text-primary">1,245</p>
+                <span className="ml-2 text-sm font-medium text-success">+12%</span>
+              </div>
             </div>
-
-            {/* Responsive Table Area */}
-            <div className="bg-white dark:bg-gray-800 shadow overflow-hidden sm:rounded-md border border-gray-100 dark:border-gray-700">
-              
-              {/* Desktop/Tablet Table View */}
-              <div className="hidden md:block overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                  <thead className="bg-gray-50 dark:bg-gray-900">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Batch ID</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Product</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Date</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                    {batches.map((batch) => (
-                      <tr key={batch.id}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{batch.id}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{batch.product}</td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200">
-                            {batch.status}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{batch.date}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            
+            <div className="bg-surface p-6 rounded-xl shadow-sm border border-border">
+              <div className="flex items-center justify-between">
+                <p className="text-text-muted text-sm font-medium">Dispatched</p>
+                <Truck className="w-5 h-5 text-text-muted" aria-hidden="true" />
               </div>
-
-              {/* Mobile Card List View */}
-              <div className="block md:hidden">
-                <ul className="divide-y divide-gray-200 dark:divide-gray-700">
-                  {batches.map((batch) => (
-                    <li key={batch.id} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-sm font-bold text-gray-900 dark:text-white">{batch.id}</span>
-                        <span className="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200">
-                          {batch.status}
-                        </span>
-                      </div>
-                      <div className="text-sm text-gray-600 dark:text-gray-300">{batch.product}</div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">Date: {batch.date}</div>
-                    </li>
-                  ))}
-                </ul>
+              <div className="mt-2 flex items-baseline">
+                <p className="text-3xl font-bold text-text-primary">890</p>
+                <span className="ml-2 text-sm font-medium text-success">+5%</span>
               </div>
-
+            </div>
+            
+            <div className="bg-surface p-6 rounded-xl shadow-sm border border-border">
+              <div className="flex items-center justify-between">
+                <p className="text-text-muted text-sm font-medium">Pending QR</p>
+                <QrCode className="w-5 h-5 text-text-muted" aria-hidden="true" />
+              </div>
+              <div className="mt-2 flex items-baseline">
+                <p className="text-3xl font-bold text-text-primary">355</p>
+                <span className="ml-2 text-sm font-medium text-warning">-2%</span>
+              </div>
             </div>
           </div>
+
+          {/* Table */}
+          <div className="bg-surface shadow-sm rounded-xl border border-border overflow-hidden">
+            <div className="px-6 py-4 border-b border-border flex justify-between items-center bg-surface-2">
+              <h2 className="text-base font-semibold text-text-primary">Recent Activity</h2>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-border">
+                <thead className="bg-surface-2">
+                  <tr>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-text-muted uppercase tracking-wider">Batch ID</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-text-muted uppercase tracking-wider">Product</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-text-muted uppercase tracking-wider">Status</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-text-muted uppercase tracking-wider">Date</th>
+                    <th scope="col" className="relative px-6 py-3"><span className="sr-only">Actions</span></th>
+                  </tr>
+                </thead>
+                <tbody className="bg-surface divide-y divide-border">
+                  {batches.map((batch) => (
+                    <tr key={batch.id} className="hover:bg-surface-2 transition-colors cursor-pointer group">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-text-primary">{batch.id}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-text-muted">{batch.product}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <Badge variant={batch.status}>{batch.statusText}</Badge>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-text-muted">{batch.date}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <ChevronRight className="w-5 h-5 text-text-muted group-hover:text-brand transition-colors inline-block" aria-hidden="true" />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
         </main>
       </div>
-      
-      <Footer />
     </div>
   );
 }

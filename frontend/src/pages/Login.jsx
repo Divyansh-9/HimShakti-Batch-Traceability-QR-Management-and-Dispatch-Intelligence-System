@@ -1,63 +1,106 @@
+import { useState } from 'react';
 import Navbar from '../components/Navbar';
-import Footer from '../components/Footer';
+import Input from '../components/ui/Input';
+import Button from '../components/ui/Button';
 
 export default function Login() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleLogin = (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    // Simulate API call for phase 3 verification
+    setTimeout(() => {
+      setIsLoading(false);
+      window.location.href = '/dashboard';
+    }, 1000);
+  };
+
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
+    <div className="min-h-screen flex flex-col bg-background transition-colors">
       <Navbar />
       
-      <main className="flex-grow flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 w-full">
-        <div className="max-w-md w-full space-y-8 bg-white p-10 rounded-xl shadow border border-gray-100">
-          <div>
-            <h2 className="mt-2 text-center text-3xl font-extrabold text-gray-900">
-              Manager Login
-            </h2>
-            <p className="mt-2 text-center text-sm text-gray-600">
-              Sign in to access the traceability dashboard
-            </p>
-          </div>
-          <form className="mt-8 space-y-6" action="#" method="POST" onSubmit={(e) => e.preventDefault()}>
-            <input type="hidden" name="remember" defaultValue="true" />
-            <div className="rounded-md shadow-sm -space-y-px">
-              <div>
-                <label htmlFor="email-address" className="sr-only">Email address</label>
-                <input id="email-address" name="email" type="email" autoComplete="email" required className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-orange-500 focus:border-orange-500 focus:z-10 sm:text-sm" placeholder="Email address" />
-              </div>
-              <div>
-                <label htmlFor="password" className="sr-only">Password</label>
-                <input id="password" name="password" type="password" autoComplete="current-password" required className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-orange-500 focus:border-orange-500 focus:z-10 sm:text-sm" placeholder="Password" />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <input id="remember-me" name="remember-me" type="checkbox" className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded" />
-                <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">
-                  Remember me
-                </label>
-              </div>
-
-              <div className="text-sm">
-                <a href="#" className="font-medium text-orange-600 hover:text-orange-500">
-                  Forgot your password?
-                </a>
-              </div>
-            </div>
-
-            <div>
-              <button type="submit" className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500">
-                Sign in
-              </button>
+      <main className="flex-grow flex w-full">
+        {/* Left Side: Form */}
+        <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-12">
+          <div className="w-full max-w-md">
+            <div className="mb-10 text-center lg:text-left">
+              <h2 className="text-3xl font-extrabold text-text-primary tracking-tight">
+                Manager Login
+              </h2>
+              <p className="mt-3 text-text-muted">
+                Secure access to the traceability dashboard
+              </p>
             </div>
             
-            <div className="mt-4 text-center">
-              <p className="text-sm text-gray-500">[Authentication will be wired up to MongoDB backend in Phase 3]</p>
+            <form className="space-y-6" onSubmit={handleLogin}>
+              <div className="space-y-4">
+                <Input 
+                  id="email-address" 
+                  label="Email Address" 
+                  type="email" 
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="manager@himshakti.com" 
+                  required 
+                />
+                
+                <Input 
+                  id="password" 
+                  label="Password" 
+                  type="password" 
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••" 
+                  required 
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <input id="remember-me" name="remember-me" type="checkbox" className="h-4 w-4 text-brand focus:ring-brand border-border rounded bg-surface focus:outline-none focus:ring-2 focus:ring-offset-2" />
+                  <label htmlFor="remember-me" className="ml-2 block text-sm text-text-muted">
+                    Remember me
+                  </label>
+                </div>
+
+                <div className="text-sm">
+                  <a href="#" className="font-medium text-brand hover:text-brand-hover focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand rounded-sm">
+                    Forgot password?
+                  </a>
+                </div>
+              </div>
+
+              <div>
+                <Button type="submit" className="w-full" size="lg" isLoading={isLoading}>
+                  Sign in to Dashboard
+                </Button>
+              </div>
+              
+              <div className="mt-6 p-4 bg-surface-2 rounded-lg border border-border text-center">
+                <p className="text-sm text-text-muted">[Auth API integration scheduled for Phase 3]</p>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        {/* Right Side: Branded Panel (Hidden on Mobile/Tablet) */}
+        <div className="hidden lg:flex lg:w-1/2 bg-surface-2 border-l border-border relative overflow-hidden items-center justify-center">
+          <div className="absolute inset-0 bg-brand/5 backdrop-blur-3xl"></div>
+          
+          <div className="relative z-10 max-w-lg p-12 text-center">
+            <div className="w-24 h-24 bg-surface shadow-xl rounded-2xl mx-auto flex items-center justify-center mb-8 border border-border">
+              <span className="text-4xl">🏔️</span>
             </div>
-          </form>
+            <h3 className="text-2xl font-bold text-text-primary mb-4">Quality from the Himalayas</h3>
+            <p className="text-lg text-text-muted leading-relaxed">
+              Every jar of jam, every packet of salt. Verified and traced from our local farmers directly to your table.
+            </p>
+          </div>
         </div>
       </main>
-
-      <Footer />
     </div>
   );
 }

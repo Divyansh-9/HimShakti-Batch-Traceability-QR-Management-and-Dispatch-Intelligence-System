@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Button, Input, Modal, Toast, Loader } from '../components/ui';
 
 const ComponentShowcase = () => {
@@ -13,21 +13,21 @@ const ComponentShowcase = () => {
   };
 
   return (
-    <div className="min-h-screen p-8 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+    <div className="min-h-screen p-8 bg-blue-50 dark:bg-blue-900 text-blue-900 dark:text-blue-100">
       <div className="max-w-4xl mx-auto space-y-12">
         
         <div>
           <h1 className="text-3xl font-bold mb-2">UI Component Showcase</h1>
-          <p className="text-gray-500 dark:text-gray-400">Library of reusable components for HimShakti</p>
+          <p className="text-blue-500 dark:text-blue-400">Library of reusable components for HimShakti</p>
         </div>
 
         {/* Buttons */}
         <section className="space-y-4">
-          <h2 className="text-xl font-semibold border-b pb-2 border-gray-200 dark:border-gray-700">Buttons</h2>
+          <h2 className="text-xl font-semibold border-b pb-2 border-blue-200 dark:border-blue-700">Buttons</h2>
           
           <div className="space-y-4">
             <div>
-              <h3 className="text-sm font-medium mb-2 text-gray-500">Variants</h3>
+              <h3 className="text-sm font-medium mb-2 text-blue-500">Variants</h3>
               <div className="flex flex-wrap gap-4">
                 <Button variant="primary">Primary</Button>
                 <Button variant="secondary">Secondary</Button>
@@ -37,7 +37,7 @@ const ComponentShowcase = () => {
             </div>
             
             <div>
-              <h3 className="text-sm font-medium mb-2 text-gray-500">Sizes</h3>
+              <h3 className="text-sm font-medium mb-2 text-blue-500">Sizes</h3>
               <div className="flex flex-wrap items-center gap-4">
                 <Button size="sm">Small</Button>
                 <Button size="md">Medium</Button>
@@ -46,7 +46,7 @@ const ComponentShowcase = () => {
             </div>
 
             <div>
-              <h3 className="text-sm font-medium mb-2 text-gray-500">States</h3>
+              <h3 className="text-sm font-medium mb-2 text-blue-500">States</h3>
               <div className="flex flex-wrap gap-4">
                 <Button disabled>Disabled</Button>
                 <Button loading>Loading...</Button>
@@ -57,7 +57,7 @@ const ComponentShowcase = () => {
 
         {/* Inputs */}
         <section className="space-y-4">
-          <h2 className="text-xl font-semibold border-b pb-2 border-gray-200 dark:border-gray-700">Inputs</h2>
+          <h2 className="text-xl font-semibold border-b pb-2 border-blue-200 dark:border-blue-700">Inputs</h2>
           <div className="max-w-sm space-y-4">
             <Input 
               label="Standard Input" 
@@ -80,7 +80,7 @@ const ComponentShowcase = () => {
 
         {/* Modals & Toasts */}
         <section className="space-y-4">
-          <h2 className="text-xl font-semibold border-b pb-2 border-gray-200 dark:border-gray-700">Overlays (Modals & Toasts)</h2>
+          <h2 className="text-xl font-semibold border-b pb-2 border-blue-200 dark:border-blue-700">Overlays (Modals & Toasts)</h2>
           <div className="flex gap-4">
             <Button onClick={() => setIsModalOpen(true)}>Open Modal</Button>
             <Button variant="secondary" onClick={triggerToasts}>Trigger Toasts</Button>
@@ -103,12 +103,12 @@ const ComponentShowcase = () => {
 
         {/* Loaders */}
         <section className="space-y-4">
-          <h2 className="text-xl font-semibold border-b pb-2 border-gray-200 dark:border-gray-700">Loaders</h2>
+          <h2 className="text-xl font-semibold border-b pb-2 border-blue-200 dark:border-blue-700">Loaders</h2>
           
           <div className="space-y-8">
             <div>
-              <h3 className="text-sm font-medium mb-4 text-gray-500">Spinners</h3>
-              <div className="flex items-center gap-8 bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700">
+              <h3 className="text-sm font-medium mb-4 text-blue-500">Spinners</h3>
+              <div className="flex items-center gap-8 bg-white dark:bg-blue-800 p-6 rounded-lg border border-blue-200 dark:border-blue-700">
                 <Loader size="sm" />
                 <Loader size="md" />
                 <Loader size="lg" />
@@ -116,8 +116,8 @@ const ComponentShowcase = () => {
             </div>
 
             <div>
-              <h3 className="text-sm font-medium mb-4 text-gray-500">Table Skeleton</h3>
-              <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700">
+              <h3 className="text-sm font-medium mb-4 text-blue-500">Table Skeleton</h3>
+              <div className="bg-white dark:bg-blue-800 p-6 rounded-lg border border-blue-200 dark:border-blue-700">
                 <Loader skeleton />
               </div>
             </div>

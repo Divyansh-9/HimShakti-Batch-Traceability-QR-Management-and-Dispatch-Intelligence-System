@@ -14,6 +14,11 @@ npm install
 npm run dev
 ```
 
+### UI Features
+- **Responsive Dashboard Layout:** Adapts to mobile and desktop automatically.
+- **Dark/Light Mode:** Includes a fully animated toggle using `lucide-react` icons. User preferences are saved across sessions via `localStorage`.
+- **Custom Components Library:** Reusable, modern UI elements including interactive Modals and Toasts via `react-hot-toast`.
+
 ## Documentation Structure
 
 The documentation follows the Software Development Life Cycle (SDLC) process and is structured into the following phases:

@@ -1,53 +1,29 @@
-import React from 'react';
+import { forwardRef } from 'react';
 
 /**
- * Input Component
- * 
- * @param {Object} props
- * @param {string} [props.label]
- * @param {string} [props.placeholder]
- * @param {string} [props.type="text"]
- * @param {string|number} [props.value]
- * @param {Function} [props.onChange]
- * @param {string} [props.error]
- * @param {string} [props.className]
+ * @prop {string} id - Required for label association
+ * @prop {string} label - Input label
+ * @prop {string} [type] - "text", "email", "password", etc.
  */
-const Input = ({
-  label,
-  placeholder,
-  type = 'text',
-  value,
-  onChange,
-  error,
-  className = '',
-  ...props
-}) => {
-  const baseInputStyles = 'flex h-10 w-full rounded-md border bg-transparent px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:text-gray-100 dark:focus:ring-offset-gray-900';
-  const normalStyles = 'border-gray-300 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-700 dark:focus:border-blue-400 dark:focus:ring-blue-400';
-  const errorStyles = 'border-red-500 focus:border-red-500 focus:ring-red-500 dark:border-red-500 dark:focus:border-red-400 dark:focus:ring-red-400';
-
+const Input = forwardRef(({ id, label, type = 'text', className = '', error, ...props }, ref) => {
   return (
-    <div className={`flex flex-col gap-1.5 w-full ${className}`}>
+    <div className={`w-full ${className}`}>
       {label && (
-        <label className="text-sm font-medium leading-none text-gray-700 dark:text-gray-300">
+        <label htmlFor={id} className="block text-sm font-medium text-text-primary mb-1">
           {label}
         </label>
       )}
       <input
+        id={id}
         type={type}
-        className={`${baseInputStyles} ${error ? errorStyles : normalStyles}`}
-        placeholder={placeholder}
-        value={value}
-        onChange={onChange}
+        ref={ref}
+        className={`appearance-none block w-full px-3 py-2 border ${error ? 'border-error' : 'border-border'} rounded-md shadow-sm placeholder-text-muted text-text-primary bg-surface focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand sm:text-sm transition-colors`}
         {...props}
       />
-      {error && (
-        <span className="text-xs text-red-500 dark:text-red-400 mt-0.5">
-          {error}
-        </span>
-      )}
+      {error && <p className="mt-1 text-sm text-error">{error}</p>}
     </div>
   );
-};
+});
 
+Input.displayName = 'Input';
 export default Input;

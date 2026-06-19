@@ -1,43 +1,94 @@
-import { Link } from 'react-router-dom';
-import { useTheme } from '../hooks/useTheme';
+import { Link, useLocation } from 'react-router-dom';
+import ThemeToggle from './ThemeToggle';
+import { Menu, X } from 'lucide-react';
+import { useState } from 'react';
 
 export default function Navbar() {
-  const { theme, toggleTheme } = useTheme();
+  const [isOpen, setIsOpen] = useState(false);
+  const location = useLocation();
+
+  const links = [
+    { name: 'Home', path: '/' },
+    { name: 'About', path: '/about' },
+    { name: 'Dashboard', path: '/dashboard' },
+  ];
+
+  const isActive = (path) => location.pathname === path;
 
   return (
-    <nav className="bg-white dark:bg-gray-900 shadow-sm border-b border-gray-100 dark:border-gray-800 transition-colors">
+    <nav className="bg-surface/90 backdrop-blur-md border-b border-border sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16 items-center">
+        <div className="flex justify-between h-[72px] md:h-[72px] h-[60px] items-center">
           <div className="flex-shrink-0 flex items-center">
-            <Link to="/" className="text-2xl font-bold text-orange-600 dark:text-orange-500 tracking-tight">
-              HimShakti<span className="text-gray-800 dark:text-gray-200 text-lg font-medium ml-2">Traceability</span>
+            <Link to="/" className="text-2xl font-bold text-brand tracking-tight">
+              HimShakti<span className="text-text-primary text-lg font-medium ml-2">Traceability</span>
             </Link>
           </div>
-          <div className="hidden sm:ml-6 sm:flex sm:items-center sm:space-x-8">
-            <Link to="/" className="border-transparent text-gray-500 dark:text-gray-400 hover:border-orange-500 hover:text-gray-900 dark:hover:text-white inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-colors">
-              Home
-            </Link>
-            <Link to="/about" className="border-transparent text-gray-500 dark:text-gray-400 hover:border-orange-500 hover:text-gray-900 dark:hover:text-white inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-colors">
-              About
-            </Link>
-            <Link to="/dashboard" className="border-transparent text-gray-500 dark:text-gray-400 hover:border-orange-500 hover:text-gray-900 dark:hover:text-white inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-colors">
-              Dashboard
-            </Link>
-            <div className="flex items-center ml-4 space-x-4">
-              <button 
-                onClick={toggleTheme}
-                className="p-2 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500"
-                aria-label="Toggle Dark Mode"
+          
+          {/* Desktop Nav */}
+          <div className="hidden md:flex md:items-center md:space-x-8">
+            {links.map((link) => (
+              <Link 
+                key={link.name}
+                to={link.path} 
+                className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-colors h-[72px] ${
+                  isActive(link.path) 
+                    ? 'border-brand text-brand' 
+                    : 'border-transparent text-text-muted hover:border-border hover:text-text-primary'
+                }`}
               >
-                {theme === 'light' ? '🌙' : '☀️'}
-              </button>
-              <Link to="/login" className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-orange-600 hover:bg-orange-700 dark:hover:bg-orange-600 transition-colors">
+                {link.name}
+              </Link>
+            ))}
+            <div className="flex items-center ml-4 space-x-4 pl-4 border-l border-border">
+              <ThemeToggle />
+              <Link to="/login" className="inline-flex items-center justify-center font-medium rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand px-4 py-2 text-sm bg-brand text-white hover:bg-brand-hover">
+                Login
+              </Link>
+            </div>
+          </div>
+
+          {/* Mobile Menu Button */}
+          <div className="flex items-center md:hidden space-x-4">
+            <ThemeToggle />
+            <button
+              onClick={() => setIsOpen(!isOpen)}
+              className="text-text-muted hover:bg-surface-2 p-2 rounded-md transition-colors"
+              aria-label="Toggle menu"
+              aria-expanded={isOpen}
+            >
+              {isOpen ? <X className="w-6 h-6" aria-hidden="true" /> : <Menu className="w-6 h-6" aria-hidden="true" />}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile Drawer */}
+      {isOpen && (
+        <div className="md:hidden border-b border-border bg-surface shadow-lg">
+          <div className="pt-2 pb-4 space-y-1">
+            {links.map((link) => (
+              <Link
+                key={link.name}
+                to={link.path}
+                className={`block pl-3 pr-4 py-3 border-l-4 text-base font-medium ${
+                  isActive(link.path)
+                    ? 'bg-brand/10 border-brand text-brand'
+                    : 'border-transparent text-text-muted hover:bg-surface-2 hover:text-text-primary'
+                }`}
+                onClick={() => setIsOpen(false)}
+              >
+                {link.name}
+              </Link>
+            ))}
+            <div className="pt-4 pb-2 border-t border-border px-4">
+              <Link to="/login" className="w-full flex justify-center items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-brand hover:bg-brand-hover" onClick={() => setIsOpen(false)}>
                 Login
               </Link>
             </div>
           </div>
         </div>
-      </div>
+      )}
     </nav>
   );
 }
