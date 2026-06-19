@@ -1,6 +1,6 @@
 # HimShakti Batch Traceability, QR Management, and Dispatch Intelligence System
 
-![Deliverable 1 Complete](https://img.shields.io/badge/Status-Deliverable%201%20Complete-success)
+![Deliverable 2 Complete](https://img.shields.io/badge/Status-Deliverable%201%20Complete-success)
 
 This repository contains the documentation and phase-wise planning reports for the **Batch Traceability, QR Management, and Dispatch Intelligence System**, developed for HimShakti Food Processing.
 
