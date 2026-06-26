@@ -4,18 +4,29 @@ import Home from './pages/Home';
 import About from './pages/About';
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
+import TracePage from './pages/TracePage';
 import ComponentShowcase from './pages/ComponentShowcase';
+import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
   return (
     <>
-      <Toaster position="top-right" />
+      <Toaster position="top-right" toastOptions={{ duration: 3000 }} />
       <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/about" element={<About />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/showcase" element={<ComponentShowcase />} />
+        <Route path="/"          element={<Home />} />
+        <Route path="/about"     element={<About />} />
+        <Route path="/login"     element={<Login />} />
+        <Route path="/showcase"  element={<ComponentShowcase />} />
+
+        {/* Public QR trace page — no auth required */}
+        <Route path="/trace/:batchCode" element={<TracePage />} />
+
+        {/* Protected routes — must be logged in */}
+        <Route path="/dashboard" element={
+          <ProtectedRoute>
+            <Dashboard />
+          </ProtectedRoute>
+        } />
       </Routes>
     </>
   );

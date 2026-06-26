@@ -1,10 +1,11 @@
 # Phase 5 — Implementation Plan
 ## Batch Traceability, QR Management, and Dispatch Intelligence System
 **Project**: HimShakti Food Processing — Intern 2  
-**Version**: 1.0.0  
-**Date**: 2026-06-11  
+**Version**: 1.1.0  
+**Date**: 2026-06-25 *(Updated from 2026-06-11)*
 **Author**: Documentation Lead  
 **Timeline**: 6 Weeks (Standard Internship Window)
+**Status**: Week 4 Complete — Backend API Implemented
 
 ---
 
@@ -400,5 +401,64 @@ A feature is considered **Done** only when all of the following are true:
 | Planning Report | Business context, stakeholders, risks | `intern-2/planning_report.md` |
 | Final Project Report & System Design | Architecture, schemas, API design, AI flow | `final_project_report.md` |
 | Software Requirements Specification (SRS) | Functional and non-functional requirements | `intern-2/srs.md` |
-| Implementation Plan (this document) | Build timeline, task breakdown, testing | `intern-2/implementation_plan.md` |
+| Implementation Plan (this document) | Build timeline, task breakdown, testing | `intern-2/implementation_plan_Initial.md` |
 | User Guide | Manager-facing usage guide | `intern-2/user_guide.md` (to be created in Week 6) |
+
+---
+
+## 10. Actual Progress Log (Week 4 — 2026-06-25)
+
+### 10.1. Backend Implementation — Completed Files
+
+All 19 required backend source files have been implemented and committed.
+
+| File | Purpose | Status |
+| :--- | :--- | :--- |
+| `backend/server.js` | Express entry point, port 5001, all middleware and routes wired | ✅ Done |
+| `backend/.env` | 8 environment variables — all populated | ✅ Done |
+| `backend/.env.example` | Safe template for version control | ✅ Done |
+| `backend/.gitignore` | Excludes node_modules, .env, logs | ✅ Done |
+| `src/config/db.js` | MongoDB Atlas connection with error handling | ✅ Done |
+| `src/models/Batch.model.js` | Batch schema, 3 compound indexes | ✅ Done |
+| `src/models/ScanEvent.model.js` | ScanEvent schema, IP hash enforcement | ✅ Done |
+| `src/utils/productContract.js` | Asserts Intern 1 product contract fields | ✅ Done |
+| `src/services/expiryCalculator.js` | Predicted/fallback expiry, FEFO status | ✅ Done |
+| `src/utils/batchCodeGenerator.js` | Sequential HS-YYYY-MM-NNN code generator | ✅ Done |
+| `src/services/qrGenerator.js` | QR code → Base64 PNG via `qrcode` lib | ✅ Done |
+| `src/services/geminiService.js` | Gemini dispatch audit + 4hr in-memory cache | ✅ Done |
+| `src/middleware/errorHandler.js` | Centralized error responses | ✅ Done |
+| `src/middleware/rateLimiter.js` | API (100/15min) and AI (5/15min) rate limits | ✅ Done |
+| `src/middleware/auth.js` | JWT `protect()` guard + `generateToken()` | ✅ Done |
+| `src/controllers/products.controller.js` | Reads Intern 1's products — no writes | ✅ Done |
+| `src/controllers/batches.controller.js` | Full CRUD + dispatch recording | ✅ Done |
+| `src/controllers/dispatch.controller.js` | FEFO priority queue endpoint | ✅ Done |
+| `src/controllers/qr.controller.js` | Public trace page + async scan logging | ✅ Done |
+| `src/controllers/ai.controller.js` | Gemini audit trigger + cache response | ✅ Done |
+| `src/routes/*.routes.js` (×5) | All 5 route files wired to controllers | ✅ Done |
+| `src/scripts/seedTestBatch.js` | Dev utility to seed a batch for testing | ✅ Done |
+
+### 10.2. Blockers
+
+All blockers have been resolved as of 2026-06-25!
+
+| Blocker | Type | Action Required | Owner |
+| :--- | :--- | :--- | :--- |
+| ~~MongoDB Atlas IP not whitelisted~~ | Network | ~~Add `0.0.0.0/0` in Atlas → Security → Network Access~~ (✅ Resolved) | Intern 1 (cluster admin) |
+| ~~`products` seed data not confirmed~~ | Data | ~~Verify 5 product documents exist in `himshakti.products`~~ (✅ 5 items confirmed) | Intern 1 |
+| ~~`GEMINI_API_KEY` not set~~ | Config | ~~Obtain key from aistudio.google.com and add to `.env`~~ (✅ Set) | Intern 2 |
+
+### 10.3. Next Steps (Week 4 Remaining)
+
+- [x] Receive Atlas IP whitelist confirmation from Intern 1
+- [x] Run `npm run dev` and confirm `✅ MongoDB Atlas connected`
+- [ ] Execute Postman Tests 1–10 from Week 4 guide
+- [ ] Verify `batches` and `scanevents` collections in MongoDB Compass
+
+---
+
+## 11. Revision History
+
+| Version | Date | Author | Changes |
+| :--- | :--- | :--- | :--- |
+| 1.0.0 | 2026-06-11 | Documentation Lead | Initial 6-week implementation plan |
+| 1.1.0 | 2026-06-25 | Intern 2 | Added §10 actual progress log (Week 4 backend complete), §11 revision history. Updated header status. |

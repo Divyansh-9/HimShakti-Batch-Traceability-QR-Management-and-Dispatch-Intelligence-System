@@ -25,3 +25,7 @@ dist-ssr
 
 # Python Scripts
 *.py
+
+# env variables
+.env
+.env.*
