@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import CreateBatchModal from '../components/CreateBatchModal';
 import DispatchModal from '../components/DispatchModal';
@@ -92,7 +93,7 @@ const TAB_META = {
     dot:         'bg-teal-500',
     mainTint:    'bg-teal-500/[0.015]',
   },
-  requests: {
+  admin: {
     wash:        'bg-rose-500/[0.03]',
     border:      'border-rose-400/25',
     accentBar:   'bg-rose-500',
@@ -101,9 +102,9 @@ const TAB_META = {
     accentIcon:  'text-rose-400',
     image:       '/home-hero.png',
     icon:        ShieldCheck,
-    eyebrow:     'User Management',
-    title:       'Access Requests',
-    desc:        'Review and approve or reject pending access requests. Generate one-time invite links for approved users.',
+    eyebrow:     'System Administration',
+    title:       'Admin Panel',
+    desc:        'User roster, role assignments, and access request management. Full visibility into who can access what.',
     dot:         'bg-rose-500',
     mainTint:    'bg-rose-500/[0.015]',
   },
@@ -543,31 +544,76 @@ function AIAuditTab() {
   );
 }
 
-// ── Admin: Access Requests Tab ────────────────────────────────────
+// ── Admin Panel Tab (Users + Access Requests) ──────────────────
+
+const ROLE_STYLE = {
+  'admin':                  'bg-rose-500/10 text-rose-400 border-rose-500/20',
+  'manager':                'bg-brand/10 text-brand border-brand/20',
+  'factory-manager':        'bg-amber-500/10 text-amber-400 border-amber-500/20',
+  'quality-inspector':      'bg-teal-500/10 text-teal-400 border-teal-500/20',
+  'dispatch-coordinator':   'bg-blue-500/10 text-blue-400 border-blue-500/20',
+};
+const ROLE_LABEL = {
+  'admin':                  'Administrator',
+  'manager':                'Manager',
+  'factory-manager':        'Factory Mgr',
+  'quality-inspector':      'QA Inspector',
+  'dispatch-coordinator':   'Dispatch',
+};
 const STATUS_BADGE = {
   pending:  'bg-amber-500/10 text-amber-600 border-amber-500/20',
   approved: 'bg-green-500/10 text-green-600 border-green-500/20',
   rejected: 'bg-red-500/10  text-red-500  border-red-500/20',
 };
 
-function AccessRequestsTab() {
+function StatCard({ icon: Icon, label, value, sub, color }) {
+  return (
+    <div className={`bg-surface border border-border rounded-xl p-5 flex items-center gap-4`}>
+      <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${color}`}>
+        <Icon className="w-5 h-5" />
+      </div>
+      <div className="min-w-0">
+        <p className="text-2xl font-extrabold text-text-primary leading-none">{value}</p>
+        <p className="text-sm font-medium text-text-primary mt-0.5">{label}</p>
+        {sub && <p className="text-xs text-text-muted mt-0.5 truncate">{sub}</p>}
+      </div>
+    </div>
+  );
+}
+
+function AdminPanelTab() {
+  const [users,       setUsers]       = useState([]);
   const [requests,    setRequests]    = useState([]);
-  const [loading,     setLoading]     = useState(true);
+  const [stats,       setStats]       = useState(null);
+  const [loadingU,    setLoadingU]    = useState(true);
+  const [loadingR,    setLoadingR]    = useState(true);
   const [rejectId,    setRejectId]    = useState(null);
   const [rejectNote,  setRejectNote]  = useState('');
-  const [inviteLink,  setInviteLink]  = useState(null); // { link, name }
-  const [actionLoad,  setActionLoad]  = useState(null); // id of in-flight request
+  const [inviteLink,  setInviteLink]  = useState(null);
+  const [actionLoad,  setActionLoad]  = useState(null);
+  const [togglingId,  setTogglingId]  = useState(null);
+  const [activeView,  setActiveView]  = useState('users'); // 'users' | 'requests'
+
+  const fetchUsers = useCallback(async () => {
+    setLoadingU(true);
+    try {
+      const data = await client('/auth/users');
+      setUsers(data.data || []);
+      setStats(data.stats || null);
+    } catch { toast.error('Failed to load users'); }
+    finally { setLoadingU(false); }
+  }, []);
 
   const fetchRequests = useCallback(async () => {
-    setLoading(true);
+    setLoadingR(true);
     try {
       const data = await client('/auth/requests');
       setRequests(data.data || []);
     } catch { toast.error('Failed to load requests'); }
-    finally { setLoading(false); }
+    finally { setLoadingR(false); }
   }, []);
 
-  useEffect(() => { fetchRequests(); }, [fetchRequests]);
+  useEffect(() => { fetchUsers(); fetchRequests(); }, [fetchUsers, fetchRequests]);
 
   async function handleApprove(id, name) {
     setActionLoad(id);
@@ -576,6 +622,7 @@ function AccessRequestsTab() {
       setInviteLink({ link: data.inviteLink, name });
       toast.success('Request approved!');
       fetchRequests();
+      fetchUsers();
     } catch (err) { toast.error(err.message); }
     finally { setActionLoad(null); }
   }
@@ -594,22 +641,18 @@ function AccessRequestsTab() {
     finally { setActionLoad(null); }
   }
 
+  async function handleToggle(userId) {
+    setTogglingId(userId);
+    try {
+      const data = await client(`/auth/users/${userId}/toggle`, { method: 'PATCH' });
+      toast.success(data.message);
+      fetchUsers();
+    } catch (err) { toast.error(err.message); }
+    finally { setTogglingId(null); }
+  }
+
   const pending  = requests.filter(r => r.status === 'pending');
   const resolved = requests.filter(r => r.status !== 'pending');
-
-  if (loading) {
-    return (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {[...Array(3)].map((_, i) => (
-          <div key={i} className="bg-surface border border-border rounded-xl p-5 animate-pulse">
-            <div className="h-4 bg-surface-2 rounded w-1/2 mb-3" />
-            <div className="h-3 bg-surface-2 rounded w-3/4 mb-2" />
-            <div className="h-3 bg-surface-2 rounded w-1/3" />
-          </div>
-        ))}
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
@@ -629,8 +672,7 @@ function AccessRequestsTab() {
             </div>
             <div className="bg-surface-2 border border-border rounded-xl px-4 py-3 flex items-center gap-3 mb-4">
               <code className="text-xs text-text-muted flex-1 break-all leading-relaxed">{inviteLink.link}</code>
-              <button
-                onClick={() => { navigator.clipboard.writeText(inviteLink.link); toast.success('Copied!'); }}
+              <button onClick={() => { navigator.clipboard.writeText(inviteLink.link); toast.success('Copied!'); }}
                 className="flex-shrink-0 p-2 hover:bg-surface rounded-lg transition-colors text-brand">
                 <Copy className="w-4 h-4" />
               </button>
@@ -645,124 +687,263 @@ function AccessRequestsTab() {
                 <ExternalLink className="w-4 h-4" /> Open
               </button>
             </div>
-            <button onClick={() => setInviteLink(null)}
-              className="w-full mt-3 text-sm text-text-muted hover:text-text-primary transition-colors">
-              Close
-            </button>
+            <button onClick={() => setInviteLink(null)} className="w-full mt-3 text-sm text-text-muted hover:text-text-primary transition-colors">Close</button>
           </div>
         </div>
       )}
 
-      {/* Pending */}
-      <div>
-        <div className="flex items-center gap-2 mb-4">
-          <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-          <h3 className="text-sm font-bold text-text-primary uppercase tracking-wider">Pending ({pending.length})</h3>
+      {/* Stats Row */}
+      {stats && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatCard icon={Users}       label="Total Users"       value={stats.totalUsers}      sub={`${stats.activeUsers} active`}         color="bg-brand/10 text-brand" />
+          <StatCard icon={ShieldCheck} label="Pending Requests"  value={stats.pendingRequests} sub="awaiting review"                        color="bg-amber-500/10 text-amber-400" />
+          <StatCard icon={CheckCircle} label="Active Users"      value={stats.activeUsers}     sub="can log in"                             color="bg-green-500/10 text-green-400" />
+          <StatCard icon={Users}       label="Roles in Use"      value={Object.keys(stats.roleCounts).length} sub={Object.entries(stats.roleCounts).map(([r,c])=>`${c} ${ROLE_LABEL[r]||r}`).join(' · ')} color="bg-blue-500/10 text-blue-400" />
         </div>
-        {pending.length === 0 ? (
-          <div className="text-center py-12 bg-surface border border-border rounded-xl">
-            <Users className="w-10 h-10 text-text-muted/30 mx-auto mb-3" />
-            <p className="text-text-muted text-sm">No pending requests</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {pending.map(r => (
-              <div key={r._id} className="bg-surface border border-amber-400/25 border-l-4 border-l-amber-400 rounded-xl p-5">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="min-w-0">
-                    <p className="font-semibold text-text-primary truncate">{r.name}</p>
-                    <p className="text-text-muted text-xs truncate">{r.email}</p>
-                  </div>
-                  <span className={`ml-2 flex-shrink-0 px-2.5 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-wide ${STATUS_BADGE[r.status]}`}>
-                    {r.status}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 mb-4">
-                  <span className="px-2.5 py-1 bg-surface-2 border border-border rounded-lg text-xs text-text-muted font-medium">
-                    {r.role}
-                  </span>
-                  <span className="text-text-muted text-xs">
-                    {new Date(r.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                  </span>
-                </div>
+      )}
 
-                {rejectId === r._id ? (
-                  <div className="space-y-2">
-                    <textarea
-                      value={rejectNote}
-                      onChange={e => setRejectNote(e.target.value)}
-                      placeholder="Reason for rejection (optional)"
-                      rows={2}
-                      className="w-full px-3 py-2 text-xs bg-surface-2 border border-border rounded-lg text-text-primary placeholder:text-text-muted resize-none focus:outline-none focus:ring-2 focus:ring-red-400/30"
-                    />
-                    <div className="flex gap-2">
-                      <button onClick={() => handleReject(r._id)} disabled={actionLoad === r._id}
-                        className="flex-1 py-2 bg-red-500 hover:bg-red-600 text-white text-xs font-bold rounded-lg transition-all disabled:opacity-50">
-                        {actionLoad === r._id ? 'Rejecting…' : 'Confirm Reject'}
-                      </button>
-                      <button onClick={() => { setRejectId(null); setRejectNote(''); }}
-                        className="px-3 py-2 border border-border text-text-muted text-xs rounded-lg hover:bg-surface-2 transition-colors">
-                        Cancel
+      {/* Sub-nav */}
+      <div className="flex gap-1 bg-surface-2 border border-border p-1 rounded-xl w-fit">
+        {[
+          { id: 'users',    label: 'Users Roster',     icon: Users },
+          { id: 'requests', label: `Access Requests${pending.length ? ` (${pending.length})` : ''}`, icon: ShieldCheck },
+        ].map(v => (
+          <button key={v.id} onClick={() => setActiveView(v.id)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
+              activeView === v.id
+                ? 'bg-surface shadow text-text-primary'
+                : 'text-text-muted hover:text-text-primary'
+            }`}>
+            <v.icon className="w-3.5 h-3.5" />
+            {v.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── VIEW: Users Roster ── */}
+      {activeView === 'users' && (
+        <div>
+          {loadingU ? (
+            <div className="space-y-3">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="bg-surface border border-border rounded-xl p-4 animate-pulse flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-surface-2" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3 bg-surface-2 rounded w-1/3" />
+                    <div className="h-2.5 bg-surface-2 rounded w-1/4" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="bg-surface border border-border rounded-2xl overflow-hidden">
+              {/* Table Header */}
+              <div className="grid grid-cols-12 gap-3 px-5 py-3 bg-surface-2 border-b border-border text-[10px] font-bold uppercase tracking-widest text-text-muted">
+                <div className="col-span-4">User</div>
+                <div className="col-span-2">Username</div>
+                <div className="col-span-2">Role</div>
+                <div className="col-span-2">Joined</div>
+                <div className="col-span-1">Status</div>
+                <div className="col-span-1 text-right">Action</div>
+              </div>
+
+              {/* Table Rows */}
+              {users.length === 0 ? (
+                <div className="text-center py-12">
+                  <Users className="w-10 h-10 text-text-muted/30 mx-auto mb-3" />
+                  <p className="text-text-muted text-sm">No users found</p>
+                </div>
+              ) : (
+                users.map((u, i) => (
+                  <div key={u._id}
+                    className={`grid grid-cols-12 gap-3 px-5 py-3.5 items-center transition-colors hover:bg-surface-2/50 ${
+                      i < users.length - 1 ? 'border-b border-border' : ''
+                    }`}>
+
+                    {/* Name + email */}
+                    <div className="col-span-4 flex items-center gap-3 min-w-0">
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+                        ROLE_STYLE[u.role] || 'bg-surface-2 text-text-muted'
+                      }`}>
+                        {u.name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2)}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-text-primary truncate">{u.name}</p>
+                        <p className="text-xs text-text-muted truncate">{u.email || '—'}</p>
+                      </div>
+                    </div>
+
+                    {/* Username */}
+                    <div className="col-span-2">
+                      <span className="text-xs font-mono text-text-muted bg-surface-2 px-2 py-0.5 rounded">@{u.username}</span>
+                    </div>
+
+                    {/* Role badge */}
+                    <div className="col-span-2">
+                      <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide border ${
+                        ROLE_STYLE[u.role] || 'bg-surface-2 text-text-muted border-border'
+                      }`}>
+                        {ROLE_LABEL[u.role] || u.role}
+                      </span>
+                    </div>
+
+                    {/* Joined */}
+                    <div className="col-span-2">
+                      <p className="text-xs text-text-muted">
+                        {new Date(u.createdAt).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'2-digit' })}
+                      </p>
+                    </div>
+
+                    {/* Status */}
+                    <div className="col-span-1">
+                      <span className={`inline-flex items-center gap-1 text-[10px] font-bold ${
+                        u.isActive ? 'text-green-500' : 'text-text-muted'
+                      }`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${
+                          u.isActive ? 'bg-green-500' : 'bg-text-muted/40'
+                        }`} />
+                        {u.isActive ? 'Active' : 'Off'}
+                      </span>
+                    </div>
+
+                    {/* Toggle action */}
+                    <div className="col-span-1 flex justify-end">
+                      <button
+                        onClick={() => handleToggle(u._id)}
+                        disabled={togglingId === u._id}
+                        title={u.isActive ? 'Deactivate user' : 'Activate user'}
+                        className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold border transition-all disabled:opacity-40 ${
+                          u.isActive
+                            ? 'border-red-400/30 text-red-400 hover:bg-red-500/10'
+                            : 'border-green-500/30 text-green-500 hover:bg-green-500/10'
+                        }`}>
+                        {togglingId === u._id ? '…' : u.isActive ? 'Disable' : 'Enable'}
                       </button>
                     </div>
                   </div>
-                ) : (
-                  <div className="flex gap-2">
-                    <button onClick={() => handleApprove(r._id, r.name)} disabled={actionLoad === r._id}
-                      className="flex-1 py-2 bg-green-500 hover:bg-green-600 text-white text-xs font-bold rounded-lg transition-all disabled:opacity-50 flex items-center justify-center gap-1.5">
-                      <CheckCircle className="w-3.5 h-3.5" />
-                      {actionLoad === r._id ? 'Approving…' : 'Approve'}
-                    </button>
-                    <button onClick={() => setRejectId(r._id)}
-                      className="flex-1 py-2 border border-red-400/30 text-red-500 hover:bg-red-500/5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5">
-                      <XCircle className="w-3.5 h-3.5" /> Reject
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
-      {/* Resolved */}
-      {resolved.length > 0 && (
-        <div>
-          <p className="text-xs font-bold text-text-muted uppercase tracking-wider mb-3">History ({resolved.length})</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {resolved.map(r => (
-              <div key={r._id} className="bg-surface border border-border rounded-xl p-4">
-                <div className="flex items-center justify-between mb-1">
-                  <p className="text-sm font-semibold text-text-primary truncate">{r.name}</p>
-                  <span className={`ml-2 flex-shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold border ${STATUS_BADGE[r.status]}`}>
-                    {r.status}
-                  </span>
-                </div>
-                <p className="text-text-muted text-xs truncate mb-1">{r.email}</p>
-                {r.approvedBy && <p className="text-text-muted text-[10px]">By: {r.approvedBy}</p>}
-                {r.note && <p className="text-text-muted text-[10px] italic mt-1">"{r.note}"</p>}
+      {/* ── VIEW: Access Requests ── */}
+      {activeView === 'requests' && (
+        <div className="space-y-6">
+
+          {/* Pending */}
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+              <h3 className="text-sm font-bold text-text-primary uppercase tracking-wider">Pending ({pending.length})</h3>
+            </div>
+            {loadingR ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {[...Array(2)].map((_, i) => (
+                  <div key={i} className="bg-surface border border-border rounded-xl p-5 animate-pulse h-36" />
+                ))}
               </div>
-            ))}
+            ) : pending.length === 0 ? (
+              <div className="text-center py-12 bg-surface border border-border rounded-xl">
+                <CheckCircle className="w-10 h-10 text-green-400/40 mx-auto mb-3" />
+                <p className="text-text-muted text-sm font-medium">All caught up — no pending requests</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {pending.map(r => (
+                  <div key={r._id} className="bg-surface border border-amber-400/25 border-l-4 border-l-amber-400 rounded-xl p-5">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-text-primary truncate">{r.name}</p>
+                        <p className="text-text-muted text-xs truncate">{r.email}</p>
+                      </div>
+                      <span className={`ml-2 flex-shrink-0 px-2.5 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-wide ${STATUS_BADGE[r.status]}`}>
+                        {r.status}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 mb-4">
+                      <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border ${ROLE_STYLE[r.role] || 'bg-surface-2 text-text-muted border-border'}`}>
+                        {ROLE_LABEL[r.role] || r.role}
+                      </span>
+                      <span className="text-text-muted text-xs">
+                        {new Date(r.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </span>
+                    </div>
+                    {rejectId === r._id ? (
+                      <div className="space-y-2">
+                        <textarea value={rejectNote} onChange={e => setRejectNote(e.target.value)}
+                          placeholder="Reason for rejection (optional)" rows={2}
+                          className="w-full px-3 py-2 text-xs bg-surface-2 border border-border rounded-lg text-text-primary placeholder:text-text-muted resize-none focus:outline-none focus:ring-2 focus:ring-red-400/30"
+                        />
+                        <div className="flex gap-2">
+                          <button onClick={() => handleReject(r._id)} disabled={actionLoad === r._id}
+                            className="flex-1 py-2 bg-red-500 hover:bg-red-600 text-white text-xs font-bold rounded-lg transition-all disabled:opacity-50">
+                            {actionLoad === r._id ? 'Rejecting…' : 'Confirm Reject'}
+                          </button>
+                          <button onClick={() => { setRejectId(null); setRejectNote(''); }}
+                            className="px-3 py-2 border border-border text-text-muted text-xs rounded-lg hover:bg-surface-2 transition-colors">Cancel</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex gap-2">
+                        <button onClick={() => handleApprove(r._id, r.name)} disabled={actionLoad === r._id}
+                          className="flex-1 py-2 bg-green-500 hover:bg-green-600 text-white text-xs font-bold rounded-lg transition-all disabled:opacity-50 flex items-center justify-center gap-1.5">
+                          <CheckCircle className="w-3.5 h-3.5" />
+                          {actionLoad === r._id ? 'Approving…' : 'Approve'}
+                        </button>
+                        <button onClick={() => setRejectId(r._id)}
+                          className="flex-1 py-2 border border-red-400/30 text-red-500 hover:bg-red-500/5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5">
+                          <XCircle className="w-3.5 h-3.5" /> Reject
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
+
+          {/* History */}
+          {resolved.length > 0 && (
+            <div>
+              <p className="text-xs font-bold text-text-muted uppercase tracking-wider mb-3">History ({resolved.length})</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {resolved.map(r => (
+                  <div key={r._id} className="bg-surface border border-border rounded-xl p-4">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-sm font-semibold text-text-primary truncate">{r.name}</p>
+                      <span className={`ml-2 flex-shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold border ${STATUS_BADGE[r.status]}`}>{r.status}</span>
+                    </div>
+                    <p className="text-text-muted text-xs truncate mb-1">{r.email}</p>
+                    {r.approvedBy && <p className="text-text-muted text-[10px]">By: {r.approvedBy}</p>}
+                    {r.note && <p className="text-text-muted text-[10px] italic mt-1">"{r.note}"</p>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
   );
 }
 
-// ── Main Dashboard ──────────────────────────────────────────
+
 const NAV_TABS = [
-  { id: 'overview',  label: 'Overview',        icon: LayoutDashboard },
-  { id: 'batches',   label: 'Batches',         icon: Package },
-  { id: 'fefo',      label: 'FEFO Queue',      icon: Truck },
-  { id: 'qr',        label: 'QR Codes',        icon: QrCode },
-  { id: 'ai',        label: 'AI Audit',        icon: Bot },
-  { id: 'requests',  label: 'Access Requests', icon: ShieldCheck, adminOnly: true },
+  { id: 'overview',  label: 'Overview',      icon: LayoutDashboard },
+  { id: 'batches',   label: 'Batches',       icon: Package },
+  { id: 'fefo',      label: 'FEFO Queue',    icon: Truck },
+  { id: 'qr',        label: 'QR Codes',      icon: QrCode },
+  { id: 'ai',        label: 'AI Audit',      icon: Bot },
+  { id: 'admin',     label: 'Admin Panel',   icon: ShieldCheck, adminOnly: true },
 ];
 
 
 export default function Dashboard() {
-  const [activeTab, setActiveTab]           = useState('overview');
+  const { id: tabParam } = Object.fromEntries(new URLSearchParams(window.location.search));
+  const [activeTab, setActiveTab]           = useState(tabParam || 'overview');
+
   const [isSidebarOpen, setIsSidebarOpen]   = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [batchToDispatch, setBatchToDispatch] = useState(null);
@@ -770,8 +951,9 @@ export default function Dashboard() {
   const user                                  = getUser(); // { username, name, role }
   const { batches, loading, createBatch, downloadQR, dispatchBatch } = useBatches();
 
-  // Filter NAV_TABS — requests tab only visible to admin
+  // Filter NAV_TABS — admin tab only visible to admin role
   const visibleTabs = NAV_TABS.filter(t => !t.adminOnly || user?.role === 'admin');
+
 
 
   async function handleCreateBatch(payload) {
@@ -934,10 +1116,10 @@ export default function Dashboard() {
                 <AIAuditTab />
               </>
             )}
-            {activeTab === 'requests' && (
+            {activeTab === 'admin' && (
               <>
-                <TabBanner tabId="requests" />
-                <AccessRequestsTab />
+                <TabBanner tabId="admin" />
+                <AdminPanelTab />
               </>
             )}
           </div>

@@ -205,4 +205,64 @@ async function activate(req, res, next) {
   }
 }
 
-module.exports = { login, requestAccess, listRequests, approve, reject, activate };
+// ─────────────────────────────────────────────────────────────────
+// GET /auth/users  [admin only]
+// Returns all registered users (no passwordHash) + summary stats.
+// ─────────────────────────────────────────────────────────────────
+async function listUsers(req, res, next) {
+  try {
+    const users = await User.find()
+      .select('-passwordHash')
+      .sort({ createdAt: -1 });
+
+    // Role distribution for the admin stats panel
+    const roleCounts = users.reduce((acc, u) => {
+      acc[u.role] = (acc[u.role] || 0) + 1;
+      return acc;
+    }, {});
+
+    // Pending request count
+    const pendingCount = await AccessRequest.countDocuments({ status: 'pending' });
+
+    return res.json({
+      success: true,
+      count:   users.length,
+      stats: {
+        totalUsers:    users.length,
+        activeUsers:   users.filter(u => u.isActive).length,
+        pendingRequests: pendingCount,
+        roleCounts,
+      },
+      data: users,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// PATCH /auth/users/:id/toggle  [admin only]
+// Activate or deactivate a user account.
+// ─────────────────────────────────────────────────────────────────
+async function toggleUserStatus(req, res, next) {
+  try {
+    const user = await User.findById(req.params.id).select('-passwordHash');
+    if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+    // Prevent admin from deactivating themselves
+    if (user.username === req.user.username) {
+      return res.status(400).json({ success: false, error: 'You cannot deactivate your own account' });
+    }
+    user.isActive = !user.isActive;
+    await user.save();
+    return res.json({
+      success:  true,
+      message:  `User ${user.username} is now ${user.isActive ? 'active' : 'inactive'}`,
+      isActive: user.isActive,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { login, requestAccess, listRequests, approve, reject, activate, listUsers, toggleUserStatus };
+

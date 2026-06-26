@@ -9,8 +9,11 @@ router.post('/request-access', ctrl.requestAccess);
 router.post('/activate',       ctrl.activate);
 
 // Admin only
-router.get( '/requests',             protect, requireAdmin, ctrl.listRequests);
-router.post('/requests/:id/approve', protect, requireAdmin, ctrl.approve);
-router.post('/requests/:id/reject',  protect, requireAdmin, ctrl.reject);
+router.get( '/requests',              protect, requireAdmin, ctrl.listRequests);
+router.post('/requests/:id/approve',  protect, requireAdmin, ctrl.approve);
+router.post('/requests/:id/reject',   protect, requireAdmin, ctrl.reject);
+router.get( '/users',                 protect, requireAdmin, ctrl.listUsers);
+router.patch('/users/:id/toggle',     protect, requireAdmin, ctrl.toggleUserStatus);
 
 module.exports = router;
+

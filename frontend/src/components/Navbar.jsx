@@ -177,7 +177,7 @@ export default function Navbar() {
                     {user?.role === 'admin' && (
                       <button
                         className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm text-text-muted hover:bg-surface-2 hover:text-text-primary transition-colors"
-                        onClick={() => setUserMenuOpen(false)}
+                        onClick={() => { navigate('/dashboard?tab=admin'); setUserMenuOpen(false); }}
                       >
                         <Shield className="w-4 h-4 text-rose-400" />
                         Admin Panel
