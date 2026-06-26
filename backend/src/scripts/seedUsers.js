@@ -12,8 +12,8 @@ async function seedUsers() {
     return;
   }
 
-  const adminPw   = process.env.SEED_ADMIN_PASSWORD   || 'himshakti_admin_2026';
-  const managerPw = process.env.SEED_MANAGER_PASSWORD || 'himshakti2026';
+  const adminPw   = process.env.SEED_ADMIN_PASSWORD;
+  const managerPw = process.env.SEED_MANAGER_PASSWORD;
 
   await User.insertMany([
     {
