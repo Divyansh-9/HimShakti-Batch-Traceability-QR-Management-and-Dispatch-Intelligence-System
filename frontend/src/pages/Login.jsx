@@ -94,20 +94,25 @@ function RoleSelector({ value, onChange }) {
 
 // ── Request Access Form ───────────────────────────────────────
 function RequestAccessForm() {
-  const [form, setForm]         = useState({ name: '', email: '', role: 'factory-manager' });
-  const [submitted, setSubmitted] = useState(false);
-  const [loading, setLoading]   = useState(false);
+  const { requestAccess, loading } = useAuth();
+  const [form, setForm]            = useState({ name: '', email: '', role: 'factory-manager' });
+  const [submitted, setSubmitted]  = useState(false);
+  const [serverError, setServerError] = useState('');
 
   const onChange = e => setForm(p => ({ ...p, [e.target.name]: e.target.value }));
 
   async function handleSubmit(e) {
     e.preventDefault();
+    setServerError('');
     if (!form.name.trim() || !form.email.trim()) { toast.error('Please fill all fields'); return; }
-    setLoading(true);
-    await new Promise(r => setTimeout(r, 1200));
-    setLoading(false);
-    setSubmitted(true);
-    toast.success('Request submitted!');
+
+    const result = await requestAccess(form);
+    if (result.success) {
+      setSubmitted(true);
+      toast.success('Request submitted!');
+    } else {
+      setServerError(result.error || 'Something went wrong. Please try again.');
+    }
   }
 
   if (submitted) {
@@ -121,7 +126,8 @@ function RequestAccessForm() {
           The admin team will review your request and send credentials to{' '}
           <strong className="text-white/80">{form.email}</strong> within 1–2 business days.
         </p>
-        <button onClick={() => setSubmitted(false)} className="mt-5 text-sm text-white/60 hover:text-white underline">
+        <button onClick={() => { setSubmitted(false); setForm({ name: '', email: '', role: 'factory-manager' }); }}
+          className="mt-5 text-sm text-white/60 hover:text-white underline">
           Submit another
         </button>
       </div>
@@ -130,14 +136,22 @@ function RequestAccessForm() {
 
   return (
     <form className="space-y-4" onSubmit={handleSubmit}>
-      <GlassInput id="req-name" label="Full Name" value={form.name} onChange={e => onChange({ target: { name: 'name', value: e.target.value } })} placeholder="e.g. Ramesh Kumar" required />
-      <GlassInput id="req-email" label="Work Email" type="email" value={form.email} onChange={e => onChange({ target: { name: 'email', value: e.target.value } })} placeholder="you@himshakti.com" required />
+      <GlassInput id="req-name" label="Full Name" value={form.name}
+        onChange={e => onChange({ target: { name: 'name', value: e.target.value } })}
+        placeholder="e.g. Ramesh Kumar" required />
+      <GlassInput id="req-email" label="Work Email" type="email" value={form.email}
+        onChange={e => onChange({ target: { name: 'email', value: e.target.value } })}
+        placeholder="you@himshakti.com" required />
       <RoleSelector value={form.role} onChange={role => setForm(p => ({ ...p, role }))} />
-      <button
-        type="submit"
-        disabled={loading}
-        className="w-full py-3 bg-brand hover:bg-brand-hover text-white font-bold rounded-xl transition-all duration-200 hover:-translate-y-0.5 shadow-lg shadow-brand/30 disabled:opacity-50 disabled:cursor-not-allowed mt-1"
-      >
+
+      {serverError && (
+        <p className="text-red-300 text-xs bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+          {serverError}
+        </p>
+      )}
+
+      <button type="submit" disabled={loading}
+        className="w-full py-3 bg-brand hover:bg-brand-hover text-white font-bold rounded-xl transition-all duration-200 hover:-translate-y-0.5 shadow-lg shadow-brand/30 disabled:opacity-50 disabled:cursor-not-allowed mt-1">
         {loading ? 'Submitting…' : 'Submit Access Request'}
       </button>
       <p className="text-xs text-white/40 text-center">Credentials will be sent to your email within 1–2 business days.</p>

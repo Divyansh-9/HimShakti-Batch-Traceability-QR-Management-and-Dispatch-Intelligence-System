@@ -12,7 +12,7 @@ const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001';
 async function client(path, options = {}) {
   const { skipAuthRedirect = false, ...fetchOptions } = options;
 
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem('hs_token');
 
   const headers = {
     'Content-Type': 'application/json',
@@ -27,7 +27,7 @@ async function client(path, options = {}) {
 
   // Global 401 handler — skip for public pages (e.g. TracePage)
   if (res.status === 401 && !skipAuthRedirect) {
-    localStorage.removeItem('token');
+    localStorage.removeItem('hs_token');
     window.location.href = '/login';
     return;
   }

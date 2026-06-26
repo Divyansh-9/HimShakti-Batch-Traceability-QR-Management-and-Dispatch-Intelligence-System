@@ -13,12 +13,12 @@ function isTokenValid(token) {
 }
 
 export default function ProtectedRoute({ children }) {
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem('hs_token');
 
   if (!token || !isTokenValid(token)) {
-    // Clear any stale / expired token so next login starts fresh
-    localStorage.removeItem('token');
+    localStorage.removeItem('hs_token');
     return <Navigate to="/login" replace />;
+
   }
 
   return children;

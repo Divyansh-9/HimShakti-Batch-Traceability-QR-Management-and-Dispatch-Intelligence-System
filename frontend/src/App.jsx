@@ -5,8 +5,10 @@ import About from './pages/About';
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import TracePage from './pages/TracePage';
+import InvitePage from './pages/InvitePage';
 import ComponentShowcase from './pages/ComponentShowcase';
 import ProtectedRoute from './components/ProtectedRoute';
+
 
 function App() {
   return (
@@ -20,6 +22,10 @@ function App() {
 
         {/* Public QR trace page — no auth required */}
         <Route path="/trace/:batchCode" element={<TracePage />} />
+
+        {/* Invite page — new user sets their password via invite link */}
+        <Route path="/invite" element={<InvitePage />} />
+
 
         {/* Protected routes — must be logged in */}
         <Route path="/dashboard" element={

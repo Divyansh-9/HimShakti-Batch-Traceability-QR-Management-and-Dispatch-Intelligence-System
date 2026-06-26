@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Navbar from '../components/Navbar';
 import CreateBatchModal from '../components/CreateBatchModal';
 import DispatchModal from '../components/DispatchModal';
@@ -7,10 +7,13 @@ import { useDispatch } from '../hooks/useDispatch';
 import { useAIAudit } from '../hooks/useAIAudit';
 import { useAuth } from '../hooks/useAuth';
 import toast from 'react-hot-toast';
+import client from '../api/client';
 import {
   Package, Truck, QrCode, LayoutDashboard, Bot,
-  LogOut, Download, AlertTriangle, CheckCircle, Clock, RefreshCw, Menu, Search, InboxIcon, Leaf, Plus
+  LogOut, Download, AlertTriangle, CheckCircle, Clock, RefreshCw, Menu, Search, InboxIcon, Leaf, Plus,
+  ShieldCheck, Users, XCircle, Copy, ExternalLink, ChevronDown
 } from 'lucide-react';
+
 
 // ── Tab metadata ───────────────────────────────────────────────────
 const TAB_META = {
@@ -88,6 +91,21 @@ const TAB_META = {
     desc:        'Gemini 2.5 Flash analyses live inventory and recommends exact dispatch order, risk flags, and notes. Cached 4 hours.',
     dot:         'bg-teal-500',
     mainTint:    'bg-teal-500/[0.015]',
+  },
+  requests: {
+    wash:        'bg-rose-500/[0.03]',
+    border:      'border-rose-400/25',
+    accentBar:   'bg-rose-500',
+    accentText:  'text-rose-700',
+    accentLight: 'text-rose-300',
+    accentIcon:  'text-rose-400',
+    image:       '/home-hero.png',
+    icon:        ShieldCheck,
+    eyebrow:     'User Management',
+    title:       'Access Requests',
+    desc:        'Review and approve or reject pending access requests. Generate one-time invite links for approved users.',
+    dot:         'bg-rose-500',
+    mainTint:    'bg-rose-500/[0.015]',
   },
 };
 
@@ -525,22 +543,236 @@ function AIAuditTab() {
   );
 }
 
+// ── Admin: Access Requests Tab ────────────────────────────────────
+const STATUS_BADGE = {
+  pending:  'bg-amber-500/10 text-amber-600 border-amber-500/20',
+  approved: 'bg-green-500/10 text-green-600 border-green-500/20',
+  rejected: 'bg-red-500/10  text-red-500  border-red-500/20',
+};
+
+function AccessRequestsTab() {
+  const [requests,    setRequests]    = useState([]);
+  const [loading,     setLoading]     = useState(true);
+  const [rejectId,    setRejectId]    = useState(null);
+  const [rejectNote,  setRejectNote]  = useState('');
+  const [inviteLink,  setInviteLink]  = useState(null); // { link, name }
+  const [actionLoad,  setActionLoad]  = useState(null); // id of in-flight request
+
+  const fetchRequests = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await client('/auth/requests');
+      setRequests(data.data || []);
+    } catch { toast.error('Failed to load requests'); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { fetchRequests(); }, [fetchRequests]);
+
+  async function handleApprove(id, name) {
+    setActionLoad(id);
+    try {
+      const data = await client(`/auth/requests/${id}/approve`, { method: 'POST' });
+      setInviteLink({ link: data.inviteLink, name });
+      toast.success('Request approved!');
+      fetchRequests();
+    } catch (err) { toast.error(err.message); }
+    finally { setActionLoad(null); }
+  }
+
+  async function handleReject(id) {
+    setActionLoad(id);
+    try {
+      await client(`/auth/requests/${id}/reject`, {
+        method: 'POST',
+        body:   JSON.stringify({ note: rejectNote }),
+      });
+      toast.success('Request rejected.');
+      setRejectId(null); setRejectNote('');
+      fetchRequests();
+    } catch (err) { toast.error(err.message); }
+    finally { setActionLoad(null); }
+  }
+
+  const pending  = requests.filter(r => r.status === 'pending');
+  const resolved = requests.filter(r => r.status !== 'pending');
+
+  if (loading) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {[...Array(3)].map((_, i) => (
+          <div key={i} className="bg-surface border border-border rounded-xl p-5 animate-pulse">
+            <div className="h-4 bg-surface-2 rounded w-1/2 mb-3" />
+            <div className="h-3 bg-surface-2 rounded w-3/4 mb-2" />
+            <div className="h-3 bg-surface-2 rounded w-1/3" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+
+      {/* Invite Link Modal */}
+      {inviteLink && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setInviteLink(null)}>
+          <div className="bg-surface border border-border rounded-2xl p-7 shadow-2xl max-w-lg w-full mx-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-green-500/10 border border-green-500/20 rounded-xl flex items-center justify-center">
+                <CheckCircle className="w-5 h-5 text-green-500" />
+              </div>
+              <div>
+                <h3 className="font-bold text-text-primary">Invite Link Ready</h3>
+                <p className="text-text-muted text-sm">For {inviteLink.name} — expires in 48 hours</p>
+              </div>
+            </div>
+            <div className="bg-surface-2 border border-border rounded-xl px-4 py-3 flex items-center gap-3 mb-4">
+              <code className="text-xs text-text-muted flex-1 break-all leading-relaxed">{inviteLink.link}</code>
+              <button
+                onClick={() => { navigator.clipboard.writeText(inviteLink.link); toast.success('Copied!'); }}
+                className="flex-shrink-0 p-2 hover:bg-surface rounded-lg transition-colors text-brand">
+                <Copy className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => { navigator.clipboard.writeText(inviteLink.link); toast.success('Copied!'); }}
+                className="flex-1 py-2.5 bg-brand hover:bg-brand-hover text-white text-sm font-bold rounded-xl transition-all flex items-center justify-center gap-2">
+                <Copy className="w-4 h-4" /> Copy Link
+              </button>
+              <button onClick={() => window.open(inviteLink.link, '_blank')}
+                className="flex-1 py-2.5 border border-border text-text-muted hover:text-text-primary text-sm font-medium rounded-xl transition-all flex items-center justify-center gap-2">
+                <ExternalLink className="w-4 h-4" /> Open
+              </button>
+            </div>
+            <button onClick={() => setInviteLink(null)}
+              className="w-full mt-3 text-sm text-text-muted hover:text-text-primary transition-colors">
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Pending */}
+      <div>
+        <div className="flex items-center gap-2 mb-4">
+          <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+          <h3 className="text-sm font-bold text-text-primary uppercase tracking-wider">Pending ({pending.length})</h3>
+        </div>
+        {pending.length === 0 ? (
+          <div className="text-center py-12 bg-surface border border-border rounded-xl">
+            <Users className="w-10 h-10 text-text-muted/30 mx-auto mb-3" />
+            <p className="text-text-muted text-sm">No pending requests</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {pending.map(r => (
+              <div key={r._id} className="bg-surface border border-amber-400/25 border-l-4 border-l-amber-400 rounded-xl p-5">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-text-primary truncate">{r.name}</p>
+                    <p className="text-text-muted text-xs truncate">{r.email}</p>
+                  </div>
+                  <span className={`ml-2 flex-shrink-0 px-2.5 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-wide ${STATUS_BADGE[r.status]}`}>
+                    {r.status}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="px-2.5 py-1 bg-surface-2 border border-border rounded-lg text-xs text-text-muted font-medium">
+                    {r.role}
+                  </span>
+                  <span className="text-text-muted text-xs">
+                    {new Date(r.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </span>
+                </div>
+
+                {rejectId === r._id ? (
+                  <div className="space-y-2">
+                    <textarea
+                      value={rejectNote}
+                      onChange={e => setRejectNote(e.target.value)}
+                      placeholder="Reason for rejection (optional)"
+                      rows={2}
+                      className="w-full px-3 py-2 text-xs bg-surface-2 border border-border rounded-lg text-text-primary placeholder:text-text-muted resize-none focus:outline-none focus:ring-2 focus:ring-red-400/30"
+                    />
+                    <div className="flex gap-2">
+                      <button onClick={() => handleReject(r._id)} disabled={actionLoad === r._id}
+                        className="flex-1 py-2 bg-red-500 hover:bg-red-600 text-white text-xs font-bold rounded-lg transition-all disabled:opacity-50">
+                        {actionLoad === r._id ? 'Rejecting…' : 'Confirm Reject'}
+                      </button>
+                      <button onClick={() => { setRejectId(null); setRejectNote(''); }}
+                        className="px-3 py-2 border border-border text-text-muted text-xs rounded-lg hover:bg-surface-2 transition-colors">
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <button onClick={() => handleApprove(r._id, r.name)} disabled={actionLoad === r._id}
+                      className="flex-1 py-2 bg-green-500 hover:bg-green-600 text-white text-xs font-bold rounded-lg transition-all disabled:opacity-50 flex items-center justify-center gap-1.5">
+                      <CheckCircle className="w-3.5 h-3.5" />
+                      {actionLoad === r._id ? 'Approving…' : 'Approve'}
+                    </button>
+                    <button onClick={() => setRejectId(r._id)}
+                      className="flex-1 py-2 border border-red-400/30 text-red-500 hover:bg-red-500/5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5">
+                      <XCircle className="w-3.5 h-3.5" /> Reject
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Resolved */}
+      {resolved.length > 0 && (
+        <div>
+          <p className="text-xs font-bold text-text-muted uppercase tracking-wider mb-3">History ({resolved.length})</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {resolved.map(r => (
+              <div key={r._id} className="bg-surface border border-border rounded-xl p-4">
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-sm font-semibold text-text-primary truncate">{r.name}</p>
+                  <span className={`ml-2 flex-shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold border ${STATUS_BADGE[r.status]}`}>
+                    {r.status}
+                  </span>
+                </div>
+                <p className="text-text-muted text-xs truncate mb-1">{r.email}</p>
+                {r.approvedBy && <p className="text-text-muted text-[10px]">By: {r.approvedBy}</p>}
+                {r.note && <p className="text-text-muted text-[10px] italic mt-1">"{r.note}"</p>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main Dashboard ──────────────────────────────────────────
 const NAV_TABS = [
-  { id: 'overview',  label: 'Overview',  icon: LayoutDashboard },
-  { id: 'batches',   label: 'Batches',   icon: Package },
-  { id: 'fefo',      label: 'FEFO Queue',icon: Truck },
-  { id: 'qr',        label: 'QR Codes',  icon: QrCode },
-  { id: 'ai',        label: 'AI Audit',  icon: Bot },
+  { id: 'overview',  label: 'Overview',        icon: LayoutDashboard },
+  { id: 'batches',   label: 'Batches',         icon: Package },
+  { id: 'fefo',      label: 'FEFO Queue',      icon: Truck },
+  { id: 'qr',        label: 'QR Codes',        icon: QrCode },
+  { id: 'ai',        label: 'AI Audit',        icon: Bot },
+  { id: 'requests',  label: 'Access Requests', icon: ShieldCheck, adminOnly: true },
 ];
+
 
 export default function Dashboard() {
   const [activeTab, setActiveTab]           = useState('overview');
   const [isSidebarOpen, setIsSidebarOpen]   = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [batchToDispatch, setBatchToDispatch] = useState(null); // DispatchModal state
-  const { logout }                            = useAuth();
+  const [batchToDispatch, setBatchToDispatch] = useState(null);
+  const { logout, getUser }                   = useAuth();
+  const user                                  = getUser(); // { username, name, role }
   const { batches, loading, createBatch, downloadQR, dispatchBatch } = useBatches();
+
+  // Filter NAV_TABS — requests tab only visible to admin
+  const visibleTabs = NAV_TABS.filter(t => !t.adminOnly || user?.role === 'admin');
+
 
   async function handleCreateBatch(payload) {
     await createBatch(payload);
@@ -615,7 +847,7 @@ export default function Dashboard() {
             {/* Nav */}
             <nav className="flex-1 space-y-0.5 px-3">
               <p className="text-white/25 text-[9px] font-bold uppercase tracking-widest px-2 mb-2">Navigation</p>
-              {NAV_TABS.map(tab => {
+              {visibleTabs.map(tab => {
                 const Icon = tab.icon;
                 const isActive = activeTab === tab.id;
                 const meta = TAB_META[tab.id];
@@ -700,6 +932,12 @@ export default function Dashboard() {
               <>
                 <TabBanner tabId="ai" />
                 <AIAuditTab />
+              </>
+            )}
+            {activeTab === 'requests' && (
+              <>
+                <TabBanner tabId="requests" />
+                <AccessRequestsTab />
               </>
             )}
           </div>
