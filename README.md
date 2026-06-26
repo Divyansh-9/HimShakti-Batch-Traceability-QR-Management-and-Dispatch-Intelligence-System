@@ -23,8 +23,8 @@ A full-stack batch traceability platform for **HimShakti Food Processing, Uttara
 │                    MongoDB Atlas — himshakti DB                    │
 │                                                                    │
 │  ┌──────────────────┐         ┌───────────────────────────────┐   │
-│  │  products        │──READ──▶│  batches  (Intern 2 owns)     │   │
-│  │  (Intern 1 owns) │         │  batchCode, packDate,         │   │
+│  │  products        │──READ──▶│  batches  (Intern  owns)     │   │
+│  │  (Intern   owns) │         │  batchCode, packDate,         │   │
 │  │  5 items seeded  │         │  expiryDate, QR, farmer, FEFO │   │
 │  └──────────────────┘         └────────────────┬──────────────┘   │
 │                                                │                  │
