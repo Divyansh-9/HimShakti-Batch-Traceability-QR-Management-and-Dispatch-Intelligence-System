@@ -14,6 +14,10 @@ async function seedUsers() {
 
   const adminPw   = process.env.SEED_ADMIN_PASSWORD;
   const managerPw = process.env.SEED_MANAGER_PASSWORD;
+  if (!adminPw || !managerPw) {
+  console.error('❌ Set SEED_ADMIN_PASSWORD and SEED_MANAGER_PASSWORD in .env');
+  return;
+}
 
   await User.insertMany([
     {
