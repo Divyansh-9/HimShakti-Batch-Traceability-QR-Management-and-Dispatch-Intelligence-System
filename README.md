@@ -30,7 +30,7 @@ A full-stack batch traceability platform for **HimShakti Food Processing, Uttara
 │                                                │                  │
 │                                                ▼                  │
 │                               ┌───────────────────────────────┐   │
-│                               │  scanEvents  (Intern 2 owns)  │   │
+│                               │  scanEvents  (Intern   owns)  │   │
 │                               │  QR scan logs, device,        │   │
 │                               │  ipHash, source               │   │
 │                               └───────────────────────────────┘   │
