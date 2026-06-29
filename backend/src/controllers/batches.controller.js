@@ -56,6 +56,10 @@ async function createBatch(req, res, next) {
       createdBy: req.user?.name || 'manager'
     });
 
+    // Emit real-time event so all connected dashboards update immediately
+    const io = req.app.get('io');
+    if (io) io.emit('batch:created', { ...batch.toObject(), daysUntilExpiry });
+
     res.status(201).json({
       success: true,
       message: `Batch ${batchCode} created successfully`,
@@ -110,6 +114,11 @@ async function recordDispatch(req, res, next) {
       { new: true, runValidators: true }
     );
     if (!batch) return res.status(404).json({ success: false, error: 'Batch not found' });
+
+    // Emit real-time status change to all connected dashboards
+    const io = req.app.get('io');
+    if (io) io.emit('batch:updated', { batchId: batch._id, batchCode: batch.batchCode, status: 'DISPATCHED' });
+
     res.json({ success: true, message: `Batch ${batch.batchCode} marked as DISPATCHED`, data: batch });
   } catch (err) { next(err); }
 }

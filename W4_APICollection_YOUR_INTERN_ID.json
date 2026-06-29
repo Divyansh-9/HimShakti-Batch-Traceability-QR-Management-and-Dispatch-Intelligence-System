@@ -1,0 +1,415 @@
+{
+  "info": {
+    "name": "HimShakti API - Week 4",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5001"
+    },
+    {
+      "key": "token",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Health Check",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/health",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "health"
+          ]
+        }
+      },
+      "response": [
+        {
+          "name": "200 OK",
+          "originalRequest": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "health"
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n  \"status\": \"ok\",\n  \"timestamp\": \"2026-06-27T12:00:00.000Z\"\n}"
+        }
+      ]
+    },
+    {
+      "name": "2. Login (POST)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"manager\",\n  \"password\": \"himshakti2026\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/auth/login",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "auth",
+            "login"
+          ]
+        }
+      },
+      "response": [
+        {
+          "name": "200 OK",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"manager\",\n  \"password\": \"himshakti2026\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n  \"success\": true,\n  \"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\",\n  \"user\": {\n    \"id\": \"1\",\n    \"role\": \"manager\"\n  }\n}"
+        }
+      ]
+    },
+    {
+      "name": "3. List Batches (GET list)",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/api/batches",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "batches"
+          ]
+        }
+      },
+      "response": [
+        {
+          "name": "200 OK",
+          "originalRequest": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/batches",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "batches"
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n  \"success\": true,\n  \"count\": 2,\n  \"data\": [\n    {\n      \"_id\": \"64a1b2c3d4e5f6\",\n      \"batchCode\": \"HS-2026-06-001\",\n      \"productId\": \"prod_123\",\n      \"farmerName\": \"Ramesh Negi\",\n      \"quantityKg\": 100\n    }\n  ],\n  \"pagination\": {\n    \"page\": 1,\n    \"pages\": 1\n  }\n}"
+        }
+      ]
+    },
+    {
+      "name": "4. Get Single Batch (GET single)",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/api/batches/64a1b2c3d4e5f6",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "batches",
+            "64a1b2c3d4e5f6"
+          ]
+        }
+      },
+      "response": [
+        {
+          "name": "200 OK",
+          "originalRequest": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/batches/64a1b2c3d4e5f6",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "batches",
+                "64a1b2c3d4e5f6"
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n  \"success\": true,\n  \"data\": {\n    \"_id\": \"64a1b2c3d4e5f6\",\n    \"batchCode\": \"HS-2026-06-001\",\n    \"productId\": \"prod_123\",\n    \"farmerName\": \"Ramesh Negi\",\n    \"quantityKg\": 100\n  }\n}"
+        }
+      ]
+    },
+    {
+      "name": "5. Create Batch (POST)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"productId\": \"prod_123\",\n  \"farmerName\": \"Ramesh Negi\",\n  \"farmerVillage\": \"Kullu\",\n  \"quantityKg\": 50,\n  \"packDate\": \"2026-06-27\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/batches",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "batches"
+          ]
+        }
+      },
+      "response": [
+        {
+          "name": "201 Created",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"prod_123\",\n  \"farmerName\": \"Ramesh Negi\",\n  \"farmerVillage\": \"Kullu\",\n  \"quantityKg\": 50,\n  \"packDate\": \"2026-06-27\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/batches",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "batches"
+              ]
+            }
+          },
+          "status": "Created",
+          "code": 201,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n  \"success\": true,\n  \"data\": {\n    \"_id\": \"64a1b2c3d4e5f7\",\n    \"batchCode\": \"HS-2026-06-002\",\n    \"qrCodeUrl\": \"...\"\n  }\n}"
+        }
+      ]
+    },
+    {
+      "name": "6. Dispatch Batch (PATCH)",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"destination\": \"Delhi Warehouse\",\n  \"notes\": \"Priority shipment\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/batches/64a1b2c3d4e5f6/dispatch",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "batches",
+            "64a1b2c3d4e5f6",
+            "dispatch"
+          ]
+        }
+      },
+      "response": [
+        {
+          "name": "200 OK",
+          "originalRequest": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"destination\": \"Delhi Warehouse\",\n  \"notes\": \"Priority shipment\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/batches/64a1b2c3d4e5f6/dispatch",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "batches",
+                "64a1b2c3d4e5f6",
+                "dispatch"
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n  \"success\": true,\n  \"data\": {\n    \"status\": \"DISPATCHED\",\n    \"dispatchDate\": \"2026-06-27T12:00:00.000Z\"\n  }\n}"
+        }
+      ]
+    },
+    {
+      "name": "7. FEFO Queue (GET)",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/api/dispatch/fefo",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "dispatch",
+            "fefo"
+          ]
+        }
+      },
+      "response": [
+        {
+          "name": "200 OK",
+          "originalRequest": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/dispatch/fefo",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "dispatch",
+                "fefo"
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n  \"success\": true,\n  \"data\": [\n    {\n      \"batchCode\": \"HS-2026-06-001\",\n      \"daysToExpiry\": 15,\n      \"fefoScore\": 85\n    }\n  ]\n}"
+        }
+      ]
+    }
+  ]
+}

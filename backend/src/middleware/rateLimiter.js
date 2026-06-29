@@ -8,7 +8,7 @@ const aiLimiter = rateLimit({
 
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: 500, // Increased for dev/testing so you don't get locked out
   message: { success: false, error: 'Too many requests. Please wait.' }
 });
 

@@ -1,27 +1,27 @@
-// src/hooks/useDispatch.js
-import { useState, useEffect } from 'react';
+/**
+ * @fileoverview useDispatch — React Query powered FEFO queue hook.
+ */
+import { useQuery } from '@tanstack/react-query';
 import client from '../api/client';
 
+const DISPATCH_KEY = ['dispatch', 'fefo'];
+
+async function fetchFEFO() {
+  const data = await client('/api/dispatch/fefo');
+  return data.data || [];
+}
+
 export function useDispatch() {
-  const [queue, setQueue]     = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState(null);
+  const {
+    data: queue = [],
+    isLoading: loading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: DISPATCH_KEY,
+    queryFn: fetchFEFO,
+    staleTime: 60 * 1000, // queue doesn't need to refresh as often
+  });
 
-  const fetchQueue = async () => {
-    try {
-      const data = await client('/api/dispatch/fefo');
-      setQueue(data.data || []);
-      setError(null);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchQueue();
-  }, []);
-
-  return { queue, loading, error, refetch: fetchQueue };
+  return { queue, loading, error: error?.message || null, refetch };
 }

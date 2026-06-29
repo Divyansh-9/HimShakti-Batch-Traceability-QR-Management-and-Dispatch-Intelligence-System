@@ -3,16 +3,18 @@ import { useSearchParams } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import CreateBatchModal from '../components/CreateBatchModal';
 import DispatchModal from '../components/DispatchModal';
+import ErrorBoundary from '../components/ErrorBoundary';
 import { useBatches } from '../hooks/useBatches';
 import { useDispatch } from '../hooks/useDispatch';
 import { useAIAudit } from '../hooks/useAIAudit';
 import { useAuth } from '../hooks/useAuth';
+import { useSocket } from '../hooks/useSocket';
 import toast from 'react-hot-toast';
 import client from '../api/client';
 import {
   Package, Truck, QrCode, LayoutDashboard, Bot,
-  LogOut, Download, AlertTriangle, CheckCircle, Clock, RefreshCw, Menu, Search, InboxIcon, Leaf, Plus,
-  ShieldCheck, Users, XCircle, Copy, ExternalLink, ChevronDown
+  LogOut, Download, AlertTriangle, CheckCircle, Clock, RefreshCw, Menu, Search, Leaf, Plus,
+  ShieldCheck, Users, XCircle, Copy, ExternalLink, Zap, TrendingUp, Activity, Info
 } from 'lucide-react';
 
 
@@ -470,76 +472,257 @@ function QRTab({ batches, loading, onDownloadQR }) {
   );
 }
 
-// ── Tab: AI Audit ───────────────────────────────────────────
-function AIAuditTab() {
+// ── Tab: AI Audit — structured JSON card layout ──────────────────
+function AIAuditTab({ batchCount }) {
   const { report, fromCache, generatedAt, loading, error, runAudit } = useAIAudit();
+
+  const SEVERITY_COLOR = {
+    HIGH:   'bg-red-500/10 text-red-500 border-red-500/20',
+    MEDIUM: 'bg-amber-500/10 text-amber-500 border-amber-500/20',
+    LOW:    'bg-green-500/10 text-green-500 border-green-500/20',
+  };
 
   function getCacheLabel() {
     if (!fromCache || !generatedAt) return null;
-    const cacheHours = 4;
-    const elapsed    = (Date.now() - generatedAt.getTime()) / 3600000;
-    const remaining  = Math.max(0, cacheHours - elapsed);
-    const h          = Math.floor(remaining);
-    const m          = Math.round((remaining - h) * 60);
-    return `Report from ${generatedAt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })} · Cached (refreshes in ${h}h ${m}m)`;
+    const elapsed   = (Date.now() - generatedAt.getTime()) / 3600000;
+    const remaining = Math.max(0, 4 - elapsed);
+    const h = Math.floor(remaining);
+    const m = Math.round((remaining - h) * 60);
+    return `Cached · refreshes in ${h}h ${m}m`;
+  }
+
+  // Guard: require batches before audit
+  if (batchCount === 0) {
+    return (
+      <div className="bg-surface border border-border rounded-xl p-12 text-center">
+        <Bot className="w-12 h-12 text-text-muted mx-auto mb-4 opacity-30" />
+        <p className="font-semibold text-text-primary">No batches to analyse</p>
+        <p className="text-sm text-text-muted mt-1">Add at least one batch before running an AI audit.</p>
+      </div>
+    );
   }
 
   return (
-    <div className="bg-surface border border-border rounded-xl overflow-hidden">
-      <div className="px-6 py-5 border-b border-border flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-brand/10 rounded-lg flex items-center justify-center">
-            <Bot className="w-4 h-4 text-brand" />
+    <div className="space-y-4">
+      {/* ── Header card ── */}
+      <div className="bg-surface border border-border rounded-xl overflow-hidden">
+        <div className="px-6 py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-brand/10 rounded-xl flex items-center justify-center">
+              <Bot className="w-5 h-5 text-brand" />
+            </div>
+            <div>
+              <h2 className="font-semibold text-text-primary">AI Dispatch Audit</h2>
+              <p className="text-xs text-text-muted mt-0.5">Gemini 2.5 Flash · structured JSON output · NVIDIA fallback</p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-sm font-semibold text-text-primary">AI Dispatch Audit</h2>
-            <p className="text-xs text-text-muted">Powered by Gemini 2.5 Flash · NVIDIA fallback</p>
+          <div className="flex items-center gap-2">
+            {report && fromCache && (
+              <span className="hidden sm:flex items-center gap-1.5 text-xs text-text-muted bg-surface-2 border border-border px-3 py-1.5 rounded-lg">
+                <Clock className="w-3 h-3" />
+                {getCacheLabel()}
+              </span>
+            )}
+            <button
+              onClick={runAudit}
+              disabled={loading}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-brand hover:bg-brand-hover text-white text-sm font-semibold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm hover:shadow-md">
+              {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+              {loading ? 'Analysing…' : report ? 'Re-run Audit' : 'Run Audit'}
+            </button>
           </div>
         </div>
-        <button
-          onClick={runAudit}
-          disabled={loading}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-brand hover:bg-brand-hover text-white text-sm font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-          {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Bot className="w-4 h-4" />}
-          {loading ? 'Running Audit...' : 'Run Audit'}
-        </button>
-      </div>
 
-      <div className="p-6">
-        {!report && !loading && !error && (
-          <div className="text-center py-12">
-            <Bot className="w-12 h-12 text-text-muted mx-auto mb-4 opacity-30" />
-            <p className="text-text-muted text-sm">Click "Run Audit" to generate an AI dispatch advisory report.</p>
-            <p className="text-text-muted text-xs mt-1 opacity-60">Results are cached for 4 hours.</p>
-          </div>
-        )}
-
-        {loading && (
-          <div className="space-y-3">
-            {[...Array(6)].map((_, i) => (
-              <div key={i} className={`h-3 bg-surface-2 rounded animate-pulse ${i % 3 === 2 ? 'w-2/3' : 'w-full'}`} />
+        {/* Metrics bar — shown after report is ready */}
+        {report && !loading && (
+          <div className="border-t border-border grid grid-cols-2 sm:grid-cols-4 divide-x divide-border">
+            {[
+              { label: 'Batches Analysed', value: report.totalAnalyzed ?? batchCount, icon: Activity, color: 'text-brand' },
+              { label: 'Urgent Dispatch',  value: report.urgentBatches?.length ?? 0,   icon: AlertTriangle, color: 'text-red-500' },
+              { label: 'Quality Flags',    value: report.qualityWarnings?.length ?? 0,  icon: TrendingUp,    color: 'text-amber-500' },
+              { label: 'Risk Signals',     value: report.supplyChainRisks?.length ?? 0, icon: Info,          color: 'text-teal-500' },
+            ].map(m => (
+              <div key={m.label} className="px-5 py-3 flex items-center gap-3">
+                <m.icon className={`w-4 h-4 ${m.color} flex-shrink-0`} />
+                <div>
+                  <p className="text-lg font-extrabold text-text-primary leading-none">{m.value}</p>
+                  <p className="text-[10px] text-text-muted font-medium mt-0.5">{m.label}</p>
+                </div>
+              </div>
             ))}
           </div>
         )}
-
-        {error && (
-          <div className="p-4 bg-red-500/5 border border-red-500/20 rounded-lg text-red-400 text-sm">{error}</div>
-        )}
-
-        {report && !loading && (
-          <>
-            {fromCache && (
-              <div className="flex items-center gap-2 mb-4 text-xs text-text-muted bg-surface-2 px-3 py-2 rounded-lg border border-border">
-                <Clock className="w-3.5 h-3.5 flex-shrink-0" />
-                {getCacheLabel()}
-              </div>
-            )}
-            <div className="prose prose-sm max-w-none text-text-muted leading-relaxed whitespace-pre-wrap text-sm">
-              {report}
-            </div>
-          </>
-        )}
       </div>
+
+      {/* ── Loading skeleton ── */}
+      {loading && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="bg-surface border border-border rounded-xl p-5 space-y-3 animate-pulse">
+              <div className="h-4 bg-surface-2 rounded w-1/3" />
+              <div className="h-3 bg-surface-2 rounded w-full" />
+              <div className="h-3 bg-surface-2 rounded w-5/6" />
+              <div className="h-3 bg-surface-2 rounded w-2/3" />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── Error state ── */}
+      {error && !loading && (
+        <div className="bg-red-500/5 border border-red-500/20 rounded-xl p-6 flex items-start gap-4">
+          <div className="w-9 h-9 bg-red-500/10 rounded-lg flex items-center justify-center flex-shrink-0">
+            <AlertTriangle className="w-4 h-4 text-red-400" />
+          </div>
+          <div>
+            <p className="font-semibold text-red-400">Audit Failed</p>
+            <p className="text-sm text-text-muted mt-1">{error}</p>
+            <button onClick={runAudit} className="mt-3 text-xs text-brand hover:text-brand-hover font-medium">Try again →</button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Empty state ── */}
+      {!report && !loading && !error && (
+        <div className="bg-surface border border-border rounded-xl p-12 text-center">
+          <div className="w-16 h-16 bg-teal-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <Bot className="w-8 h-8 text-teal-500 opacity-60" />
+          </div>
+          <p className="font-semibold text-text-primary">Ready to analyse {batchCount} batch{batchCount !== 1 ? 'es' : ''}</p>
+          <p className="text-sm text-text-muted mt-1 max-w-xs mx-auto">Get AI-powered dispatch recommendations, risk flags, and quality alerts. Results are cached for 4 hours.</p>
+          <button onClick={runAudit}
+            className="mt-5 inline-flex items-center gap-2 px-5 py-2.5 bg-brand hover:bg-brand-hover text-white text-sm font-semibold rounded-xl transition-all shadow-sm">
+            <Zap className="w-4 h-4" /> Run AI Audit
+          </button>
+        </div>
+      )}
+
+      {/* ── Report cards ── */}
+      {report && !loading && (
+        <div className="grid gap-4 sm:grid-cols-2">
+
+          {/* Summary */}
+          {report.summary && (
+            <div className="sm:col-span-2 bg-surface border border-border rounded-xl p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-7 h-7 bg-teal-500/10 rounded-lg flex items-center justify-center">
+                  <Activity className="w-3.5 h-3.5 text-teal-500" />
+                </div>
+                <h3 className="text-sm font-semibold text-text-primary">Executive Summary</h3>
+              </div>
+              <p className="text-sm text-text-muted leading-relaxed">{report.summary}</p>
+            </div>
+          )}
+
+          {/* Urgent Batches */}
+          <div className="bg-red-500/5 border border-red-500/15 rounded-xl p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-7 h-7 bg-red-500/10 rounded-lg flex items-center justify-center">
+                <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
+              </div>
+              <h3 className="text-sm font-semibold text-red-500">Urgent Dispatch</h3>
+              <span className="ml-auto text-xs font-bold bg-red-500/10 text-red-500 px-2 py-0.5 rounded-full">
+                {report.urgentBatches?.length ?? 0}
+              </span>
+            </div>
+            {report.urgentBatches?.length === 0 ? (
+              <div className="flex items-center gap-2 text-sm text-text-muted">
+                <CheckCircle className="w-4 h-4 text-green-500" /> No urgent batches
+              </div>
+            ) : (
+              <ul className="space-y-2">
+                {report.urgentBatches.map((b, i) => (
+                  <li key={i} className="flex flex-col gap-0.5">
+                    <span className="text-xs font-mono font-bold text-red-400">{b.batchCode}</span>
+                    <span className="text-xs text-text-muted">{b.reason}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {/* Quality Warnings */}
+          <div className="bg-amber-500/5 border border-amber-500/15 rounded-xl p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-7 h-7 bg-amber-500/10 rounded-lg flex items-center justify-center">
+                <TrendingUp className="w-3.5 h-3.5 text-amber-500" />
+              </div>
+              <h3 className="text-sm font-semibold text-amber-500">Quality Concerns</h3>
+              <span className="ml-auto text-xs font-bold bg-amber-500/10 text-amber-500 px-2 py-0.5 rounded-full">
+                {report.qualityWarnings?.length ?? 0}
+              </span>
+            </div>
+            {report.qualityWarnings?.length === 0 ? (
+              <div className="flex items-center gap-2 text-sm text-text-muted">
+                <CheckCircle className="w-4 h-4 text-green-500" /> All batches pass quality threshold
+              </div>
+            ) : (
+              <ul className="space-y-2">
+                {report.qualityWarnings.map((w, i) => (
+                  <li key={i} className="flex flex-col gap-0.5">
+                    <span className="text-xs font-mono font-bold text-amber-400">{w.batchCode}</span>
+                    <span className="text-xs text-text-muted">{w.concern}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {/* Top 3 Dispatch Priorities */}
+          <div className="bg-surface border border-border rounded-xl p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-7 h-7 bg-brand/10 rounded-lg flex items-center justify-center">
+                <Truck className="w-3.5 h-3.5 text-brand" />
+              </div>
+              <h3 className="text-sm font-semibold text-text-primary">Top 3 Dispatch Priorities</h3>
+            </div>
+            <ol className="space-y-3">
+              {(report.top3Priorities || []).map((p, i) => (
+                <li key={i} className="flex items-start gap-3">
+                  <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0 mt-0.5 ${
+                    i === 0 ? 'bg-brand text-white' :
+                    i === 1 ? 'bg-surface-2 text-text-primary' :
+                              'bg-surface-2 text-text-muted'
+                  }`}>#{p.rank}</span>
+                  <div>
+                    <p className="text-xs font-mono font-semibold text-text-primary">{p.batchCode}</p>
+                    <p className="text-xs text-text-muted mt-0.5">{p.action}</p>
+                    {p.reasoning && <p className="text-[10px] text-text-muted/70 mt-1 italic">{p.reasoning}</p>}
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </div>
+
+          {/* Supply Chain Risks */}
+          <div className="bg-surface border border-border rounded-xl p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-7 h-7 bg-teal-500/10 rounded-lg flex items-center justify-center">
+                <Info className="w-3.5 h-3.5 text-teal-500" />
+              </div>
+              <h3 className="text-sm font-semibold text-text-primary">Supply Chain Risks</h3>
+            </div>
+            {(report.supplyChainRisks || []).length === 0 ? (
+              <p className="text-sm text-text-muted">No systemic risks flagged.</p>
+            ) : (
+              <ul className="space-y-3">
+                {report.supplyChainRisks.map((r, i) => (
+                  <li key={i} className="flex items-start gap-2.5">
+                    <span className={`inline-flex items-center text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded border flex-shrink-0 mt-0.5 ${
+                      SEVERITY_COLOR[r.severity] || SEVERITY_COLOR.LOW
+                    }`}>{r.severity}</span>
+                    <div>
+                      <p className="text-xs text-text-primary font-medium">{r.risk}</p>
+                      {r.recommendation && <p className="text-[10px] text-text-muted mt-0.5">{r.recommendation}</p>}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+        </div>
+      )}
     </div>
   );
 }
@@ -951,6 +1134,9 @@ export default function Dashboard() {
   const user                                  = getUser(); // { username, name, role }
   const { batches, loading, createBatch, downloadQR, dispatchBatch } = useBatches();
 
+  // Connect to WebSocket for real-time batch updates across all dashboard tabs
+  useSocket();
+
   // Filter NAV_TABS — admin tab only visible to admin role
   const visibleTabs = NAV_TABS.filter(t => !t.adminOnly || user?.role === 'admin');
 
@@ -1113,7 +1299,9 @@ export default function Dashboard() {
             {activeTab === 'ai' && (
               <>
                 <TabBanner tabId="ai" />
-                <AIAuditTab />
+                <ErrorBoundary>
+                  <AIAuditTab batchCount={batches.length} />
+                </ErrorBoundary>
               </>
             )}
             {activeTab === 'admin' && (

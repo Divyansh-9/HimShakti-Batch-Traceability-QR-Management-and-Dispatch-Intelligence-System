@@ -1,5 +1,5 @@
-const bcrypt  = require('bcryptjs');
-const User    = require('../models/User.model');
+const bcrypt = require('bcryptjs');
+const User = require('../models/User.model');
 
 /**
  * Seeds default admin + manager accounts on first boot.
@@ -12,27 +12,27 @@ async function seedUsers() {
     return;
   }
 
-  const adminPw   = process.env.SEED_ADMIN_PASSWORD;
+  const adminPw = process.env.SEED_ADMIN_PASSWORD;
   const managerPw = process.env.SEED_MANAGER_PASSWORD;
   if (!adminPw || !managerPw) {
-  console.error('❌ Set SEED_ADMIN_PASSWORD and SEED_MANAGER_PASSWORD in .env');
-  return;
-}
+    console.error('❌ Set SEED_ADMIN_PASSWORD and SEED_MANAGER_PASSWORD in .env');
+    return;
+  }
 
   await User.insertMany([
     {
-      username:     'admin',
+      username: 'admin',
       passwordHash: await bcrypt.hash(adminPw, 12),
-      name:         'System Administrator',
-      email:        '',
-      role:         'admin',
+      name: 'System Administrator',
+      email: '',
+      role: 'admin',
     },
     {
-      username:     'manager',
+      username: 'manager',
       passwordHash: await bcrypt.hash(managerPw, 12),
-      name:         'Factory Manager',
-      email:        '',
-      role:         'manager',
+      name: 'Factory Manager',
+      email: '',
+      role: 'manager',
     },
   ]);
 
