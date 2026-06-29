@@ -16,6 +16,7 @@ require('dotenv').config();
 const mongoose   = require('mongoose');
 const Batch      = require('../models/Batch.model');
 const ScanEvent  = require('../models/ScanEvent.model');
+const { generateBatchQR } = require('../services/qrGenerator');
 
 const args       = process.argv.slice(2);
 const CLEAR_FIRST = args.includes('--clear');
@@ -51,22 +52,24 @@ const FARMERS = [
   { farmerName: 'Dinesh Bisht',     village: 'Pauri' },
 ];
 
-function makeBatch(code, productKey, farmerIdx, packDaysAgo, extraDaysUntilExpiry, status, buyerInfo = null) {
+async function makeBatch(code, productKey, farmerIdx, packDaysAgo, extraDaysUntilExpiry, status, buyerInfo = null) {
   const p = PRODUCTS[productKey];
   const packDate   = daysAgo(packDaysAgo);
   const expiryDate = daysFromNow(extraDaysUntilExpiry);
   const farmer     = FARMERS[farmerIdx];
 
+  const { dataUrl: qrCodeDataUrl, absoluteUrl: qrAbsoluteUrl } = await generateBatchQR(code);
+
   return {
     batchCode:        code,
     productName:      p.productName,
     sku:              p.sku,
-    productId:        new mongoose.Types.ObjectId(), // placeholder — real app uses product lookup
+    productId:        new mongoose.Types.ObjectId(),
     sourceLotCode:    `LOT-${code}`,
     farmerName:       farmer.farmerName,
     village:          farmer.village,
     quantityProduced: [100, 150, 200, 250, 300, 75][farmerIdx % 6],
-    unit:             ['Kg', 'Units', 'Liters', 'Kg', 'Kg', 'Units'][farmerIdx % 6] === 'Liters' ? 'Kg' : 'Kg',
+    unit:             'Kg',
     yieldPercent:     [88, 76, 91, 65, 82, 93][farmerIdx % 6],
     packDate,
     expiryDate,
@@ -74,8 +77,8 @@ function makeBatch(code, productKey, farmerIdx, packDaysAgo, extraDaysUntilExpir
     shelfLifeSource:  'predicted',
     status,
     priorityScore:    status === 'URGENT' ? 340 : status === 'WARNING' ? 280 : status === 'DISPATCHED' ? 0 : 200,
-    qrCodeDataUrl:    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
-    qrAbsoluteUrl:    `${process.env.PUBLIC_BASE_URL || 'http://localhost:5001'}/trace/${code}`,
+    qrCodeDataUrl,
+    qrAbsoluteUrl,
     traceabilityNote: `Batch ${code} — packed from ${farmer.village} harvest. Best before ${expiryDate.toDateString()}.`,
     createdBy:        'manager',
     ...(status === 'DISPATCHED' && buyerInfo ? {
@@ -86,35 +89,31 @@ function makeBatch(code, productKey, farmerIdx, packDaysAgo, extraDaysUntilExpir
 }
 
 // ── Rich batch dataset ────────────────────────────────────────────────
-// 20 batches: 4 statuses, 5 products, 6 farmers, 4 villages
-const RICH_BATCHES = [
-  // --- READY batches (healthy, in stock) ---
-  makeBatch('HS-2026-06-002', 'WBJC',   0, 5,  172, 'READY'),
-  makeBatch('HS-2026-06-003', 'WBJC',   0, 6,  171, 'READY'),
-  makeBatch('HS-2026-06-004', 'WBJC',   4, 8,  169, 'READY'),
-  makeBatch('HS-2026-06-005', 'WBJC',   4, 9,  168, 'READY'),
-  makeBatch('HS-2026-06-010', 'RHSLT',  2, 15, 715, 'READY'),
-  makeBatch('HS-2026-06-011', 'RHSLT',  5, 20, 710, 'READY'),
-  makeBatch('HS-2026-06-014', 'WBDRP',  3, 10, 260, 'READY'),
-  makeBatch('HS-2026-06-015', 'WBDRP',  1, 12, 258, 'READY'),
-
-  // --- WARNING batches (21–30 days to expiry) ---
-  makeBatch('HS-2026-06-016', 'ABHJAM', 2, 340, 25, 'WARNING'),
-  makeBatch('HS-2026-06-017', 'ABHJAM', 5, 345, 22, 'WARNING'),
-  makeBatch('HS-2026-06-018', 'KMGC',   1, 65,  28, 'WARNING'),
-  makeBatch('HS-2026-06-019', 'KMGC',   3, 67,  23, 'WARNING'),
-
-  // --- URGENT batches (≤7 days to expiry) ---
-  makeBatch('HS-2026-06-020', 'ABHJAM', 0, 360, 5,  'URGENT'),
-  makeBatch('HS-2026-06-021', 'KMGC',   1, 85,  3,  'URGENT'),
-  makeBatch('HS-2026-06-022', 'WBJC',   3, 175, 6,  'URGENT'),
-
-  // --- DISPATCHED batches (fulfilled orders) ---
-  makeBatch('HS-2026-06-001', 'WBJC',   0, 30, 147, 'DISPATCHED', { buyer: 'Nature Fresh Distributors, Delhi',      daysAgo: 25 }),
-  makeBatch('HS-2026-06-006', 'WBJC',   4, 35, 142, 'DISPATCHED', { buyer: 'Himalayan Organic Mart, Dehradun',      daysAgo: 20 }),
-  makeBatch('HS-2026-06-007', 'KMGC',   1, 25,  62, 'DISPATCHED', { buyer: 'Organic India Pvt Ltd, Bangalore',      daysAgo: 18 }),
-  makeBatch('HS-2026-06-008', 'ABHJAM', 5, 180, 182,'DISPATCHED', { buyer: 'Pure Nature Stores, Mumbai',            daysAgo: 12 }),
-  makeBatch('HS-2026-06-009', 'RHSLT',  2, 60,  667,'DISPATCHED', { buyer: 'Uttarakhand State Co-op, Dehradun',     daysAgo: 8  }),
+const BATCH_SPECS = [
+  // --- READY batches ---
+  ['HS-2026-06-002', 'WBJC',   0, 5,  172, 'READY'],
+  ['HS-2026-06-003', 'WBJC',   0, 6,  171, 'READY'],
+  ['HS-2026-06-004', 'WBJC',   4, 8,  169, 'READY'],
+  ['HS-2026-06-005', 'WBJC',   4, 9,  168, 'READY'],
+  ['HS-2026-06-010', 'RHSLT',  2, 15, 715, 'READY'],
+  ['HS-2026-06-011', 'RHSLT',  5, 20, 710, 'READY'],
+  ['HS-2026-06-014', 'WBDRP',  3, 10, 260, 'READY'],
+  ['HS-2026-06-015', 'WBDRP',  1, 12, 258, 'READY'],
+  // --- WARNING batches ---
+  ['HS-2026-06-016', 'ABHJAM', 2, 340, 25, 'WARNING'],
+  ['HS-2026-06-017', 'ABHJAM', 5, 345, 22, 'WARNING'],
+  ['HS-2026-06-018', 'KMGC',   1, 65,  28, 'WARNING'],
+  ['HS-2026-06-019', 'KMGC',   3, 67,  23, 'WARNING'],
+  // --- URGENT batches ---
+  ['HS-2026-06-020', 'ABHJAM', 0, 360, 5,  'URGENT'],
+  ['HS-2026-06-021', 'KMGC',   1, 85,  3,  'URGENT'],
+  ['HS-2026-06-022', 'WBJC',   3, 175, 6,  'URGENT'],
+  // --- DISPATCHED batches ---
+  ['HS-2026-06-001', 'WBJC',   0, 30, 147, 'DISPATCHED', { buyer: 'Nature Fresh Distributors, Delhi',   daysAgo: 25 }],
+  ['HS-2026-06-006', 'WBJC',   4, 35, 142, 'DISPATCHED', { buyer: 'Himalayan Organic Mart, Dehradun',   daysAgo: 20 }],
+  ['HS-2026-06-007', 'KMGC',   1, 25,  62, 'DISPATCHED', { buyer: 'Organic India Pvt Ltd, Bangalore',   daysAgo: 18 }],
+  ['HS-2026-06-008', 'ABHJAM', 5, 180, 182,'DISPATCHED', { buyer: 'Pure Nature Stores, Mumbai',         daysAgo: 12 }],
+  ['HS-2026-06-009', 'RHSLT',  2, 60,  667,'DISPATCHED', { buyer: 'Uttarakhand State Co-op, Dehradun',  daysAgo: 8  }],
 ];
 
 // ── Scan events ───────────────────────────────────────────────────────
@@ -166,7 +165,10 @@ async function seed() {
       console.log('🗑️  Cleared.');
     }
 
-    console.log(`\n📦 Seeding ${RICH_BATCHES.length} batches (upsert by batchCode)...`);
+    console.log(`\n📦 Generating real QR codes and seeding ${BATCH_SPECS.length} batches...`);
+    const RICH_BATCHES = await Promise.all(BATCH_SPECS.map(spec => makeBatch(...spec)));
+    console.log('   ↳ QR codes generated ✅');
+
     let created = 0;
     let updated = 0;
 
@@ -176,7 +178,6 @@ async function seed() {
         b,
         { upsert: true, new: true, runValidators: false }
       );
-      // Mongoose upsert: if _id existed it's an update, else create
       if (result.createdAt && (new Date() - result.createdAt) < 5000) {
         created++;
       } else {
@@ -206,6 +207,7 @@ async function seed() {
     console.log(`   Products:   ${[...new Set(RICH_BATCHES.map(b => b.productName))].length} types`);
     console.log(`   Farmers:    ${[...new Set(RICH_BATCHES.map(b => b.farmerName))].length} unique`);
     console.log(`   Villages:   ${[...new Set(RICH_BATCHES.map(b => b.village))].length} locations\n`);
+    console.log(`   QR Codes:   All ${RICH_BATCHES.length} generated (300×300 dark-green on white) 🎉\n`);
 
     process.exit(0);
   } catch (err) {

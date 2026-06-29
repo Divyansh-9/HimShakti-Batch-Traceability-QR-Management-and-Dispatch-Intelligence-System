@@ -438,36 +438,197 @@ function FEFOTab() {
   );
 }
 
-// ── Tab: QR Management ──────────────────────────────────────
-function QRTab({ batches, loading, onDownloadQR }) {
+// ── Tab: QR Code Centre — premium redesign ──────────────────────
+function QRCard({ batch, onDownloadQR }) {
+  const [qrDataUrl, setQrDataUrl] = useState(null);
+  const [qrLoading, setQrLoading] = useState(false);
+  const [qrError,   setQrError]   = useState(false);
+  const [scanCount, setScanCount] = useState(null);
+  const [copied,    setCopied]    = useState(false);
+  const { getBatchScans } = useBatches();
+
+  const traceUrl = `${window.location.origin}/trace/${batch.batchCode}`;
+
+  // Lazy-load QR on mount using the lightweight /api/batches/:id/qr endpoint
+  useEffect(() => {
+    let cancelled = false;
+    setQrLoading(true);
+    client(`/api/batches/${batch._id}/qr`)
+      .then(data => {
+        if (!cancelled) setQrDataUrl(data.data?.qrCodeDataUrl || null);
+      })
+      .catch(() => { if (!cancelled) setQrError(true); })
+      .finally(() => { if (!cancelled) setQrLoading(false); });
+
+    // Also fetch scan count
+    getBatchScans(batch._id)
+      .then(data => { if (!cancelled) setScanCount(data?.totalScans ?? 0); })
+      .catch(() => {});
+
+    return () => { cancelled = true; };
+  }, [batch._id]);
+
+  function handleCopy() {
+    navigator.clipboard.writeText(traceUrl).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  const STATUS_ACCENT = {
+    URGENT:  'border-red-500/40 shadow-red-500/10',
+    WARNING: 'border-amber-500/40 shadow-amber-500/10',
+    READY:   'border-green-500/20',
+  };
+
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      {loading
-        ? [...Array(6)].map((_, i) => (
-          <div key={i} className="bg-surface border border-border rounded-xl p-5 animate-pulse">
-            <div className="h-4 bg-surface-2 rounded w-1/2 mb-3" />
-            <div className="h-3 bg-surface-2 rounded w-3/4 mb-2" />
-            <div className="h-8 bg-surface-2 rounded w-full mt-4" />
+    <div className={`bg-surface border rounded-2xl overflow-hidden hover:shadow-lg transition-all duration-200 group ${STATUS_ACCENT[batch.status] || 'border-border'}`}>
+      {/* QR image area */}
+      <div className="relative bg-white flex items-center justify-center" style={{ minHeight: 180 }}>
+        {qrLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-white">
+            <div className="w-8 h-8 border-2 border-brand/30 border-t-brand rounded-full animate-spin" />
           </div>
-        ))
-        : batches.filter(b => b.status !== 'DISPATCHED').map(b => (
-          <div key={b._id} className="bg-surface border border-border rounded-xl p-5 hover:border-brand/50 transition-colors group">
-            <div className="flex items-center gap-2 mb-2">
-              <QrCode className="w-4 h-4 text-brand flex-shrink-0" />
-              <p className="text-sm font-mono font-medium text-text-primary truncate">{b.batchCode}</p>
-            </div>
-            <p className="text-xs text-text-muted mb-1 truncate">{b.productName}</p>
-            <div className="flex items-center justify-between mt-3">
-              <StatusBadge status={b.status} />
-              <button
-                onClick={() => onDownloadQR(b._id, b.batchCode)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-brand hover:bg-brand/10 rounded-lg transition-colors border border-brand/20 hover:border-brand/40">
-                <Download className="w-3.5 h-3.5" /> Download QR
-              </button>
-            </div>
+        )}
+        {qrError && !qrLoading && (
+          <div className="flex flex-col items-center gap-2 py-8 opacity-50">
+            <QrCode className="w-8 h-8 text-text-muted" />
+            <p className="text-xs text-text-muted">QR unavailable</p>
           </div>
-        ))
-      }
+        )}
+        {qrDataUrl && !qrLoading && (
+          <img
+            src={qrDataUrl}
+            alt={`QR code for batch ${batch.batchCode}`}
+            className="w-44 h-44 object-contain p-3"
+          />
+        )}
+
+        {/* Scan count badge */}
+        {scanCount !== null && (
+          <div className="absolute top-2 left-2 flex items-center gap-1 bg-black/60 text-white text-[10px] font-bold px-2 py-1 rounded-full backdrop-blur-sm">
+            <Activity className="w-3 h-3" />
+            {scanCount} scan{scanCount !== 1 ? 's' : ''}
+          </div>
+        )}
+
+        {/* Status badge */}
+        <div className="absolute top-2 right-2">
+          <StatusBadge status={batch.status} />
+        </div>
+
+        {/* Hover overlay with quick actions */}
+        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center gap-3 opacity-0 group-hover:opacity-100 transition-all duration-200">
+          <button
+            onClick={handleCopy}
+            title="Copy trace link"
+            className="w-10 h-10 bg-white/20 hover:bg-white/30 rounded-xl flex items-center justify-center transition-colors text-white"
+          >
+            {copied ? <CheckCircle className="w-5 h-5 text-green-400" /> : <Copy className="w-5 h-5" />}
+          </button>
+          <button
+            onClick={() => window.open(`/trace/${batch.batchCode}`, '_blank')}
+            title="Open trace page"
+            className="w-10 h-10 bg-white/20 hover:bg-white/30 rounded-xl flex items-center justify-center transition-colors text-white"
+          >
+            <ExternalLink className="w-5 h-5" />
+          </button>
+          <button
+            onClick={() => onDownloadQR(batch._id, batch.batchCode)}
+            title="Download QR"
+            className="w-10 h-10 bg-brand/80 hover:bg-brand rounded-xl flex items-center justify-center transition-colors text-white"
+          >
+            <Download className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+
+      {/* Card footer */}
+      <div className="px-4 py-3 border-t border-border">
+        <p className="text-xs font-mono font-bold text-text-primary truncate">{batch.batchCode}</p>
+        <p className="text-[11px] text-text-muted truncate mt-0.5">{batch.productName}</p>
+        <div className="flex items-center gap-1.5 mt-2">
+          <p className="text-[10px] text-text-muted/60 truncate flex-1">{batch.farmerName} · {batch.village}</p>
+          <button
+            onClick={() => onDownloadQR(batch._id, batch.batchCode)}
+            className="flex-shrink-0 inline-flex items-center gap-1 text-[10px] font-semibold text-brand hover:text-brand-hover transition-colors"
+          >
+            <Download className="w-3 h-3" /> Download
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function QRTab({ batches, loading, onDownloadQR }) {
+  const [filter, setFilter] = useState('all');
+
+  const FILTERS = [
+    { id: 'all',      label: 'All',      count: batches.filter(b => b.status !== 'DISPATCHED').length },
+    { id: 'URGENT',   label: 'Urgent',   count: batches.filter(b => b.status === 'URGENT').length },
+    { id: 'WARNING',  label: 'Warning',  count: batches.filter(b => b.status === 'WARNING').length },
+    { id: 'READY',    label: 'Ready',    count: batches.filter(b => b.status === 'READY').length },
+  ];
+
+  const visible = batches.filter(b =>
+    b.status !== 'DISPATCHED' &&
+    (filter === 'all' || b.status === filter)
+  );
+
+  return (
+    <div className="space-y-4">
+      {/* Filter tabs + print button */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex gap-1 bg-surface-2 border border-border p-1 rounded-xl w-fit">
+          {FILTERS.map(f => (
+            <button key={f.id} onClick={() => setFilter(f.id)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                filter === f.id
+                  ? 'bg-surface shadow text-text-primary'
+                  : 'text-text-muted hover:text-text-primary'
+              }`}>
+              {f.label}
+              {f.count > 0 && (
+                <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${
+                  filter === f.id ? 'bg-brand/10 text-brand' : 'bg-surface text-text-muted'
+                }`}>{f.count}</span>
+              )}
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={() => window.print()}
+          className="inline-flex items-center gap-2 px-4 py-2 border border-border rounded-xl text-sm font-medium text-text-muted hover:text-text-primary hover:bg-surface-2 transition-colors print:hidden"
+        >
+          <Download className="w-4 h-4" /> Print Sheet
+        </button>
+      </div>
+
+      {/* QR grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {loading
+          ? [...Array(8)].map((_, i) => (
+            <div key={i} className="bg-surface border border-border rounded-2xl overflow-hidden animate-pulse">
+              <div className="bg-surface-2 h-44" />
+              <div className="p-3 space-y-2">
+                <div className="h-3 bg-surface-2 rounded w-3/4" />
+                <div className="h-2.5 bg-surface-2 rounded w-1/2" />
+              </div>
+            </div>
+          ))
+          : visible.length === 0
+            ? (
+              <div className="col-span-full flex flex-col items-center justify-center py-16 gap-3">
+                <QrCode className="w-12 h-12 text-text-muted opacity-30" />
+                <p className="text-text-muted text-sm font-medium">No batches match this filter</p>
+              </div>
+            )
+            : visible.map(b => (
+              <QRCard key={b._id} batch={b} onDownloadQR={onDownloadQR} />
+            ))
+        }
+      </div>
     </div>
   );
 }
