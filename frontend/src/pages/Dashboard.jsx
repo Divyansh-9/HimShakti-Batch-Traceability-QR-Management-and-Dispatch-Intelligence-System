@@ -1145,7 +1145,15 @@ function AdminPanelTab() {
   const [inviteLink,  setInviteLink]  = useState(null);
   const [actionLoad,  setActionLoad]  = useState(null);
   const [togglingId,  setTogglingId]  = useState(null);
-  const [activeView,  setActiveView]  = useState('users'); // 'users' | 'requests'
+  const [activeView,  setActiveView]  = useState('users');
+
+  // Users Roster filters
+  const [userSearch,   setUserSearch]   = useState('');
+  const [roleFilter,   setRoleFilter]   = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all'); // 'all' | 'active' | 'inactive'
+
+  // Access Requests filter
+  const [reqFilter,    setReqFilter]    = useState('pending');
 
   const fetchUsers = useCallback(async () => {
     setLoadingU(true);
@@ -1174,8 +1182,7 @@ function AdminPanelTab() {
       const data = await client(`/auth/requests/${id}/approve`, { method: 'POST' });
       setInviteLink({ link: data.inviteLink, name });
       toast.success('Request approved!');
-      fetchRequests();
-      fetchUsers();
+      fetchRequests(); fetchUsers();
     } catch (err) { toast.error(err.message); }
     finally { setActionLoad(null); }
   }
@@ -1205,12 +1212,45 @@ function AdminPanelTab() {
   }
 
   const pending  = requests.filter(r => r.status === 'pending');
-  const resolved = requests.filter(r => r.status !== 'pending');
+  const approved = requests.filter(r => r.status === 'approved');
+  const rejected = requests.filter(r => r.status === 'rejected');
+
+  // Visible requests by filter
+  const visibleRequests = requests.filter(r =>
+    reqFilter === 'all' ? true : r.status === reqFilter
+  );
+
+  // Role distribution
+  const allRoles = [...new Set(users.map(u => u.role))];
+  const roleCounts = allRoles.reduce((acc, r) => ({ ...acc, [r]: users.filter(u => u.role === r).length }), {});
+  const ROLE_DOT = {
+    'admin':                'bg-rose-400',
+    'manager':              'bg-brand',
+    'factory-manager':      'bg-amber-400',
+    'quality-inspector':    'bg-teal-400',
+    'dispatch-coordinator': 'bg-blue-400',
+  };
+
+  // User roster filter
+  const ROLE_FILTERS = [
+    { id: 'all', label: 'All', count: users.length },
+    ...allRoles.map(r => ({ id: r, label: ROLE_LABEL[r] || r, count: roleCounts[r] || 0 })),
+  ];
+
+  const filteredUsers = users.filter(u => {
+    const matchSearch = !userSearch ||
+      u.name?.toLowerCase().includes(userSearch.toLowerCase()) ||
+      u.email?.toLowerCase().includes(userSearch.toLowerCase()) ||
+      u.username?.toLowerCase().includes(userSearch.toLowerCase());
+    const matchRole   = roleFilter === 'all' || u.role === roleFilter;
+    const matchStatus = statusFilter === 'all' || (statusFilter === 'active' ? u.isActive : !u.isActive);
+    return matchSearch && matchRole && matchStatus;
+  });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
 
-      {/* Invite Link Modal */}
+      {/* ── Invite Link Modal ── */}
       {inviteLink && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setInviteLink(null)}>
           <div className="bg-surface border border-border rounded-2xl p-7 shadow-2xl max-w-lg w-full mx-4" onClick={e => e.stopPropagation()}>
@@ -1245,51 +1285,193 @@ function AdminPanelTab() {
         </div>
       )}
 
-      {/* Stats Row */}
+      {/* ── KPI Row ── */}
       {stats && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard icon={Users}       label="Total Users"       value={stats.totalUsers}      sub={`${stats.activeUsers} active`}         color="bg-brand/10 text-brand" />
-          <StatCard icon={ShieldCheck} label="Pending Requests"  value={stats.pendingRequests} sub="awaiting review"                        color="bg-amber-500/10 text-amber-400" />
-          <StatCard icon={CheckCircle} label="Active Users"      value={stats.activeUsers}     sub="can log in"                             color="bg-green-500/10 text-green-400" />
-          <StatCard icon={Users}       label="Roles in Use"      value={Object.keys(stats.roleCounts).length} sub={Object.entries(stats.roleCounts).map(([r,c])=>`${c} ${ROLE_LABEL[r]||r}`).join(' · ')} color="bg-blue-500/10 text-blue-400" />
+          <div className="bg-surface border border-l-4 border-brand/20 border-l-brand rounded-xl p-5">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-semibold text-text-muted uppercase tracking-wide">Total Users</p>
+              <div className="w-8 h-8 rounded-lg bg-brand/10 flex items-center justify-center"><Users className="w-4 h-4 text-brand" /></div>
+            </div>
+            <p className="text-3xl font-extrabold text-text-primary">{stats.totalUsers}</p>
+            <p className="text-xs text-text-muted mt-1">{stats.activeUsers} active</p>
+          </div>
+          <div className="bg-surface border border-l-4 border-amber-500/20 border-l-amber-500 rounded-xl p-5">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-semibold text-text-muted uppercase tracking-wide">Pending</p>
+              <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center relative">
+                <ShieldCheck className="w-4 h-4 text-amber-400" />
+                {stats.pendingRequests > 0 && <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-amber-500 rounded-full text-[8px] font-black text-white flex items-center justify-center">{stats.pendingRequests}</span>}
+              </div>
+            </div>
+            <p className="text-3xl font-extrabold text-text-primary">{stats.pendingRequests}</p>
+            <p className="text-xs text-text-muted mt-1">
+              {stats.pendingRequests > 0
+                ? <button onClick={() => { setActiveView('requests'); setReqFilter('pending'); }}
+                    className="text-amber-500 hover:text-amber-400 font-semibold">Review now →</button>
+                : 'all caught up'}
+            </p>
+          </div>
+          <div className="bg-surface border border-l-4 border-green-500/20 border-l-green-500 rounded-xl p-5">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-semibold text-text-muted uppercase tracking-wide">Active</p>
+              <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center"><CheckCircle className="w-4 h-4 text-green-400" /></div>
+            </div>
+            <p className="text-3xl font-extrabold text-text-primary">{stats.activeUsers}</p>
+            <p className="text-xs text-text-muted mt-1">{stats.totalUsers - stats.activeUsers} disabled</p>
+          </div>
+          <div className="bg-surface border border-l-4 border-blue-500/20 border-l-blue-500 rounded-xl p-5">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-semibold text-text-muted uppercase tracking-wide">Roles in Use</p>
+              <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center"><Users className="w-4 h-4 text-blue-400" /></div>
+            </div>
+            <p className="text-3xl font-extrabold text-text-primary">{Object.keys(stats.roleCounts || {}).length}</p>
+            <p className="text-xs text-text-muted mt-1 truncate">
+              {Object.entries(stats.roleCounts || {}).map(([r, c]) => `${c} ${ROLE_LABEL[r] || r}`).join(' · ')}
+            </p>
+          </div>
         </div>
       )}
 
-      {/* Sub-nav */}
-      <div className="flex gap-1 bg-surface-2 border border-border p-1 rounded-xl w-fit">
-        {[
-          { id: 'users',    label: 'Users Roster',     icon: Users },
-          { id: 'requests', label: `Access Requests${pending.length ? ` (${pending.length})` : ''}`, icon: ShieldCheck },
-        ].map(v => (
-          <button key={v.id} onClick={() => setActiveView(v.id)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
-              activeView === v.id
-                ? 'bg-surface shadow text-text-primary'
-                : 'text-text-muted hover:text-text-primary'
-            }`}>
-            <v.icon className="w-3.5 h-3.5" />
-            {v.label}
-          </button>
-        ))}
+      {/* ── Role Distribution Bar ── */}
+      {!loadingU && users.length > 0 && (
+        <div className="bg-surface border border-border rounded-xl p-4">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-semibold text-text-muted uppercase tracking-wide">Role Distribution</p>
+            <p className="text-xs text-text-muted">{users.length} total users</p>
+          </div>
+          <div className="flex h-2 rounded-full overflow-hidden mb-3 gap-0.5">
+            {allRoles.map(role => (
+              <div key={role} title={`${ROLE_LABEL[role] || role}: ${roleCounts[role]}`}
+                className={`${ROLE_DOT[role] || 'bg-surface-2'} transition-all duration-700 cursor-pointer`}
+                style={{ width: `${(roleCounts[role] / users.length) * 100}%`, minWidth: 4 }}
+                onClick={() => setRoleFilter(role === roleFilter ? 'all' : role)}
+              />
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {allRoles.map(role => (
+              <button key={role}
+                onClick={() => { setRoleFilter(role === roleFilter ? 'all' : role); setActiveView('users'); }}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[10px] font-bold uppercase tracking-wide transition-all ${
+                  roleFilter === role
+                    ? (ROLE_STYLE[role] || 'bg-surface-2 text-text-muted border-border') + ' shadow-sm'
+                    : 'bg-surface border-border text-text-muted hover:text-text-primary'
+                }`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${ROLE_DOT[role] || 'bg-surface-2'}`} />
+                {ROLE_LABEL[role] || role}
+                <span className="font-black">{roleCounts[role]}</span>
+              </button>
+            ))}
+            {roleFilter !== 'all' && (
+              <button onClick={() => setRoleFilter('all')} className="text-[10px] text-brand hover:text-brand-hover font-semibold">Clear ×</button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Section Navigation ── */}
+      <div className="flex items-center justify-between">
+        <div className="flex gap-0 bg-surface-2 border border-border p-1 rounded-xl w-fit">
+          {[
+            { id: 'users',    label: 'Users Roster', icon: Users,       count: users.length },
+            { id: 'requests', label: 'Access Requests', icon: ShieldCheck, count: pending.length, pulse: pending.length > 0 },
+          ].map(v => (
+            <button key={v.id} onClick={() => setActiveView(v.id)}
+              className={`relative flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                activeView === v.id ? 'bg-surface shadow text-text-primary' : 'text-text-muted hover:text-text-primary'
+              }`}>
+              {v.pulse && <span className="absolute top-1 right-1 w-2 h-2 bg-amber-500 rounded-full animate-pulse" />}
+              <v.icon className="w-3.5 h-3.5" />
+              {v.label}
+              <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${
+                activeView === v.id ? 'bg-brand/10 text-brand' : 'bg-surface text-text-muted'
+              }`}>{v.count}</span>
+            </button>
+          ))}
+        </div>
+        <button onClick={() => { fetchUsers(); fetchRequests(); }}
+          className="p-2 text-text-muted hover:text-brand rounded-lg transition-colors" title="Refresh">
+          <RefreshCw className="w-4 h-4" />
+        </button>
       </div>
 
-      {/* ── VIEW: Users Roster ── */}
+      {/* ══════════════════════════════════════════════════════
+          VIEW: Users Roster
+      ══════════════════════════════════════════════════════ */}
       {activeView === 'users' && (
-        <div>
+        <div className="bg-surface border border-border rounded-2xl overflow-hidden">
+          {/* Command bar */}
+          <div className="px-4 pt-4 pb-0 border-b border-border">
+            {/* Row 1: search + status toggle */}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
+                <input type="text" value={userSearch} onChange={e => setUserSearch(e.target.value)}
+                  placeholder="Search by name, email, username…"
+                  className="w-full pl-9 pr-4 py-2 bg-surface border border-border rounded-lg text-sm text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-brand/50 focus:border-brand transition-colors" />
+              </div>
+              {/* Active/Inactive toggle */}
+              <div className="flex gap-1 bg-surface-2 border border-border p-0.5 rounded-lg flex-shrink-0">
+                {[
+                  { id: 'all',      label: 'All' },
+                  { id: 'active',   label: 'Active' },
+                  { id: 'inactive', label: 'Inactive' },
+                ].map(s => (
+                  <button key={s.id} onClick={() => setStatusFilter(s.id)}
+                    className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                      statusFilter === s.id
+                        ? s.id === 'active'   ? 'bg-green-500/15 text-green-500 shadow-sm'
+                        : s.id === 'inactive' ? 'bg-red-500/15 text-red-400 shadow-sm'
+                                              : 'bg-surface text-text-primary shadow-sm'
+                        : 'text-text-muted hover:text-text-primary'
+                    }`}>{s.label}</button>
+                ))}
+              </div>
+            </div>
+
+            {/* Row 2: Role filter tabs */}
+            <div className="flex gap-0 overflow-x-auto">
+              {ROLE_FILTERS.map(f => (
+                <button key={f.id} onClick={() => setRoleFilter(f.id)}
+                  className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold border-b-2 whitespace-nowrap transition-all ${
+                    roleFilter === f.id
+                      ? 'border-brand text-brand'
+                      : 'border-transparent text-text-muted hover:text-text-primary hover:border-border'
+                  }`}>
+                  {f.id !== 'all' && <span className={`w-1.5 h-1.5 rounded-full ${ROLE_DOT[f.id] || 'bg-surface-2'}`} />}
+                  {f.label}
+                  <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${
+                    roleFilter === f.id ? 'bg-brand/10 text-brand' : 'bg-surface-2 text-text-muted'
+                  }`}>{f.count}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Table */}
           {loadingU ? (
-            <div className="space-y-3">
+            <div className="p-4 space-y-2">
               {[...Array(4)].map((_, i) => (
-                <div key={i} className="bg-surface border border-border rounded-xl p-4 animate-pulse flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-surface-2" />
-                  <div className="flex-1 space-y-2">
-                    <div className="h-3 bg-surface-2 rounded w-1/3" />
-                    <div className="h-2.5 bg-surface-2 rounded w-1/4" />
-                  </div>
+                <div key={i} className="flex items-center gap-4 animate-pulse py-2">
+                  <div className="w-9 h-9 rounded-xl bg-surface-2 flex-shrink-0" />
+                  <div className="flex-1 space-y-2"><div className="h-3 bg-surface-2 rounded w-1/3" /><div className="h-2.5 bg-surface-2 rounded w-1/4" /></div>
+                  <div className="h-5 bg-surface-2 rounded w-16" />
+                  <div className="h-5 bg-surface-2 rounded w-20" />
                 </div>
               ))}
             </div>
+          ) : filteredUsers.length === 0 ? (
+            <div className="text-center py-12">
+              <Users className="w-10 h-10 text-text-muted/30 mx-auto mb-3" />
+              <p className="text-text-muted text-sm">No users match these filters</p>
+              {(userSearch || roleFilter !== 'all' || statusFilter !== 'all') && (
+                <button onClick={() => { setUserSearch(''); setRoleFilter('all'); setStatusFilter('all'); }}
+                  className="mt-2 text-xs text-brand hover:text-brand-hover font-semibold">Clear filters</button>
+              )}
+            </div>
           ) : (
-            <div className="bg-surface border border-border rounded-2xl overflow-hidden">
+            <>
               {/* Table Header */}
               <div className="grid grid-cols-12 gap-3 px-5 py-3 bg-surface-2 border-b border-border text-[10px] font-bold uppercase tracking-widest text-text-muted">
                 <div className="col-span-4">User</div>
@@ -1300,112 +1482,134 @@ function AdminPanelTab() {
                 <div className="col-span-1 text-right">Action</div>
               </div>
 
-              {/* Table Rows */}
-              {users.length === 0 ? (
-                <div className="text-center py-12">
-                  <Users className="w-10 h-10 text-text-muted/30 mx-auto mb-3" />
-                  <p className="text-text-muted text-sm">No users found</p>
-                </div>
-              ) : (
-                users.map((u, i) => (
-                  <div key={u._id}
-                    className={`grid grid-cols-12 gap-3 px-5 py-3.5 items-center transition-colors hover:bg-surface-2/50 ${
-                      i < users.length - 1 ? 'border-b border-border' : ''
+              {filteredUsers.map((u, i) => (
+                <div key={u._id}
+                  className={`grid grid-cols-12 gap-3 px-5 py-3.5 items-center transition-colors hover:bg-surface-2/50 ${
+                    i < filteredUsers.length - 1 ? 'border-b border-border' : ''
+                  } ${!u.isActive ? 'opacity-60' : ''}`}>
+
+                  {/* Name + email */}
+                  <div className="col-span-4 flex items-center gap-3 min-w-0">
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold flex-shrink-0 border ${
+                      ROLE_STYLE[u.role] || 'bg-surface-2 text-text-muted border-border'
                     }`}>
-
-                    {/* Name + email */}
-                    <div className="col-span-4 flex items-center gap-3 min-w-0">
-                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold flex-shrink-0 ${
-                        ROLE_STYLE[u.role] || 'bg-surface-2 text-text-muted'
-                      }`}>
-                        {u.name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2)}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-text-primary truncate">{u.name}</p>
-                        <p className="text-xs text-text-muted truncate">{u.email || '—'}</p>
-                      </div>
+                      {u.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
                     </div>
-
-                    {/* Username */}
-                    <div className="col-span-2">
-                      <span className="text-xs font-mono text-text-muted bg-surface-2 px-2 py-0.5 rounded">@{u.username}</span>
-                    </div>
-
-                    {/* Role badge */}
-                    <div className="col-span-2">
-                      <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide border ${
-                        ROLE_STYLE[u.role] || 'bg-surface-2 text-text-muted border-border'
-                      }`}>
-                        {ROLE_LABEL[u.role] || u.role}
-                      </span>
-                    </div>
-
-                    {/* Joined */}
-                    <div className="col-span-2">
-                      <p className="text-xs text-text-muted">
-                        {new Date(u.createdAt).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'2-digit' })}
-                      </p>
-                    </div>
-
-                    {/* Status */}
-                    <div className="col-span-1">
-                      <span className={`inline-flex items-center gap-1 text-[10px] font-bold ${
-                        u.isActive ? 'text-green-500' : 'text-text-muted'
-                      }`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${
-                          u.isActive ? 'bg-green-500' : 'bg-text-muted/40'
-                        }`} />
-                        {u.isActive ? 'Active' : 'Off'}
-                      </span>
-                    </div>
-
-                    {/* Toggle action */}
-                    <div className="col-span-1 flex justify-end">
-                      <button
-                        onClick={() => handleToggle(u._id)}
-                        disabled={togglingId === u._id}
-                        title={u.isActive ? 'Deactivate user' : 'Activate user'}
-                        className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold border transition-all disabled:opacity-40 ${
-                          u.isActive
-                            ? 'border-red-400/30 text-red-400 hover:bg-red-500/10'
-                            : 'border-green-500/30 text-green-500 hover:bg-green-500/10'
-                        }`}>
-                        {togglingId === u._id ? '…' : u.isActive ? 'Disable' : 'Enable'}
-                      </button>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-text-primary truncate">{u.name}</p>
+                      <p className="text-xs text-text-muted truncate">{u.email || '—'}</p>
                     </div>
                   </div>
-                ))
-              )}
-            </div>
+
+                  {/* Username */}
+                  <div className="col-span-2">
+                    <span className="text-xs font-mono text-text-muted bg-surface-2 px-2 py-0.5 rounded">@{u.username}</span>
+                  </div>
+
+                  {/* Role badge */}
+                  <div className="col-span-2">
+                    <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide border ${
+                      ROLE_STYLE[u.role] || 'bg-surface-2 text-text-muted border-border'
+                    }`}>{ROLE_LABEL[u.role] || u.role}</span>
+                  </div>
+
+                  {/* Joined */}
+                  <div className="col-span-2">
+                    <p className="text-xs text-text-muted">
+                      {new Date(u.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })}
+                    </p>
+                  </div>
+
+                  {/* Status */}
+                  <div className="col-span-1">
+                    <span className={`inline-flex items-center gap-1 text-[10px] font-bold ${u.isActive ? 'text-green-500' : 'text-red-400'}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${u.isActive ? 'bg-green-500 animate-pulse' : 'bg-red-400/60'}`} />
+                      {u.isActive ? 'Active' : 'Off'}
+                    </span>
+                  </div>
+
+                  {/* Toggle */}
+                  <div className="col-span-1 flex justify-end">
+                    <button onClick={() => handleToggle(u._id)} disabled={togglingId === u._id}
+                      title={u.isActive ? 'Deactivate user' : 'Activate user'}
+                      className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold border transition-all disabled:opacity-40 ${
+                        u.isActive
+                          ? 'border-red-400/30 text-red-400 hover:bg-red-500/10'
+                          : 'border-green-500/30 text-green-500 hover:bg-green-500/10'
+                      }`}>
+                      {togglingId === u._id ? '…' : u.isActive ? 'Disable' : 'Enable'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              {/* Footer */}
+              <div className="px-5 py-3 border-t border-border bg-surface-2">
+                <p className="text-xs text-text-muted">
+                  Showing <span className="font-semibold text-text-primary">{filteredUsers.length}</span> of <span className="font-semibold text-text-primary">{users.length}</span> users
+                  {roleFilter !== 'all' && <> · role: <span className="font-semibold">{ROLE_LABEL[roleFilter] || roleFilter}</span></>}
+                  {statusFilter !== 'all' && <> · status: <span className="font-semibold capitalize">{statusFilter}</span></>}
+                </p>
+              </div>
+            </>
           )}
         </div>
       )}
 
-      {/* ── VIEW: Access Requests ── */}
+      {/* ══════════════════════════════════════════════════════
+          VIEW: Access Requests
+      ══════════════════════════════════════════════════════ */}
       {activeView === 'requests' && (
-        <div className="space-y-6">
-
-          {/* Pending */}
-          <div>
-            <div className="flex items-center gap-2 mb-4">
-              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-              <h3 className="text-sm font-bold text-text-primary uppercase tracking-wider">Pending ({pending.length})</h3>
+        <div className="bg-surface border border-border rounded-2xl overflow-hidden">
+          {/* Request filter tabs */}
+          <div className="px-4 pt-0 border-b border-border">
+            <div className="flex gap-0 overflow-x-auto">
+              {[
+                { id: 'pending',  label: 'Pending',  count: pending.length,  pulse: pending.length > 0 },
+                { id: 'approved', label: 'Approved', count: approved.length },
+                { id: 'rejected', label: 'Rejected', count: rejected.length },
+                { id: 'all',      label: 'All',      count: requests.length },
+              ].map(f => (
+                <button key={f.id} onClick={() => setReqFilter(f.id)}
+                  className={`relative flex items-center gap-1.5 px-4 py-3 text-xs font-semibold border-b-2 whitespace-nowrap transition-all ${
+                    reqFilter === f.id
+                      ? f.id === 'pending'  ? 'border-amber-500 text-amber-500'
+                      : f.id === 'approved' ? 'border-green-500 text-green-500'
+                      : f.id === 'rejected' ? 'border-red-500 text-red-400'
+                                            : 'border-brand text-brand'
+                      : 'border-transparent text-text-muted hover:text-text-primary'
+                  }`}>
+                  {f.pulse && <span className="absolute top-2 right-1 w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse" />}
+                  {f.label}
+                  <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${
+                    reqFilter === f.id ? 'bg-brand/10 text-brand' : 'bg-surface-2 text-text-muted'
+                  }`}>{f.count}</span>
+                </button>
+              ))}
             </div>
+          </div>
+
+          {/* Request Cards */}
+          <div className="p-4">
             {loadingR ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {[...Array(2)].map((_, i) => (
-                  <div key={i} className="bg-surface border border-border rounded-xl p-5 animate-pulse h-36" />
-                ))}
+                {[...Array(2)].map((_, i) => <div key={i} className="bg-surface-2 rounded-xl h-36 animate-pulse" />)}
               </div>
-            ) : pending.length === 0 ? (
-              <div className="text-center py-12 bg-surface border border-border rounded-xl">
+            ) : visibleRequests.length === 0 ? (
+              <div className="text-center py-12">
                 <CheckCircle className="w-10 h-10 text-green-400/40 mx-auto mb-3" />
-                <p className="text-text-muted text-sm font-medium">All caught up — no pending requests</p>
+                <p className="text-text-muted text-sm font-medium">
+                  {reqFilter === 'pending' ? 'All caught up — no pending requests' : `No ${reqFilter} requests`}
+                </p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {pending.map(r => (
-                  <div key={r._id} className="bg-surface border border-amber-400/25 border-l-4 border-l-amber-400 rounded-xl p-5">
+                {visibleRequests.map(r => (
+                  <div key={r._id} className={`bg-surface rounded-xl p-5 border border-l-4 ${
+                    r.status === 'pending'  ? 'border-amber-400/20 border-l-amber-400' :
+                    r.status === 'approved' ? 'border-green-500/20 border-l-green-500' :
+                                             'border-red-400/20 border-l-red-400'
+                  }`}>
                     <div className="flex items-start justify-between mb-3">
                       <div className="min-w-0">
                         <p className="font-semibold text-text-primary truncate">{r.name}</p>
@@ -1415,6 +1619,7 @@ function AdminPanelTab() {
                         {r.status}
                       </span>
                     </div>
+
                     <div className="flex items-center gap-2 mb-4">
                       <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border ${ROLE_STYLE[r.role] || 'bg-surface-2 text-text-muted border-border'}`}>
                         {ROLE_LABEL[r.role] || r.role}
@@ -1423,65 +1628,59 @@ function AdminPanelTab() {
                         {new Date(r.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                       </span>
                     </div>
-                    {rejectId === r._id ? (
-                      <div className="space-y-2">
-                        <textarea value={rejectNote} onChange={e => setRejectNote(e.target.value)}
-                          placeholder="Reason for rejection (optional)" rows={2}
-                          className="w-full px-3 py-2 text-xs bg-surface-2 border border-border rounded-lg text-text-primary placeholder:text-text-muted resize-none focus:outline-none focus:ring-2 focus:ring-red-400/30"
-                        />
-                        <div className="flex gap-2">
-                          <button onClick={() => handleReject(r._id)} disabled={actionLoad === r._id}
-                            className="flex-1 py-2 bg-red-500 hover:bg-red-600 text-white text-xs font-bold rounded-lg transition-all disabled:opacity-50">
-                            {actionLoad === r._id ? 'Rejecting…' : 'Confirm Reject'}
-                          </button>
-                          <button onClick={() => { setRejectId(null); setRejectNote(''); }}
-                            className="px-3 py-2 border border-border text-text-muted text-xs rounded-lg hover:bg-surface-2 transition-colors">Cancel</button>
+
+                    {r.approvedBy && <p className="text-text-muted text-[10px] mb-1">By: {r.approvedBy}</p>}
+                    {r.note && <p className="text-text-muted text-[10px] italic mb-3">"{r.note}"</p>}
+
+                    {/* Actions — only show for pending */}
+                    {r.status === 'pending' && (
+                      rejectId === r._id ? (
+                        <div className="space-y-2">
+                          <textarea value={rejectNote} onChange={e => setRejectNote(e.target.value)}
+                            placeholder="Reason for rejection (optional)" rows={2}
+                            className="w-full px-3 py-2 text-xs bg-surface-2 border border-border rounded-lg text-text-primary placeholder:text-text-muted resize-none focus:outline-none focus:ring-2 focus:ring-red-400/30" />
+                          <div className="flex gap-2">
+                            <button onClick={() => handleReject(r._id)} disabled={actionLoad === r._id}
+                              className="flex-1 py-2 bg-red-500 hover:bg-red-600 text-white text-xs font-bold rounded-lg transition-all disabled:opacity-50">
+                              {actionLoad === r._id ? 'Rejecting…' : 'Confirm Reject'}
+                            </button>
+                            <button onClick={() => { setRejectId(null); setRejectNote(''); }}
+                              className="px-3 py-2 border border-border text-text-muted text-xs rounded-lg hover:bg-surface-2 transition-colors">Cancel</button>
+                          </div>
                         </div>
-                      </div>
-                    ) : (
-                      <div className="flex gap-2">
-                        <button onClick={() => handleApprove(r._id, r.name)} disabled={actionLoad === r._id}
-                          className="flex-1 py-2 bg-green-500 hover:bg-green-600 text-white text-xs font-bold rounded-lg transition-all disabled:opacity-50 flex items-center justify-center gap-1.5">
-                          <CheckCircle className="w-3.5 h-3.5" />
-                          {actionLoad === r._id ? 'Approving…' : 'Approve'}
-                        </button>
-                        <button onClick={() => setRejectId(r._id)}
-                          className="flex-1 py-2 border border-red-400/30 text-red-500 hover:bg-red-500/5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5">
-                          <XCircle className="w-3.5 h-3.5" /> Reject
-                        </button>
-                      </div>
+                      ) : (
+                        <div className="flex gap-2">
+                          <button onClick={() => handleApprove(r._id, r.name)} disabled={actionLoad === r._id}
+                            className="flex-1 py-2 bg-green-500 hover:bg-green-600 text-white text-xs font-bold rounded-lg transition-all disabled:opacity-50 flex items-center justify-center gap-1.5">
+                            <CheckCircle className="w-3.5 h-3.5" />
+                            {actionLoad === r._id ? 'Approving…' : 'Approve'}
+                          </button>
+                          <button onClick={() => setRejectId(r._id)}
+                            className="flex-1 py-2 border border-red-400/30 text-red-500 hover:bg-red-500/5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5">
+                            <XCircle className="w-3.5 h-3.5" /> Reject
+                          </button>
+                        </div>
+                      )
                     )}
                   </div>
                 ))}
               </div>
             )}
-          </div>
 
-          {/* History */}
-          {resolved.length > 0 && (
-            <div>
-              <p className="text-xs font-bold text-text-muted uppercase tracking-wider mb-3">History ({resolved.length})</p>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {resolved.map(r => (
-                  <div key={r._id} className="bg-surface border border-border rounded-xl p-4">
-                    <div className="flex items-center justify-between mb-1">
-                      <p className="text-sm font-semibold text-text-primary truncate">{r.name}</p>
-                      <span className={`ml-2 flex-shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold border ${STATUS_BADGE[r.status]}`}>{r.status}</span>
-                    </div>
-                    <p className="text-text-muted text-xs truncate mb-1">{r.email}</p>
-                    {r.approvedBy && <p className="text-text-muted text-[10px]">By: {r.approvedBy}</p>}
-                    {r.note && <p className="text-text-muted text-[10px] italic mt-1">"{r.note}"</p>}
-                  </div>
-                ))}
+            {/* Footer */}
+            {!loadingR && visibleRequests.length > 0 && (
+              <div className="mt-4 pt-3 border-t border-border">
+                <p className="text-xs text-text-muted">
+                  {visibleRequests.length} {reqFilter === 'all' ? 'total' : reqFilter} request{visibleRequests.length !== 1 ? 's' : ''}
+                </p>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       )}
     </div>
   );
 }
-
 
 const NAV_TABS = [
   { id: 'overview',  label: 'Overview',      icon: LayoutDashboard },
