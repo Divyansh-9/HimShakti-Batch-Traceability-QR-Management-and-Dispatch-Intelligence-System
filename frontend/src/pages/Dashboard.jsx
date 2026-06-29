@@ -204,44 +204,95 @@ function SkeletonRow() {
 }
 
 // ── Tab: Overview ───────────────────────────────────────────
-function OverviewTab({ batches, loading }) {
+function OverviewTab({ batches, loading, onTabSwitch }) {
   const total      = batches.length;
   const dispatched = batches.filter(b => b.status === 'DISPATCHED').length;
   const urgent     = batches.filter(b => b.status === 'URGENT').length;
   const warning    = batches.filter(b => b.status === 'WARNING').length;
+  const ready      = batches.filter(b => b.status === 'READY').length;
+  const active     = batches.filter(b => b.status !== 'DISPATCHED').length;
 
+  // Main KPI cards
   const kpis = [
-    { label: 'Total Batches',    value: total,      numVal: total,      icon: Package,       color: 'text-brand',     border: 'border-l-4 border-brand',       bg: 'bg-brand/5',       sub: 'across all product lines' },
-    { label: 'Dispatched',       value: dispatched, numVal: dispatched, icon: Truck,         color: 'text-blue-500',  border: 'border-l-4 border-blue-500',    bg: 'bg-blue-500/5',    sub: 'shipments completed' },
-    { label: 'Urgent / Warning', value: null,       numVal: null,       icon: AlertTriangle, color: 'text-amber-500', border: 'border-l-4 border-amber-500', bg: 'bg-amber-500/5',   sub: 'require attention',
-      customValue: <><AnimatedStat value={urgent} /><span className="text-xl font-bold text-text-muted mx-1">/</span><AnimatedStat value={warning} /></> },
+    { label: 'Total Batches',  value: total,      icon: Package,       color: 'text-brand',     bg: 'bg-brand/5',      bar: 'bg-brand',      border: 'border-l-4 border-brand',      sub: 'across all product lines' },
+    { label: 'Active Stock',   value: active,     icon: Leaf,          color: 'text-green-500', bg: 'bg-green-500/5',  bar: 'bg-green-500',  border: 'border-l-4 border-green-500',  sub: 'batches in warehouse' },
+    { label: 'Dispatched',     value: dispatched, icon: Truck,         color: 'text-blue-500',  bg: 'bg-blue-500/5',   bar: 'bg-blue-500',   border: 'border-l-4 border-blue-500',   sub: 'shipments completed' },
+    { label: 'Need Attention', value: urgent + warning, icon: AlertTriangle, color: 'text-amber-500', bg: 'bg-amber-500/5', bar: 'bg-amber-500', border: 'border-l-4 border-amber-500', sub: 'urgent or warning status' },
+  ];
+
+  // Status breakdown — clickable, navigates to filtered batches
+  const STATUS_PILLS = [
+    { status: 'URGENT',  count: urgent,  label: 'Urgent',  cls: 'bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20',    dot: 'bg-red-500' },
+    { status: 'WARNING', count: warning, label: 'Warning', cls: 'bg-amber-500/10 text-amber-500 border-amber-500/20 hover:bg-amber-500/20', dot: 'bg-amber-500' },
+    { status: 'READY',   count: ready,   label: 'Ready',   cls: 'bg-green-500/10 text-green-500 border-green-500/20 hover:bg-green-500/20',  dot: 'bg-green-500' },
+    { status: 'DISPATCHED', count: dispatched, label: 'Dispatched', cls: 'bg-blue-500/10 text-blue-500 border-blue-500/20 hover:bg-blue-500/20', dot: 'bg-blue-500' },
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+    <div className="space-y-5">
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {kpis.map(kpi => (
-          <div key={kpi.label} className={`bg-surface border border-border rounded-xl p-6 ${kpi.border} hover:shadow-md transition-shadow duration-200`}>
+          <div key={kpi.label} className={`bg-surface border border-border rounded-xl p-5 ${kpi.border} hover:shadow-md transition-all duration-200 cursor-default`}>
             <div className="flex items-center justify-between mb-3">
-              <p className="text-text-muted text-sm font-medium">{kpi.label}</p>
+              <p className="text-text-muted text-xs font-semibold uppercase tracking-wide">{kpi.label}</p>
               <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${kpi.bg}`}>
                 <kpi.icon className={`w-4 h-4 ${kpi.color}`} />
               </div>
             </div>
             {loading
-              ? <div className="h-9 w-20 bg-surface-2 rounded animate-pulse" />
+              ? <div className="h-9 w-16 bg-surface-2 rounded animate-pulse" />
               : <p className="text-3xl font-extrabold text-text-primary tracking-tight">
-                  {kpi.customValue ?? <AnimatedStat value={kpi.numVal} />}
+                  <AnimatedStat value={kpi.value} />
                 </p>
             }
-            <p className="text-xs text-text-muted mt-2 font-medium">{kpi.sub}</p>
+            <p className="text-xs text-text-muted mt-1.5">{kpi.sub}</p>
           </div>
         ))}
       </div>
 
+      {/* Status breakdown — jump to batches filtered by status */}
+      <div className="bg-surface border border-border rounded-xl p-4">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-xs font-semibold text-text-muted uppercase tracking-wide">Status Breakdown</p>
+          <button onClick={() => onTabSwitch('batches')}
+            className="text-xs text-brand hover:text-brand-hover font-semibold transition-colors">View all batches →</button>
+        </div>
+        {loading ? (
+          <div className="flex gap-2">
+            {[...Array(4)].map((_, i) => <div key={i} className="h-8 bg-surface-2 rounded-lg flex-1 animate-pulse" />)}
+          </div>
+        ) : (
+          <>
+            {/* Progress bar */}
+            <div className="flex h-2 rounded-full overflow-hidden mb-3 gap-0.5">
+              {STATUS_PILLS.map(p => p.count > 0 && (
+                <div key={p.status} className={`${p.dot} transition-all duration-700`}
+                  style={{ width: `${(p.count / total) * 100}%`, minWidth: p.count > 0 ? 4 : 0 }} />
+              ))}
+            </div>
+            {/* Clickable pills */}
+            <div className="flex flex-wrap gap-2">
+              {STATUS_PILLS.map(p => (
+                <button key={p.status}
+                  onClick={() => onTabSwitch('batches', p.status)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all duration-150 ${p.cls}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${p.dot}`} />
+                  {p.label}
+                  <span className="font-black ml-0.5">{p.count}</span>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Recent batches table */}
       <div className="bg-surface border border-border rounded-xl overflow-hidden">
-        <div className="px-6 py-4 border-b border-border">
+        <div className="px-6 py-4 border-b border-border flex items-center justify-between">
           <h2 className="text-sm font-semibold text-text-primary">Recent Batches</h2>
+          <button onClick={() => onTabSwitch('batches')}
+            className="text-xs text-brand hover:text-brand-hover font-semibold transition-colors">View all →</button>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-border">
@@ -273,12 +324,17 @@ function OverviewTab({ batches, loading }) {
   );
 }
 
-// ── Tab: Batches (full table + QR download + scan count) ────
-function BatchesTab({ batches, loading, onNewBatch, onDownloadQR, onDispatch }) {
+// ── Tab: Batches (full table + status filter + sort) ────────
+function BatchesTab({ batches, loading, onNewBatch, onDownloadQR, onDispatch, initialFilter = 'all' }) {
   const [scanInfo, setScanInfo]       = useState({});
   const [loadingScans, setLoadingScans] = useState({});
   const [query, setQuery]             = useState('');
-  const { getBatchScans }              = useBatches();
+  const [statusFilter, setStatusFilter] = useState(initialFilter);
+  const [sortBy, setSortBy]           = useState('expiry');
+  const { getBatchScans }             = useBatches();
+
+  // Sync initialFilter if parent changes it (e.g. clicking from Overview)
+  useEffect(() => { setStatusFilter(initialFilter); }, [initialFilter]);
 
   async function handleViewScans(batchId) {
     if (scanInfo[batchId]) return;
@@ -291,33 +347,96 @@ function BatchesTab({ batches, loading, onNewBatch, onDownloadQR, onDispatch }) 
     }
   }
 
-  const filtered = batches.filter(b =>
-    !query ||
-    b.batchCode?.toLowerCase().includes(query.toLowerCase()) ||
-    b.productName?.toLowerCase().includes(query.toLowerCase()) ||
-    b.farmerName?.toLowerCase().includes(query.toLowerCase()) ||
-    b.status?.toLowerCase().includes(query.toLowerCase())
+  const STATUS_FILTERS = [
+    { id: 'all',        label: 'All',        count: batches.length },
+    { id: 'URGENT',     label: 'Urgent',     count: batches.filter(b => b.status === 'URGENT').length },
+    { id: 'WARNING',    label: 'Warning',    count: batches.filter(b => b.status === 'WARNING').length },
+    { id: 'READY',      label: 'Ready',      count: batches.filter(b => b.status === 'READY').length },
+    { id: 'DISPATCHED', label: 'Dispatched', count: batches.filter(b => b.status === 'DISPATCHED').length },
+  ];
+
+  const FILTER_ACCENT = {
+    URGENT:     'text-red-500',
+    WARNING:    'text-amber-500',
+    READY:      'text-green-500',
+    DISPATCHED: 'text-blue-500',
+    all:        'text-brand',
+  };
+
+  const SORT_OPTIONS = [
+    { id: 'expiry',  label: 'Expiry (soonest)' },
+    { id: 'code',    label: 'Batch Code (A→Z)' },
+    { id: 'product', label: 'Product (A→Z)' },
+    { id: 'status',  label: 'Status' },
+  ];
+
+  function sortBatches(list) {
+    return [...list].sort((a, b) => {
+      if (sortBy === 'expiry')  return (a.daysUntilExpiry ?? 9999) - (b.daysUntilExpiry ?? 9999);
+      if (sortBy === 'code')    return (a.batchCode || '').localeCompare(b.batchCode || '');
+      if (sortBy === 'product') return (a.productName || '').localeCompare(b.productName || '');
+      if (sortBy === 'status')  {
+        const ORDER = { URGENT: 0, WARNING: 1, READY: 2, DISPATCHED: 3 };
+        return (ORDER[a.status] ?? 4) - (ORDER[b.status] ?? 4);
+      }
+      return 0;
+    });
+  }
+
+  const filtered = sortBatches(
+    batches.filter(b =>
+      (statusFilter === 'all' || b.status === statusFilter) &&
+      (!query ||
+        b.batchCode?.toLowerCase().includes(query.toLowerCase()) ||
+        b.productName?.toLowerCase().includes(query.toLowerCase()) ||
+        b.farmerName?.toLowerCase().includes(query.toLowerCase()))
+    )
   );
 
   return (
     <div className="bg-surface border border-border rounded-xl overflow-hidden">
-      {/* Header row */}
-      <div className="px-6 py-4 border-b border-border flex flex-col sm:flex-row sm:items-center gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
-          <input
-            type="text"
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            placeholder="Search by code, product, farmer, status…"
-            className="w-full pl-9 pr-4 py-2 bg-surface border border-border rounded-lg text-sm text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-brand/50 focus:border-brand transition-colors"
-          />
+      {/* ── Command bar ── */}
+      <div className="px-4 pt-4 pb-0 border-b border-border">
+        {/* Row 1: search + new batch + sort */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
+            <input
+              type="text" value={query} onChange={e => setQuery(e.target.value)}
+              placeholder="Search by code, product, farmer…"
+              className="w-full pl-9 pr-4 py-2 bg-surface border border-border rounded-lg text-sm text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-brand/50 focus:border-brand transition-colors"
+            />
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <select value={sortBy} onChange={e => setSortBy(e.target.value)}
+              className="py-2 pl-3 pr-8 bg-surface border border-border rounded-lg text-xs font-medium text-text-muted focus:outline-none focus:ring-2 focus:ring-brand/50 cursor-pointer appearance-none">
+              {SORT_OPTIONS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+            </select>
+            <button onClick={onNewBatch}
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand hover:bg-brand-hover text-white text-sm font-semibold rounded-lg transition-colors">
+              <Plus className="w-4 h-4" /> New Batch
+            </button>
+          </div>
         </div>
-        <button onClick={onNewBatch}
-          className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand hover:bg-brand-hover text-white text-sm font-medium rounded-lg transition-colors flex-shrink-0">
-          <Package className="w-4 h-4" /> + New Batch
-        </button>
+
+        {/* Row 2: status filter tabs */}
+        <div className="flex gap-0 overflow-x-auto">
+          {STATUS_FILTERS.map(f => (
+            <button key={f.id} onClick={() => setStatusFilter(f.id)}
+              className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold border-b-2 whitespace-nowrap transition-all ${
+                statusFilter === f.id
+                  ? `border-brand ${FILTER_ACCENT[f.id] || 'text-brand'}`
+                  : 'border-transparent text-text-muted hover:text-text-primary hover:border-border'
+              }`}>
+              {f.label}
+              <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${
+                statusFilter === f.id ? 'bg-brand/10 text-brand' : 'bg-surface-2 text-text-muted'
+              }`}>{f.count}</span>
+            </button>
+          ))}
+        </div>
       </div>
+
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-border">
           <thead className="bg-surface-2">
@@ -339,12 +458,11 @@ function BatchesTab({ batches, loading, onNewBatch, onDownloadQR, onDispatch }) 
                           <Package className="w-6 h-6 text-text-muted opacity-40" />
                         </div>
                         <p className="text-text-muted text-sm font-medium">
-                          {query ? `No batches match "${query}"` : 'No batches yet'}
+                          {query ? `No batches match "${query}"` : `No ${statusFilter === 'all' ? '' : statusFilter.toLowerCase() + ' '}batches`}
                         </p>
-                        {query && (
-                          <button onClick={() => setQuery('')} className="text-xs text-brand hover:text-brand-hover">
-                            Clear search
-                          </button>
+                        {(query || statusFilter !== 'all') && (
+                          <button onClick={() => { setQuery(''); setStatusFilter('all'); }}
+                            className="text-xs text-brand hover:text-brand-hover font-medium">Clear filters</button>
                         )}
                       </div>
                     </td>
@@ -355,27 +473,30 @@ function BatchesTab({ batches, loading, onNewBatch, onDownloadQR, onDispatch }) 
                   <td className="px-4 py-4 text-sm font-mono font-medium text-brand">{b.batchCode}</td>
                   <td className="px-4 py-4 text-sm text-text-muted">{b.productName}</td>
                   <td className="px-4 py-4"><StatusBadge status={b.status} /></td>
-                  <td className="px-4 py-4 text-sm text-text-muted">{b.daysUntilExpiry} days</td>
+                  <td className="px-4 py-4">
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-xs text-text-muted">{b.daysUntilExpiry ?? '—'} days</span>
+                      {b.daysUntilExpiry !== null && b.daysUntilExpiry <= 30 && (
+                        <div className="h-1 w-16 bg-surface-2 rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full transition-all ${
+                            b.daysUntilExpiry <= 7 ? 'bg-red-500' : 'bg-amber-500'
+                          }`} style={{ width: `${Math.min(100, (b.daysUntilExpiry / 30) * 100)}%` }} />
+                        </div>
+                      )}
+                    </div>
+                  </td>
                   <td className="px-4 py-4 text-sm text-text-muted">{b.farmerName}, {b.village}</td>
                   <td className="px-4 py-4 text-xs text-text-muted">
-                    {loadingScans[b._id]
-                      ? '...'
-                      : scanInfo[b._id]
-                        ? `${scanInfo[b._id].totalScans} scans`
-                        : '—'}
+                    {loadingScans[b._id] ? '…' : scanInfo[b._id] ? `${scanInfo[b._id].totalScans} scans` : '—'}
                   </td>
                   <td className="px-4 py-4">
                     <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={() => onDownloadQR(b._id, b.batchCode)}
-                        title="Download QR"
+                      <button onClick={() => onDownloadQR(b._id, b.batchCode)} title="Download QR"
                         className="p-1.5 text-text-muted hover:text-brand hover:bg-brand/10 rounded-md transition-colors">
                         <Download className="w-4 h-4" />
                       </button>
                       {b.status !== 'DISPATCHED' && (
-                        <button
-                          onClick={() => onDispatch(b)}
-                          title="Mark Dispatched"
+                        <button onClick={() => onDispatch(b)} title="Mark Dispatched"
                           className="p-1.5 text-text-muted hover:text-blue-400 hover:bg-blue-400/10 rounded-md transition-colors">
                           <Truck className="w-4 h-4" />
                         </button>
@@ -388,6 +509,16 @@ function BatchesTab({ batches, loading, onNewBatch, onDownloadQR, onDispatch }) 
           </tbody>
         </table>
       </div>
+
+      {/* Row count footer */}
+      {!loading && filtered.length > 0 && (
+        <div className="px-6 py-3 border-t border-border bg-surface-2">
+          <p className="text-xs text-text-muted">
+            Showing <span className="font-semibold text-text-primary">{filtered.length}</span> of <span className="font-semibold text-text-primary">{batches.length}</span> batches
+            {statusFilter !== 'all' && <> · filtered by <span className="font-semibold capitalize">{statusFilter.toLowerCase()}</span></>}
+          </p>
+        </div>
+      )}
     </div>
   );
 }
@@ -395,45 +526,123 @@ function BatchesTab({ batches, loading, onNewBatch, onDownloadQR, onDispatch }) 
 // ── Tab: FEFO Dispatch Queue ─────────────────────────────────
 function FEFOTab() {
   const { queue, loading, error, refetch } = useDispatch();
+  const [filter, setFilter] = useState('all');
+
+  const FEFO_FILTERS = [
+    { id: 'all',     label: 'All',     count: queue.length },
+    { id: 'URGENT',  label: 'Urgent',  count: queue.filter(b => b.status === 'URGENT').length },
+    { id: 'WARNING', label: 'Warning', count: queue.filter(b => b.status === 'WARNING').length },
+    { id: 'READY',   label: 'Ready',   count: queue.filter(b => b.status === 'READY').length },
+  ];
+
+  const FILTER_ACCENT = { URGENT: 'text-red-500', WARNING: 'text-amber-500', READY: 'text-green-500', all: 'text-brand' };
+
+  const visible = queue.filter(b => filter === 'all' || b.status === filter);
+
+  // Max days for urgency bar scaling
+  const maxDays = Math.max(...queue.map(b => b.daysUntilExpiry ?? 1), 1);
+
+  function urgencyBar(daysLeft) {
+    if (daysLeft === null || daysLeft === undefined) return null;
+    const pct = Math.max(0, Math.min(100, (daysLeft / maxDays) * 100));
+    const color = daysLeft <= 7 ? 'bg-red-500' : daysLeft <= 30 ? 'bg-amber-500' : 'bg-green-500';
+    return (
+      <div className="w-20 h-1.5 bg-surface-2 rounded-full overflow-hidden">
+        <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
+      </div>
+    );
+  }
 
   return (
     <div className="bg-surface border border-border rounded-xl overflow-hidden">
-      <div className="px-6 py-4 border-b border-border flex justify-between items-center">
-        <div>
-          <h2 className="text-sm font-semibold text-text-primary">FEFO Dispatch Priority Queue</h2>
-          <p className="text-xs text-text-muted mt-0.5">First Expired → First Out. Dispatch from top.</p>
+      {/* Header */}
+      <div className="px-6 py-4 border-b border-border">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h2 className="text-sm font-semibold text-text-primary">FEFO Dispatch Priority Queue</h2>
+            <p className="text-xs text-text-muted mt-0.5">First Expired → First Out · Dispatch from top</p>
+          </div>
+          <button onClick={refetch} className="p-1.5 text-text-muted hover:text-brand rounded-md transition-colors" title="Refresh">
+            <RefreshCw className="w-4 h-4" />
+          </button>
         </div>
-        <button onClick={refetch} className="p-1.5 text-text-muted hover:text-brand rounded-md transition-colors" title="Refresh">
-          <RefreshCw className="w-4 h-4" />
-        </button>
+
+        {/* Filter tabs */}
+        <div className="flex gap-0 overflow-x-auto -mb-px">
+          {FEFO_FILTERS.map(f => (
+            <button key={f.id} onClick={() => setFilter(f.id)}
+              className={`flex items-center gap-1.5 px-4 py-2 text-xs font-semibold border-b-2 whitespace-nowrap transition-all ${
+                filter === f.id
+                  ? `border-brand ${FILTER_ACCENT[f.id] || 'text-brand'}`
+                  : 'border-transparent text-text-muted hover:text-text-primary'
+              }`}>
+              {f.label}
+              <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${
+                filter === f.id ? 'bg-brand/10 text-brand' : 'bg-surface-2 text-text-muted'
+              }`}>{f.count}</span>
+            </button>
+          ))}
+        </div>
       </div>
+
       {error && <div className="p-4 text-red-400 text-sm">{error}</div>}
+
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-border">
           <thead className="bg-surface-2">
             <tr>
-              {['Priority', 'Batch Code', 'Product', 'Expiry', 'Days Left', 'Score'].map(h => (
-                <th key={h} className="px-6 py-3 text-left text-xs font-semibold text-text-muted uppercase tracking-wider">{h}</th>
+              {['Priority', 'Batch Code', 'Product', 'Status', 'Days Left', 'Urgency', 'Score'].map(h => (
+                <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-text-muted uppercase tracking-wider">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
             {loading
               ? [...Array(3)].map((_, i) => <SkeletonRow key={i} />)
-              : queue.map((b, idx) => (
-                <tr key={b._id} className="hover:bg-surface-2 transition-colors">
-                  <td className="px-6 py-4 text-sm font-bold text-text-muted">#{idx + 1}</td>
-                  <td className="px-6 py-4 text-sm font-mono font-medium text-brand">{b.batchCode}</td>
-                  <td className="px-6 py-4 text-sm text-text-muted">{b.productName}</td>
-                  <td className="px-6 py-4 text-sm text-text-muted">{new Date(b.expiryDate).toLocaleDateString('en-IN')}</td>
-                  <td className="px-6 py-4"><StatusBadge status={b.status} /></td>
-                  <td className="px-6 py-4 text-sm font-semibold text-text-primary">{b.priorityScore?.toFixed(1)}</td>
+              : visible.length === 0
+                ? (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-12 text-center">
+                      <div className="flex flex-col items-center gap-2">
+                        <Truck className="w-8 h-8 text-text-muted opacity-30" />
+                        <p className="text-sm text-text-muted">No {filter === 'all' ? '' : filter.toLowerCase() + ' '}batches in queue</p>
+                        {filter !== 'all' && <button onClick={() => setFilter('all')} className="text-xs text-brand hover:text-brand-hover">Clear filter</button>}
+                      </div>
+                    </td>
+                  </tr>
+                )
+                : visible.map((b, idx) => (
+                <tr key={b._id} className={`hover:bg-surface-2 transition-colors ${
+                  b.status === 'URGENT' ? 'bg-red-500/[0.02]' : ''
+                }`}>
+                  <td className="px-5 py-4">
+                    <span className={`w-7 h-7 rounded-full inline-flex items-center justify-center text-xs font-black ${
+                      idx === 0 ? 'bg-brand text-white' :
+                      idx === 1 ? 'bg-surface-2 text-text-primary' :
+                                  'text-text-muted font-bold'
+                    }`}>#{idx + 1}</span>
+                  </td>
+                  <td className="px-5 py-4 text-sm font-mono font-medium text-brand">{b.batchCode}</td>
+                  <td className="px-5 py-4 text-sm text-text-muted">{b.productName}</td>
+                  <td className="px-5 py-4"><StatusBadge status={b.status} /></td>
+                  <td className="px-5 py-4 text-sm font-semibold text-text-primary">{b.daysUntilExpiry ?? '—'}</td>
+                  <td className="px-5 py-4">{urgencyBar(b.daysUntilExpiry)}</td>
+                  <td className="px-5 py-4 text-sm font-semibold text-text-primary">{b.priorityScore?.toFixed(1)}</td>
                 </tr>
               ))
             }
           </tbody>
         </table>
       </div>
+
+      {!loading && visible.length > 0 && (
+        <div className="px-6 py-3 border-t border-border bg-surface-2">
+          <p className="text-xs text-text-muted">
+            {visible.length} batch{visible.length !== 1 ? 'es' : ''} in queue
+            {filter !== 'all' && <> · filtered by <span className="font-semibold capitalize">{filter.toLowerCase()}</span></>}
+          </p>
+        </div>
+      )}
     </div>
   );
 }
@@ -1291,12 +1500,19 @@ export default function Dashboard() {
   const [isSidebarOpen, setIsSidebarOpen]   = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [batchToDispatch, setBatchToDispatch] = useState(null);
+  const [batchesFilter, setBatchesFilter]     = useState('all'); // cross-tab filter from Overview
   const { logout, getUser }                   = useAuth();
   const user                                  = getUser(); // { username, name, role }
   const { batches, loading, createBatch, downloadQR, dispatchBatch } = useBatches();
 
   // Connect to WebSocket for real-time batch updates across all dashboard tabs
   useSocket();
+
+  // Navigate to a tab, optionally pre-set a filter (e.g. from Overview status pills)
+  function handleTabSwitch(tabId, filter = 'all') {
+    if (tabId === 'batches') setBatchesFilter(filter);
+    setActiveTab(tabId);
+  }
 
   // Filter NAV_TABS — admin tab only visible to admin role
   const visibleTabs = NAV_TABS.filter(t => !t.adminOnly || user?.role === 'admin');
@@ -1425,7 +1641,7 @@ export default function Dashboard() {
             {activeTab === 'overview' && (
               <>
                 <TabBanner tabId="overview" />
-                <OverviewTab batches={batches} loading={loading} />
+                <OverviewTab batches={batches} loading={loading} onTabSwitch={handleTabSwitch} />
               </>
             )}
             {activeTab === 'batches' && (
@@ -1442,6 +1658,7 @@ export default function Dashboard() {
                   onNewBatch={() => setShowCreateModal(true)}
                   onDownloadQR={handleDownloadQR}
                   onDispatch={handleDispatch}
+                  initialFilter={batchesFilter}
                 />
               </>
             )}
