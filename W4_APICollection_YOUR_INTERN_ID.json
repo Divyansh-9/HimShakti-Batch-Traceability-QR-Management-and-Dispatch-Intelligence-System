@@ -69,7 +69,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"username\": \"manager\",\n  \"password\": \"himshakti2026\"\n}"
+          "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"himshakti2026\"\n}"
         },
         "url": {
           "raw": "{{base_url}}/auth/login",
@@ -95,7 +95,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"username\": \"manager\",\n  \"password\": \"himshakti2026\"\n}"
+              "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"himshakti2026\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/auth/login",
@@ -118,7 +118,7 @@
             }
           ],
           "cookie": [],
-          "body": "{\n  \"success\": true,\n  \"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\",\n  \"user\": {\n    \"id\": \"1\",\n    \"role\": \"manager\"\n  }\n}"
+          "body": "{\n  \"success\": true,\n  \"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\",\n  \"user\": {\n    \"id\": \"1\",\n    \"role\": \"{{username}}\"\n  }\n}"
         }
       ]
     },
