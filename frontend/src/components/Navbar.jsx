@@ -1,7 +1,19 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import ThemeToggle from './ThemeToggle';
-import { Menu, X, LayoutDashboard, LogIn, LogOut, ChevronDown, User, Settings, Shield } from 'lucide-react';
+import { Menu, X, LayoutDashboard, LogIn, LogOut, ChevronDown, User, Settings, Shield, Link2, LinkIcon, Unlink } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
+import client from '../api/client';
+import toast from 'react-hot-toast';
+
+// Official Google multi-color SVG logo (brand-compliant)
+const GoogleSVG = () => (
+  <svg width="14" height="14" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/>
+    <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/>
+    <path fill="#FBBC05" d="M3.964 10.707A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.707V4.961H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.039l3.007-2.332z"/>
+    <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.96L3.964 6.293C4.672 4.166 6.656 3.58 9 3.58z"/>
+  </svg>
+);
 
 // Pages where the navbar starts transparent and transitions on scroll
 const HERO_ROUTES = ['/', '/about', '/login'];
@@ -45,6 +57,49 @@ export default function Navbar() {
     try { return JSON.parse(localStorage.getItem('hs_user') || 'null'); }
     catch { return null; }
   })();
+
+  // Google link state — persisted in localStorage so it survives nav
+  const [googleEmail,    setGoogleEmail]    = useState(() => localStorage.getItem('hs_google_email') || '');
+  const [googleLinking,  setGoogleLinking]  = useState(false); // loading state
+  const [showGoogleForm, setShowGoogleForm] = useState(false); // inline form visible
+  const [googleInput,    setGoogleInput]    = useState('');    // controlled input value
+
+  async function handleGoogleLink() {
+    if (!googleInput.trim()) return;
+    setGoogleLinking(true);
+    try {
+      const data = await client('/auth/me/google-link', {
+        method: 'PATCH',
+        body:   JSON.stringify({ googleEmail: googleInput.trim() }),
+      });
+      localStorage.setItem('hs_google_email', data.googleEmail);
+      setGoogleEmail(data.googleEmail);
+      setShowGoogleForm(false);
+      setGoogleInput('');
+      toast.success('Google account linked successfully!');
+    } catch (err) {
+      toast.error(err.message || 'Failed to link Google account');
+    } finally {
+      setGoogleLinking(false);
+    }
+  }
+
+  async function handleGoogleUnlink() {
+    setGoogleLinking(true);
+    try {
+      await client('/auth/me/google-link', {
+        method: 'PATCH',
+        body:   JSON.stringify({ googleEmail: null }),
+      });
+      localStorage.removeItem('hs_google_email');
+      setGoogleEmail('');
+      toast.success('Google account unlinked.');
+    } catch (err) {
+      toast.error(err.message || 'Failed to unlink');
+    } finally {
+      setGoogleLinking(false);
+    }
+  }
 
   const isActive = (path) => location.pathname === path;
   const roleMeta = ROLE_META[user?.role] || ROLE_META['manager'];
@@ -147,7 +202,7 @@ export default function Navbar() {
 
               {/* Dropdown */}
               {userMenuOpen && (
-                <div className="absolute right-0 top-[calc(100%+8px)] w-60 bg-surface border border-border rounded-2xl shadow-2xl shadow-black/20 overflow-hidden z-50 animate-[fadeSlideIn_0.15s_ease]">
+                <div className="absolute right-0 top-[calc(100%+8px)] w-72 bg-surface border border-border rounded-2xl shadow-2xl shadow-black/20 overflow-hidden z-50 animate-[fadeSlideIn_0.15s_ease]">
                   {/* User info header */}
                   <div className="px-4 pt-4 pb-3 border-b border-border bg-surface-2/50">
                     <div className="flex items-center gap-3">
@@ -181,6 +236,67 @@ export default function Navbar() {
                       >
                         <Shield className="w-4 h-4 text-rose-400" />
                         Admin Panel
+                      </button>
+                    )}
+                  </div>
+
+                  {/* ── Link Google Account section ── */}
+                  <div className="px-3 py-2.5 border-t border-border">
+                    <p className="text-[10px] font-bold text-text-muted uppercase tracking-widest mb-2">Google Account</p>
+
+                    {googleEmail ? (
+                      // Already linked — show email + unlink option
+                      <div className="bg-surface-2 rounded-xl px-3 py-2.5 flex items-center gap-2">
+                        <GoogleSVG />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[10px] text-text-muted font-medium">Linked</p>
+                          <p className="text-xs text-text-primary font-semibold truncate">{googleEmail}</p>
+                        </div>
+                        <button
+                          onClick={handleGoogleUnlink}
+                          disabled={googleLinking}
+                          title="Unlink Google account"
+                          className="p-1.5 rounded-lg text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-40"
+                        >
+                          <Unlink className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ) : showGoogleForm ? (
+                      // Inline input — no window.prompt
+                      <div className="space-y-2">
+                        <input
+                          type="email"
+                          value={googleInput}
+                          onChange={e => setGoogleInput(e.target.value)}
+                          onKeyDown={e => e.key === 'Enter' && handleGoogleLink()}
+                          placeholder="your@gmail.com"
+                          autoFocus
+                          className="w-full px-3 py-2 text-xs bg-surface-2 border border-border rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand/30"
+                        />
+                        <div className="flex gap-1.5">
+                          <button
+                            onClick={handleGoogleLink}
+                            disabled={googleLinking || !googleInput.trim()}
+                            className="flex-1 py-1.5 bg-brand hover:bg-brand-hover text-white text-[11px] font-bold rounded-lg transition-all disabled:opacity-40"
+                          >
+                            {googleLinking ? 'Linking…' : 'Link Account'}
+                          </button>
+                          <button
+                            onClick={() => { setShowGoogleForm(false); setGoogleInput(''); }}
+                            className="px-2.5 py-1.5 text-text-muted text-[11px] border border-border rounded-lg hover:bg-surface-2 transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      // Unlinked state — invite to link
+                      <button
+                        onClick={() => setShowGoogleForm(true)}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-text-muted hover:bg-surface-2 hover:text-text-primary transition-colors border border-dashed border-border"
+                      >
+                        <GoogleSVG />
+                        Link Google account
                       </button>
                     )}
                   </div>

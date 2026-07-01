@@ -264,5 +264,42 @@ async function toggleUserStatus(req, res, next) {
   }
 }
 
-module.exports = { login, requestAccess, listRequests, approve, reject, activate, listUsers, toggleUserStatus };
+// ─────────────────────────────────────────────────────────────────
+// PATCH /auth/me/google-link  [any authenticated user]
+// Saves or removes the user's linked Google email on their own account.
+// No real OAuth flow — stores email for display / future SSO readiness.
+// ─────────────────────────────────────────────────────────────────
+async function linkGoogle(req, res, next) {
+  try {
+    const { googleEmail } = req.body;
+    // req.user is set by protect() middleware
+    const user = await User.findOne({ username: req.user.username });
+    if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+
+    if (!googleEmail) {
+      // Unlink
+      user.googleEmail = null;
+      user.googleLinkedAt = null;
+    } else {
+      // Basic email format check
+      const emailRx = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRx.test(googleEmail)) {
+        return res.status(400).json({ success: false, error: 'Invalid email address' });
+      }
+      user.googleEmail    = googleEmail.toLowerCase().trim();
+      user.googleLinkedAt = new Date();
+    }
+    await user.save();
+    return res.json({
+      success:      true,
+      googleEmail:  user.googleEmail,
+      linkedAt:     user.googleLinkedAt,
+      message:      user.googleEmail ? 'Google account linked' : 'Google account unlinked',
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { login, requestAccess, listRequests, approve, reject, activate, listUsers, toggleUserStatus, linkGoogle };
 

@@ -6,6 +6,9 @@ const userSchema = new mongoose.Schema({
   passwordHash: { type: String, required: true },
   name:         { type: String, required: true, trim: true },
   email:        { type: String, default: '', lowercase: true, trim: true },
+  // Linked Google account email — optional, set via 'Link Google Account' in dashboard
+  googleEmail:  { type: String, default: null, lowercase: true, trim: true, sparse: true },
+  googleLinkedAt: { type: Date, default: null },
   role: {
     type:    String,
     enum:    ['admin', 'manager', 'factory-manager', 'quality-inspector', 'dispatch-coordinator'],

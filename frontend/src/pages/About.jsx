@@ -195,21 +195,20 @@ export default function About() {
             HERO — Full bleed image with parallax feel
         ══════════════════════════════════════════ */}
         <section className="relative min-h-screen flex items-center overflow-hidden">
-          {/* Background image */}
-          <div className="absolute inset-0">
+          {/* Background image — overflow-hidden on wrapper prevents scale-105 bleed on Android Chrome */}
+          <div className="absolute inset-0 overflow-hidden">
             <img
               src="/about-hero.png"
               alt="HimShakti farmer with organic produce in Uttarakhand"
               className="w-full h-full object-cover object-center scale-105"
-              style={{ willChange: 'transform' }}
             />
             {/* Dark gradient overlay — heavier on left for text legibility */}
             <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-black/20" />
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
           </div>
 
-          {/* Content */}
-          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 w-full">
+          {/* Content — max-w-full prevents any child from forcing horizontal scroll */}
+          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 w-full max-w-full">
             <Reveal>
               <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm text-white/80 text-xs font-semibold uppercase tracking-widest px-3 py-1.5 rounded-full mb-6 border border-white/20">
                 <Leaf className="w-3.5 h-3.5 text-green-400" />

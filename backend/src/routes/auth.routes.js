@@ -15,5 +15,9 @@ router.post('/requests/:id/reject',   protect, requireAdmin, ctrl.reject);
 router.get( '/users',                 protect, requireAdmin, ctrl.listUsers);
 router.patch('/users/:id/toggle',     protect, requireAdmin, ctrl.toggleUserStatus);
 
+// Any authenticated user — link/unlink Google account email
+router.patch('/me/google-link', protect, ctrl.linkGoogle);
+
 module.exports = router;
+
 
