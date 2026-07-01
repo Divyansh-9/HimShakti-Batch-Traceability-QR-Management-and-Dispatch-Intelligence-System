@@ -9,6 +9,7 @@ import {
   QrCode, Truck, ChevronDown
 } from 'lucide-react';
 
+
 // ─── Hooks ───────────────────────────────────────────────────
 
 /** Fires callback once when element enters viewport */
@@ -73,14 +74,15 @@ function StatCard({ icon: Icon, value, suffix = '', label, color, active }) {
     ? `${count}+` : value.includes('%') ? `${count}%` : count;
 
   return (
-    <div className={`bg-surface border border-border rounded-2xl p-6 flex flex-col gap-3 hover:shadow-md transition-shadow duration-300`}>
-      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${color}`}>
-        <Icon className="w-5 h-5" />
+    <div className={`bg-surface border border-border rounded-2xl p-4 sm:p-6 flex flex-col gap-2 sm:gap-3 hover:shadow-md transition-shadow duration-300`}>
+      <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center ${color}`}>
+        <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
       </div>
-      <p className="text-3xl font-extrabold text-text-primary tabular-nums">
+      {/* text-2xl on 320px prevents "Uttarakhand" overflowing card bounds */}
+      <p className="text-2xl sm:text-3xl font-extrabold text-text-primary tabular-nums break-words leading-tight">
         {active ? displayValue : '—'}
       </p>
-      <p className="text-sm text-text-muted">{label}</p>
+      <p className="text-xs sm:text-sm text-text-muted leading-tight">{label}</p>
     </div>
   );
 }
@@ -186,7 +188,8 @@ export default function About() {
     <div className="min-h-screen flex flex-col bg-background transition-colors">
       <Navbar />
 
-      <main className="flex-grow w-full">
+      {/* overflow-x-hidden prevents any negative-margin or transform bleed on Android Chrome */}
+      <main className="flex-grow w-full overflow-x-hidden">
 
         {/* ══════════════════════════════════════════
             HERO — Full bleed image with parallax feel
@@ -214,7 +217,9 @@ export default function About() {
               </div>
             </Reveal>
             <Reveal delay={100}>
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white leading-tight max-w-3xl">
+              {/* text-3xl on 320px Galaxy S8 → text-4xl 390px → text-5xl sm → text-6xl lg */}
+              {/* break-words prevents long words overflowing past padding on any viewport */}
+              <h1 className="text-3xl xs:text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white leading-tight max-w-3xl break-words">
                 Bringing trust and transparency to every
                 <span className="text-brand"> Himalayan harvest</span>
               </h1>
@@ -269,6 +274,7 @@ export default function About() {
                 { icon: FileText, color: 'bg-amber-500/10 text-amber-500',  value: '100%',        label: 'Batches Traceable'    },
               ].map((s, i) => (
                 <Reveal key={s.label} delay={i * 80}>
+                  {/* text-2xl on mobile prevents 320px overflow for long strings like "Uttarakhand" */}
                   <StatCard {...s} active={statsInView} />
                 </Reveal>
               ))}
@@ -287,13 +293,15 @@ export default function About() {
               <p className="mt-2 text-text-muted max-w-xl mx-auto text-sm">Every step tracked, timestamped, and traceable.</p>
             </Reveal>
 
+            {/* On mobile: vertical stack with ChevronDown between steps
+                On sm+:   horizontal row with ArrowRight between steps */}
             <div ref={chainRef} className="flex flex-col sm:flex-row items-stretch gap-0">
               {SUPPLY_CHAIN.map((s, idx) => {
                 const Icon = s.icon;
                 return (
-                  <div key={s.label} className="flex items-center flex-1">
+                  <div key={s.label} className="flex sm:items-center flex-col sm:flex-row flex-1">
                     <div
-                      className={`flex-1 bg-background border ${s.border} rounded-2xl p-5 flex flex-col gap-3 hover:shadow-md hover:-translate-y-1 transition-all duration-300 cursor-default`}
+                      className={`flex-1 bg-background border ${s.border} rounded-2xl p-4 sm:p-5 flex flex-col gap-3 hover:shadow-md hover:-translate-y-1 transition-all duration-300 cursor-default`}
                       style={{
                         opacity: chainInView ? 1 : 0,
                         transform: chainInView ? 'translateY(0)' : 'translateY(20px)',
@@ -313,13 +321,15 @@ export default function About() {
                     </div>
                     {idx < SUPPLY_CHAIN.length - 1 && (
                       <div
-                        className="flex-shrink-0 px-2"
+                        className="flex-shrink-0 flex sm:px-2 sm:py-0 py-2 justify-center"
                         style={{
                           opacity: chainInView ? 1 : 0,
                           transition: `opacity 0.4s ease ${idx * 120 + 200}ms`,
                         }}
                       >
-                        <ArrowRight className="w-4 h-4 text-text-muted opacity-40" />
+                        {/* ArrowRight on desktop, ChevronDown on mobile (vertical stack) */}
+                        <ArrowRight className="hidden sm:block w-4 h-4 text-text-muted opacity-40" />
+                        <ChevronDown className="block sm:hidden w-4 h-4 text-text-muted opacity-40" />
                       </div>
                     )}
                   </div>
@@ -342,7 +352,7 @@ export default function About() {
           </Reveal>
 
           <Reveal>
-            {/* Tab selector */}
+            {/* Tab selector — min-h-[44px] ensures WCAG 2.5.5 touch target on mobile */}
             <div className="flex flex-wrap gap-2 justify-center mb-8">
               {PERSONAS.map(p => {
                 const Icon = p.icon;
@@ -351,14 +361,14 @@ export default function About() {
                   <button
                     key={p.id}
                     onClick={() => setActivePersona(p.id)}
-                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 border ${
+                    className={`flex items-center gap-2 px-3 sm:px-4 py-2.5 min-h-[44px] rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 border ${
                       isActive
                         ? `${p.activeBg} text-white border-transparent shadow-md`
                         : `bg-surface border-border text-text-muted hover:text-text-primary hover:border-border`
                     }`}
                   >
-                    <Icon className="w-4 h-4" />
-                    {p.role}
+                    <Icon className="w-4 h-4 flex-shrink-0" />
+                    <span className="leading-tight">{p.role}</span>
                   </button>
                 );
               })}
@@ -377,18 +387,18 @@ export default function About() {
                 }
               `}</style>
               <div className="grid grid-cols-1 lg:grid-cols-2">
-                {/* Left — description */}
-                <div className="p-8 lg:p-10">
+                {/* Left — responsive padding: tight on 320px, comfortable on desktop */}
+                <div className="p-5 sm:p-8 lg:p-10">
                   <div className={`w-12 h-12 ${persona.bg} rounded-2xl flex items-center justify-center mb-5`}>
                     <PersonaIcon className={`w-6 h-6 ${persona.color}`} />
                   </div>
-                  <h3 className="text-2xl font-extrabold text-text-primary mb-2">{persona.role}</h3>
+                  <h3 className="text-xl sm:text-2xl font-extrabold text-text-primary mb-2">{persona.role}</h3>
                   <p className={`text-sm font-semibold mb-4 ${persona.color}`}>{persona.headline}</p>
                   <p className="text-text-muted leading-relaxed">{persona.description}</p>
                 </div>
 
                 {/* Right — what they get */}
-                <div className={`p-8 lg:p-10 border-t lg:border-t-0 lg:border-l border-border ${persona.bg} bg-opacity-30`}>
+                <div className={`p-5 sm:p-8 lg:p-10 border-t lg:border-t-0 lg:border-l border-border ${persona.bg} bg-opacity-30`}>
                   <p className="text-xs font-bold uppercase tracking-widest text-text-muted mb-5">What they get</p>
                   <ul className="space-y-3">
                     {persona.gets.map((g, i) => (
@@ -444,22 +454,23 @@ export default function About() {
         ══════════════════════════════════════════ */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <Reveal>
-            <div className="relative bg-brand rounded-3xl px-8 py-14 sm:px-14 flex flex-col sm:flex-row items-center justify-between gap-8 overflow-hidden">
+            <div className="relative bg-brand rounded-3xl px-6 py-12 sm:px-14 sm:py-14 flex flex-col sm:flex-row items-center justify-between gap-8 overflow-hidden">
               {/* Decorative bg circles */}
               <div className="absolute -top-10 -right-10 w-64 h-64 bg-white/5 rounded-full pointer-events-none" />
               <div className="absolute -bottom-16 -left-10 w-48 h-48 bg-white/5 rounded-full pointer-events-none" />
 
-              <div className="relative">
+              <div className="relative text-center sm:text-left">
                 <h2 className="text-2xl sm:text-3xl font-extrabold text-white">Ready to get started?</h2>
                 <p className="text-white/70 mt-2 max-w-md">
                   Sign in to manage batches, generate QR codes, and run AI-powered dispatch audits for HimShakti's organic supply chain.
                 </p>
               </div>
-              <div className="flex flex-col sm:flex-row gap-3 flex-shrink-0 relative">
-                <Link to="/login" className="inline-flex items-center justify-center px-7 py-3.5 bg-white text-brand font-bold rounded-xl hover:bg-white/90 transition-all duration-200 shadow-lg hover:-translate-y-0.5">
+              {/* w-full on mobile so buttons don't fight flex-shrink-0 in column mode */}
+              <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto flex-shrink-0 relative">
+                <Link to="/login" className="inline-flex items-center justify-center px-7 py-3.5 min-h-[44px] bg-white text-brand font-bold rounded-xl hover:bg-white/90 transition-all duration-200 shadow-lg hover:-translate-y-0.5 w-full sm:w-auto">
                   Sign In
                 </Link>
-                <Link to="/" className="inline-flex items-center justify-center px-7 py-3.5 bg-white/15 text-white font-semibold rounded-xl hover:bg-white/25 transition-all duration-200 border border-white/20">
+                <Link to="/" className="inline-flex items-center justify-center px-7 py-3.5 min-h-[44px] bg-white/15 text-white font-semibold rounded-xl hover:bg-white/25 transition-all duration-200 border border-white/20 w-full sm:w-auto">
                   Back to Home
                 </Link>
               </div>

@@ -144,8 +144,11 @@ function Row({ label, value, mono }) {
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
       padding: '8px 0', borderBottom: '1px solid #f3f4f6' }}>
       <span style={{ fontSize: 12, color: '#9ca3af', fontWeight: 500, flexShrink: 0, marginRight: 12 }}>{label}</span>
+      {/* maxWidth + wordBreak prevents long batch codes / product names overflowing on 320px */}
       <span style={{ fontSize: 13, color: '#111827', fontWeight: 600, textAlign: 'right',
-        fontFamily: mono ? 'monospace' : 'inherit' }}>{value || '—'}</span>
+        fontFamily: mono ? 'monospace' : 'inherit',
+        wordBreak: 'break-all', overflowWrap: 'anywhere', maxWidth: '65%' }}>{value || '—'}</span>
     </div>
   );
 }
+
