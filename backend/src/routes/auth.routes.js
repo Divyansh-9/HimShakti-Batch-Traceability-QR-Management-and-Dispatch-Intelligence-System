@@ -2,11 +2,13 @@ const router       = require('express').Router();
 const { protect }  = require('../middleware/auth');
 const requireAdmin = require('../middleware/requireAdmin');
 const ctrl         = require('../controllers/auth.controller');
+const { googleLogin } = require('../controllers/googleAuth.controller');
 
 // Public
 router.post('/login',          ctrl.login);
 router.post('/request-access', ctrl.requestAccess);
 router.post('/activate',       ctrl.activate);
+router.post('/google/token',   googleLogin);   // Real Google OAuth token verification
 
 // Admin only
 router.get( '/requests',              protect, requireAdmin, ctrl.listRequests);

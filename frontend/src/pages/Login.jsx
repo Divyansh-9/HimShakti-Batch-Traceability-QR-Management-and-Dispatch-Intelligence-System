@@ -1,8 +1,10 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { useGoogleLogin } from '@react-oauth/google';
 import toast from 'react-hot-toast';
-import { Eye, EyeOff, LogIn, Leaf, ArrowLeft, Lock, ArrowRight, X } from 'lucide-react';
+import client from '../api/client';
+import { Eye, EyeOff, LogIn, Leaf, ArrowLeft, ArrowRight, X, AlertTriangle, Mail } from 'lucide-react';
 
 
 // ── Google Brand-Compliant Button ─────────────────────────────
@@ -241,13 +243,15 @@ function RequestAccessForm({ prefillName = '', prefillEmail = '' }) {
 
 // ── Main Login Page ────────────────────────────────────────────
 export default function Login() {
-  const [tab,            setTab]            = useState('signin');
-  const [username,       setUsername]       = useState('');
-  const [password,       setPassword]       = useState('');
-  const [showGoogleInfo, setShowGoogleInfo] = useState(false);
+  const [tab,         setTab]         = useState('signin');
+  const [username,    setUsername]    = useState('');
+  const [password,    setPassword]    = useState('');
+  // null = idle | 'loading' = verifying with backend | { code, message } = error state
+  const [googleState, setGoogleState] = useState(null);
   const { login, loading, error } = useAuth();
   const navigate = useNavigate();
 
+  // ── Username/password login ────────────────────────────────────
   async function handleLogin(e) {
     e.preventDefault();
     const success = await login(username, password);
@@ -259,10 +263,44 @@ export default function Login() {
     }
   }
 
-  // Google button click — show inline info panel instead of a corner toast.
-  // No OAuth flow needed for this internal RBAC system.
-  function handleGoogleSignIn() {
-    setShowGoogleInfo(true);
+  // ── Real Google OAuth (useGoogleLogin from @react-oauth/google) ─
+  // Triggers the native Google account picker — same flow as YouTube/Gmail.
+  // The access_token is verified server-side via Google's /userinfo endpoint.
+  // Falls back gracefully when VITE_GOOGLE_CLIENT_ID is not configured.
+  const hasGoogleClientId = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID);
+
+  const googleLogin = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      setGoogleState('loading');
+      try {
+        const data = await client('/auth/google/token', {
+          method: 'POST',
+          body: JSON.stringify({ credential: tokenResponse.access_token }),
+        });
+        localStorage.setItem('hs_token', data.token);
+        localStorage.setItem('hs_user',  JSON.stringify(data.user));
+        toast.success(`Welcome, ${data.user.name.split(' ')[0]}!`);
+        navigate('/dashboard');
+      } catch (err) {
+        setGoogleState({ code: err.code || 'ERROR', message: err.message || 'Sign-in failed. Try again.' });
+      }
+    },
+    onError: () => {
+      setGoogleState({ code: 'POPUP_CLOSED', message: 'Sign-in was cancelled.' });
+    },
+    flow: 'implicit',
+  });
+
+  function handleGoogleClick() {
+    if (!hasGoogleClientId) {
+      setGoogleState({
+        code:    'NOT_CONFIGURED',
+        message: 'Google Sign-In is not yet configured. Sign in with your username and password below.',
+      });
+      return;
+    }
+    setGoogleState(null);
+    googleLogin();
   }
 
   return (
@@ -339,80 +377,105 @@ export default function Login() {
             {tab === 'signin' && (
               <form className="space-y-4" onSubmit={handleLogin}>
 
-                {/* Google Sign-In — inline info panel replaces the corner toast */}
+                {/* ── Google Sign-In — REAL OAuth via @react-oauth/google ── */}
                 <div>
-                  {/* The button itself */}
-                  <GoogleButton
-                    label="Continue with Google"
-                    onClick={handleGoogleSignIn}
-                  />
+                  {/* Loading state replaces the button while waiting for backend */}
+                  {googleState === 'loading' ? (
+                    <div className="w-full flex items-center justify-center gap-3 px-4 py-2.5 min-h-[44px] bg-white border border-gray-300 rounded-xl shadow-sm">
+                      <div className="w-4 h-4 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin" />
+                      <span style={{ fontFamily: "'Roboto','Inter',sans-serif", fontSize: '14px' }} className="font-medium text-gray-600">Signing you in…</span>
+                    </div>
+                  ) : (
+                    <GoogleButton
+                      label="Continue with Google"
+                      onClick={handleGoogleClick}
+                    />
+                  )}
 
-                  {/* Animated slide-down info panel */}
+                  {/* ── Contextual error panel (only appears on failure, not on click) ── */}
                   <div
                     style={{
-                      maxHeight: showGoogleInfo ? '240px' : '0',
-                      opacity:   showGoogleInfo ? 1 : 0,
+                      maxHeight: googleState && googleState !== 'loading' ? '260px' : '0',
+                      opacity:   googleState && googleState !== 'loading' ? 1 : 0,
                       overflow:  'hidden',
                       transition: 'max-height 0.35s cubic-bezier(0.4,0,0.2,1), opacity 0.25s ease',
                     }}
                   >
-                    <div className="mt-3 rounded-2xl border border-white/15 bg-white/8 backdrop-blur-sm overflow-hidden">
-                      {/* Panel header */}
-                      <div className="flex items-start justify-between px-4 pt-4 pb-3 gap-3">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0">
-                            <Lock className="w-4 h-4 text-white/70" />
+                    {googleState && googleState !== 'loading' && (
+                      <div className="mt-3 rounded-2xl border border-white/15 bg-white/8 backdrop-blur-sm overflow-hidden">
+                        {/* Panel header — icon changes by error type */}
+                        <div className="flex items-start justify-between px-4 pt-4 pb-3 gap-3">
+                          <div className="flex items-center gap-2.5">
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                              googleState.code === 'NOT_LINKED' ? 'bg-amber-500/15' : 'bg-red-500/15'
+                            }`}>
+                              {googleState.code === 'NOT_LINKED'
+                                ? <Mail className="w-4 h-4 text-amber-400" />
+                                : <AlertTriangle className="w-4 h-4 text-red-400" />}
+                            </div>
+                            <div>
+                              <p className="text-white text-sm font-semibold leading-tight">
+                                {googleState.code === 'NOT_LINKED' ? 'Google account not linked' :
+                                 googleState.code === 'ACCOUNT_DISABLED' ? 'Account disabled' :
+                                 googleState.code === 'POPUP_CLOSED' ? 'Sign-in cancelled' :
+                                 'Sign-in failed'}
+                              </p>
+                              <p className="text-white/50 text-xs mt-0.5 leading-snug max-w-[240px]">
+                                {googleState.message}
+                              </p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="text-white text-sm font-semibold leading-tight">Google SSO — Access Restricted</p>
-                            <p className="text-white/50 text-xs mt-0.5 leading-tight">
-                              For approved <span className="text-white/80 font-medium">@himshakti.com</span> accounts only
-                            </p>
-                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setGoogleState(null)}
+                            className="text-white/30 hover:text-white/70 transition-colors flex-shrink-0 p-0.5"
+                            aria-label="Dismiss"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => setShowGoogleInfo(false)}
-                          className="text-white/30 hover:text-white/70 transition-colors flex-shrink-0 p-0.5"
-                          aria-label="Dismiss"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
 
-                      {/* Two action paths */}
-                      <div className="px-4 pb-4 flex flex-col gap-2">
-                        {/* Path A — use credentials */}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowGoogleInfo(false);
-                            // Focus username field after panel closes
-                            setTimeout(() => document.getElementById('username')?.focus(), 50);
-                          }}
-                          className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-brand/20 hover:bg-brand/30 border border-brand/30 transition-all duration-200 group"
-                        >
-                          <div className="text-left">
-                            <p className="text-white text-xs font-semibold">Use assigned credentials</p>
-                            <p className="text-white/50 text-[10px] mt-0.5">Sign in with your username &amp; password below</p>
-                          </div>
-                          <ArrowRight className="w-3.5 h-3.5 text-brand group-hover:translate-x-0.5 transition-transform flex-shrink-0" />
-                        </button>
-
-                        {/* Path B — request access */}
-                        <button
-                          type="button"
-                          onClick={() => { setShowGoogleInfo(false); setTab('request'); }}
-                          className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all duration-200 group"
-                        >
-                          <div className="text-left">
-                            <p className="text-white text-xs font-semibold">Request access</p>
-                            <p className="text-white/50 text-[10px] mt-0.5">New user? Submit a request — admin reviews within 48h</p>
-                          </div>
-                          <ArrowRight className="w-3.5 h-3.5 text-white/40 group-hover:translate-x-0.5 transition-transform flex-shrink-0" />
-                        </button>
+                        {/* Context-aware action paths */}
+                        <div className="px-4 pb-4 flex flex-col gap-2">
+                          {googleState.code === 'NOT_LINKED' ? (
+                            // Not linked — guide them to sign in first, then link from dashboard
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => { setGoogleState(null); setTimeout(() => document.getElementById('username')?.focus(), 50); }}
+                                className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-brand/20 hover:bg-brand/30 border border-brand/30 transition-all duration-200 group"
+                              >
+                                <div className="text-left">
+                                  <p className="text-white text-xs font-semibold">Sign in with credentials first</p>
+                                  <p className="text-white/50 text-[10px] mt-0.5">Then link your Google account from the dashboard</p>
+                                </div>
+                                <ArrowRight className="w-3.5 h-3.5 text-brand group-hover:translate-x-0.5 transition-transform flex-shrink-0" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => { setGoogleState(null); setTab('request'); }}
+                                className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all duration-200 group"
+                              >
+                                <div className="text-left">
+                                  <p className="text-white text-xs font-semibold">New user? Request access</p>
+                                  <p className="text-white/50 text-[10px] mt-0.5">Admin will approve and link your account</p>
+                                </div>
+                                <ArrowRight className="w-3.5 h-3.5 text-white/40 group-hover:translate-x-0.5 transition-transform flex-shrink-0" />
+                              </button>
+                            </>
+                          ) : (
+                            // Generic error — retry
+                            <button
+                              type="button"
+                              onClick={() => { setGoogleState(null); handleGoogleClick(); }}
+                              className="w-full flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 transition-all duration-200 text-white text-xs font-semibold"
+                            >
+                              Try again with Google
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 </div>
 
