@@ -1180,8 +1180,15 @@ function AdminPanelTab() {
     setActionLoad(id);
     try {
       const data = await client(`/auth/requests/${id}/approve`, { method: 'POST' });
-      setInviteLink({ link: data.inviteLink, name });
-      toast.success('Request approved!');
+      // Store email delivery result alongside the link so the modal can show status
+      setInviteLink({
+        link:       data.inviteLink,
+        name,
+        emailSent:  data.emailSent,
+        emailError: data.emailError,
+        email:      data.emailSent ? data.inviteLink.split('token=')[0] : null, // not the email addr, just existence flag
+      });
+      toast.success(data.emailSent ? `Approved — invite email sent!` : 'Approved — share the link manually');
       fetchRequests(); fetchUsers();
     } catch (err) { toast.error(err.message); }
     finally { setActionLoad(null); }
@@ -1250,37 +1257,105 @@ function AdminPanelTab() {
   return (
     <div className="space-y-5">
 
-      {/* ── Invite Link Modal ── */}
+      {/* ══ Invite / Approval Modal ══ */}
       {inviteLink && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setInviteLink(null)}>
-          <div className="bg-surface border border-border rounded-2xl p-7 shadow-2xl max-w-lg w-full mx-4" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-green-500/10 border border-green-500/20 rounded-xl flex items-center justify-center">
-                <CheckCircle className="w-5 h-5 text-green-500" />
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          onClick={() => setInviteLink(null)}
+        >
+          <div
+            className="bg-surface border border-border rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* ── Header ── */}
+            <div className={`px-6 pt-6 pb-5 border-b border-border ${
+              inviteLink.emailSent ? 'bg-green-500/5' : 'bg-amber-500/5'
+            }`}>
+              <div className="flex items-center gap-3">
+                <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                  inviteLink.emailSent
+                    ? 'bg-green-500/15 border border-green-500/20'
+                    : 'bg-amber-500/15 border border-amber-500/20'
+                }`}>
+                  {inviteLink.emailSent
+                    ? <CheckCircle className="w-5 h-5 text-green-500" />
+                    : <AlertTriangle className="w-5 h-5 text-amber-500" />}
+                </div>
+                <div>
+                  <h3 className="font-bold text-text-primary leading-tight">
+                    {inviteLink.emailSent ? 'Invite Email Sent!' : 'Approved — Share Link Manually'}
+                  </h3>
+                  <p className="text-text-muted text-xs mt-0.5">
+                    For <strong>{inviteLink.name}</strong> — link expires in 48 hours
+                  </p>
+                </div>
               </div>
+            </div>
+
+            <div className="px-6 py-5 space-y-4">
+
+              {/* ── Email delivery status banner ── */}
+              {inviteLink.emailSent ? (
+                <div className="flex items-start gap-3 bg-green-500/8 border border-green-500/20 rounded-xl px-4 py-3">
+                  <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-semibold text-green-600 dark:text-green-400">Email delivered</p>
+                    <p className="text-xs text-text-muted mt-0.5">
+                      {inviteLink.name} received a branded invite email with a direct &ldquo;Set Your Password&rdquo; button. No manual sharing needed.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-start gap-3 bg-amber-500/8 border border-amber-500/20 rounded-xl px-4 py-3">
+                  <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">Email not sent</p>
+                    <p className="text-xs text-text-muted mt-0.5">
+                      {inviteLink.emailError || 'Email delivery is not configured.'}{' '}
+                      Please share the link below manually.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* ── Invite link (always shown as fallback) ── */}
               <div>
-                <h3 className="font-bold text-text-primary">Invite Link Ready</h3>
-                <p className="text-text-muted text-sm">For {inviteLink.name} — expires in 48 hours</p>
+                <p className="text-xs font-semibold text-text-muted uppercase tracking-widest mb-2">Invite Link</p>
+                <div className="bg-surface-2 border border-border rounded-xl px-4 py-3 flex items-center gap-3">
+                  <code className="text-xs text-text-muted flex-1 break-all leading-relaxed">{inviteLink.link}</code>
+                  <button
+                    onClick={() => { navigator.clipboard.writeText(inviteLink.link); toast.success('Copied!'); }}
+                    className="flex-shrink-0 p-2 hover:bg-surface rounded-lg transition-colors text-brand"
+                    title="Copy to clipboard"
+                  >
+                    <Copy className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
-            </div>
-            <div className="bg-surface-2 border border-border rounded-xl px-4 py-3 flex items-center gap-3 mb-4">
-              <code className="text-xs text-text-muted flex-1 break-all leading-relaxed">{inviteLink.link}</code>
-              <button onClick={() => { navigator.clipboard.writeText(inviteLink.link); toast.success('Copied!'); }}
-                className="flex-shrink-0 p-2 hover:bg-surface rounded-lg transition-colors text-brand">
-                <Copy className="w-4 h-4" />
+
+              {/* ── Actions ── */}
+              <div className="flex gap-2.5 pt-1">
+                <button
+                  onClick={() => { navigator.clipboard.writeText(inviteLink.link); toast.success('Copied!'); }}
+                  className="flex-1 py-2.5 bg-brand hover:bg-brand-hover text-white text-sm font-bold rounded-xl transition-all flex items-center justify-center gap-2"
+                >
+                  <Copy className="w-4 h-4" /> Copy Link
+                </button>
+                <button
+                  onClick={() => window.open(inviteLink.link, '_blank')}
+                  className="flex-1 py-2.5 border border-border text-text-muted hover:text-text-primary text-sm font-medium rounded-xl transition-all flex items-center justify-center gap-2"
+                >
+                  <ExternalLink className="w-4 h-4" /> Open
+                </button>
+              </div>
+
+              <button
+                onClick={() => setInviteLink(null)}
+                className="w-full text-sm text-text-muted hover:text-text-primary transition-colors py-1"
+              >
+                Close
               </button>
             </div>
-            <div className="flex gap-3">
-              <button onClick={() => { navigator.clipboard.writeText(inviteLink.link); toast.success('Copied!'); }}
-                className="flex-1 py-2.5 bg-brand hover:bg-brand-hover text-white text-sm font-bold rounded-xl transition-all flex items-center justify-center gap-2">
-                <Copy className="w-4 h-4" /> Copy Link
-              </button>
-              <button onClick={() => window.open(inviteLink.link, '_blank')}
-                className="flex-1 py-2.5 border border-border text-text-muted hover:text-text-primary text-sm font-medium rounded-xl transition-all flex items-center justify-center gap-2">
-                <ExternalLink className="w-4 h-4" /> Open
-              </button>
-            </div>
-            <button onClick={() => setInviteLink(null)} className="w-full mt-3 text-sm text-text-muted hover:text-text-primary transition-colors">Close</button>
           </div>
         </div>
       )}

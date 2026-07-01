@@ -3,6 +3,7 @@ const bcrypt        = require('bcryptjs');
 const User          = require('../models/User.model');
 const AccessRequest = require('../models/AccessRequest.model');
 const { generateToken } = require('../middleware/auth');
+const { sendApprovalEmail, sendRejectionEmail } = require('../services/emailService');
 
 // ─────────────────────────────────────────────────────────────────
 // POST /auth/login
@@ -103,12 +104,34 @@ async function approve(req, res, next) {
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     const inviteLink  = `${frontendUrl}/invite?token=${rawToken}`;
 
+    // ── Auto-send approval email ──────────────────────────────────────────
+    let emailResult = { sent: false, reason: 'no email address on record' };
+    if (request.email) {
+      try {
+        emailResult = await sendApprovalEmail({
+          toEmail:    request.email,
+          toName:     request.name,
+          role:       request.role,
+          inviteLink,
+          approvedBy: req.user.username,
+        });
+      } catch (emailErr) {
+        // Never block the approval response due to email failure
+        console.error('[Email] Approval email failed:', emailErr.message);
+        emailResult = { sent: false, reason: emailErr.message };
+      }
+    }
+
     return res.json({
-      success: true,
-      message: 'Request approved — invite link generated',
+      success:    true,
+      message:    emailResult.sent
+        ? `Request approved — invite email sent to ${request.email}`
+        : 'Request approved — email not sent (see emailError). Share the invite link manually.',
       inviteLink,
-      expiresIn: '48 hours',
-      requestId: request._id,
+      expiresIn:  '48 hours',
+      requestId:  request._id,
+      emailSent:  emailResult.sent,
+      emailError: emailResult.sent ? undefined : emailResult.reason,
     });
   } catch (err) {
     next(err);
@@ -131,6 +154,21 @@ async function reject(req, res, next) {
     request.note       = note || '';
     request.approvedBy = req.user.username;
     await request.save();
+
+    // ── Auto-send rejection notification email ────────────────────────────
+    if (request.email) {
+      try {
+        await sendRejectionEmail({
+          toEmail:    request.email,
+          toName:     request.name,
+          role:       request.role,
+          note:       note || '',
+          rejectedBy: req.user.username,
+        });
+      } catch (emailErr) {
+        console.error('[Email] Rejection email failed:', emailErr.message);
+      }
+    }
 
     return res.json({ success: true, message: 'Request rejected' });
   } catch (err) {
