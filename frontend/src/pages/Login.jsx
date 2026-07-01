@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import toast from 'react-hot-toast';
-import { Eye, EyeOff, LogIn, Leaf, ArrowLeft } from 'lucide-react';
+import { Eye, EyeOff, LogIn, Leaf, ArrowLeft, Lock, ArrowRight, X } from 'lucide-react';
+
 
 // ── Google Brand-Compliant Button ─────────────────────────────
 // Matches Google's Sign-In button brand guidelines:
@@ -240,9 +241,10 @@ function RequestAccessForm({ prefillName = '', prefillEmail = '' }) {
 
 // ── Main Login Page ────────────────────────────────────────────
 export default function Login() {
-  const [tab,      setTab]      = useState('signin');
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  const [tab,            setTab]            = useState('signin');
+  const [username,       setUsername]       = useState('');
+  const [password,       setPassword]       = useState('');
+  const [showGoogleInfo, setShowGoogleInfo] = useState(false);
   const { login, loading, error } = useAuth();
   const navigate = useNavigate();
 
@@ -257,23 +259,10 @@ export default function Login() {
     }
   }
 
-  // Google Sign-In on the Sign-In tab:
-  // This is an internal RBAC system — anyone with a Google account should NOT
-  // bypass admin approval. We show the professional button with a clear restriction
-  // message. When a real OAuth client ID is configured, this handler is replaced.
+  // Google button click — show inline info panel instead of a corner toast.
+  // No OAuth flow needed for this internal RBAC system.
   function handleGoogleSignIn() {
-    toast('Google login is restricted to approved @himshakti.com accounts. Use your assigned credentials or request access below.', {
-      icon: '🔒',
-      duration: 5000,
-      style: {
-        background: '#1e2433',
-        color: '#f1f5f9',
-        border: '1px solid rgba(255,255,255,0.1)',
-        borderRadius: '12px',
-        fontSize: '13px',
-        maxWidth: '340px',
-      },
-    });
+    setShowGoogleInfo(true);
   }
 
   return (
@@ -350,11 +339,82 @@ export default function Login() {
             {tab === 'signin' && (
               <form className="space-y-4" onSubmit={handleLogin}>
 
-                {/* Google Sign-In button — brand compliant, honest restriction on click */}
-                <GoogleButton
-                  label="Continue with Google"
-                  onClick={handleGoogleSignIn}
-                />
+                {/* Google Sign-In — inline info panel replaces the corner toast */}
+                <div>
+                  {/* The button itself */}
+                  <GoogleButton
+                    label="Continue with Google"
+                    onClick={handleGoogleSignIn}
+                  />
+
+                  {/* Animated slide-down info panel */}
+                  <div
+                    style={{
+                      maxHeight: showGoogleInfo ? '240px' : '0',
+                      opacity:   showGoogleInfo ? 1 : 0,
+                      overflow:  'hidden',
+                      transition: 'max-height 0.35s cubic-bezier(0.4,0,0.2,1), opacity 0.25s ease',
+                    }}
+                  >
+                    <div className="mt-3 rounded-2xl border border-white/15 bg-white/8 backdrop-blur-sm overflow-hidden">
+                      {/* Panel header */}
+                      <div className="flex items-start justify-between px-4 pt-4 pb-3 gap-3">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0">
+                            <Lock className="w-4 h-4 text-white/70" />
+                          </div>
+                          <div>
+                            <p className="text-white text-sm font-semibold leading-tight">Google SSO — Access Restricted</p>
+                            <p className="text-white/50 text-xs mt-0.5 leading-tight">
+                              For approved <span className="text-white/80 font-medium">@himshakti.com</span> accounts only
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setShowGoogleInfo(false)}
+                          className="text-white/30 hover:text-white/70 transition-colors flex-shrink-0 p-0.5"
+                          aria-label="Dismiss"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      {/* Two action paths */}
+                      <div className="px-4 pb-4 flex flex-col gap-2">
+                        {/* Path A — use credentials */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowGoogleInfo(false);
+                            // Focus username field after panel closes
+                            setTimeout(() => document.getElementById('username')?.focus(), 50);
+                          }}
+                          className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-brand/20 hover:bg-brand/30 border border-brand/30 transition-all duration-200 group"
+                        >
+                          <div className="text-left">
+                            <p className="text-white text-xs font-semibold">Use assigned credentials</p>
+                            <p className="text-white/50 text-[10px] mt-0.5">Sign in with your username &amp; password below</p>
+                          </div>
+                          <ArrowRight className="w-3.5 h-3.5 text-brand group-hover:translate-x-0.5 transition-transform flex-shrink-0" />
+                        </button>
+
+                        {/* Path B — request access */}
+                        <button
+                          type="button"
+                          onClick={() => { setShowGoogleInfo(false); setTab('request'); }}
+                          className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all duration-200 group"
+                        >
+                          <div className="text-left">
+                            <p className="text-white text-xs font-semibold">Request access</p>
+                            <p className="text-white/50 text-[10px] mt-0.5">New user? Submit a request — admin reviews within 48h</p>
+                          </div>
+                          <ArrowRight className="w-3.5 h-3.5 text-white/40 group-hover:translate-x-0.5 transition-transform flex-shrink-0" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
 
                 <OrDivider />
 
