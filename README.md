@@ -223,7 +223,7 @@ npm install
 npm run dev
 ```
 
-Open → **http://localhost:5173**
+Open → **[http://localhost:5173](https://qr-management-system-sigma.vercel.app/)**
 
 ### 4. (Optional) Seed Demo Data
 
