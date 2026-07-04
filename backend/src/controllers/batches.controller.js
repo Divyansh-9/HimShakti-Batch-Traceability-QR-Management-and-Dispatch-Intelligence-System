@@ -6,6 +6,12 @@ const { generateBatchCode } = require('../utils/batchCodeGenerator');
 const { generateBatchQR }   = require('../services/qrGenerator');
 const { assertProductContract } = require('../utils/productContract');
 
+// ── Helper: enrich batch with live daysUntilExpiry ──────────────────
+function enrichBatch(b) {
+  const days = Math.ceil((new Date(b.expiryDate) - new Date()) / 86400000);
+  return { ...b.toObject(), daysUntilExpiry: days };
+}
+
 async function createBatch(req, res, next) {
   try {
     const {
@@ -53,25 +59,26 @@ async function createBatch(req, res, next) {
       qrCodeDataUrl,
       qrAbsoluteUrl,
       traceabilityNote,
-      createdBy: req.user?.name || 'manager'
+      createdBy: req.user?.name || req.user?.username || 'manager'
     });
 
-    // Emit real-time event so all connected dashboards update immediately
     const io = req.app.get('io');
-    if (io) io.emit('batch:created', { ...batch.toObject(), daysUntilExpiry });
+    if (io) io.emit('batch:created', enrichBatch(batch));
 
     res.status(201).json({
       success: true,
       message: `Batch ${batchCode} created successfully`,
-      data: { ...batch.toObject(), daysUntilExpiry }
+      data: enrichBatch(batch)
     });
   } catch (err) { next(err); }
 }
 
 async function getAllBatches(req, res, next) {
   try {
-    const { status, sku, page = 1, limit = 20 } = req.query;
-    const filter = {};
+    const { status, sku, page = 1, limit = 100, includeDeleted } = req.query;
+    // Use $ne: true so pre-existing docs without the field are also included
+    const filter = { isDeleted: { $ne: true } };
+    if (includeDeleted === 'true' && req.user?.role === 'admin') delete filter.isDeleted;
     if (status) filter.status = status.toUpperCase();
     if (sku)    filter.sku    = sku.toUpperCase();
 
@@ -82,14 +89,9 @@ async function getAllBatches(req, res, next) {
       .sort({ expiryDate: 1 })
       .skip(skip)
       .limit(parseInt(limit))
-      .select('-qrCodeDataUrl');
+      .select('-qrCodeDataUrl');  // omit heavy base64 from list
 
-    const now      = new Date();
-    const enriched = batches.map(b => {
-      const days = Math.ceil((new Date(b.expiryDate) - now) / 86400000);
-      return { ...b.toObject(), daysUntilExpiry: days };
-    });
-
+    const enriched = batches.map(enrichBatch);
     res.json({ success: true, total, page: parseInt(page), count: enriched.length, data: enriched });
   } catch (err) { next(err); }
 }
@@ -98,8 +100,7 @@ async function getBatchById(req, res, next) {
   try {
     const batch = await Batch.findById(req.params.id);
     if (!batch) return res.status(404).json({ success: false, error: 'Batch not found' });
-    const days = Math.ceil((new Date(batch.expiryDate) - new Date()) / 86400000);
-    res.json({ success: true, data: { ...batch.toObject(), daysUntilExpiry: days } });
+    res.json({ success: true, data: enrichBatch(batch) });
   } catch (err) { next(err); }
 }
 
@@ -115,7 +116,6 @@ async function recordDispatch(req, res, next) {
     );
     if (!batch) return res.status(404).json({ success: false, error: 'Batch not found' });
 
-    // Emit real-time status change to all connected dashboards
     const io = req.app.get('io');
     if (io) io.emit('batch:updated', { batchId: batch._id, batchCode: batch.batchCode, status: 'DISPATCHED' });
 
@@ -123,7 +123,105 @@ async function recordDispatch(req, res, next) {
   } catch (err) { next(err); }
 }
 
-// @desc  Scan analytics for a batch (Idea 3)
+// @desc  Update only the traceabilityNote (audit-safe — core fields are sealed)
+// @route PATCH /api/batches/:id/note
+// @access factory-manager, manager, admin
+async function updateBatchNote(req, res, next) {
+  try {
+    const { note } = req.body;
+    if (!note || typeof note !== 'string' || note.trim().length === 0) {
+      return res.status(400).json({ success: false, error: 'Note text is required' });
+    }
+    if (note.trim().length > 1000) {
+      return res.status(400).json({ success: false, error: 'Note must be 1000 characters or fewer' });
+    }
+
+    // Roles that may edit notes
+    const allowed = ['admin', 'manager', 'factory-manager'];
+    if (!allowed.includes(req.user?.role)) {
+      return res.status(403).json({ success: false, error: 'Insufficient permissions to edit notes' });
+    }
+
+    const batch = await Batch.findById(req.params.id);
+    if (!batch) return res.status(404).json({ success: false, error: 'Batch not found' });
+    if (batch.isDeleted) return res.status(410).json({ success: false, error: 'Batch has been archived' });
+
+    // Push the OLD note into history before overwriting
+    batch.noteHistory.push({
+      note:     batch.traceabilityNote,
+      editedBy: req.user?.username || req.user?.name || 'unknown',
+      editedAt: new Date(),
+    });
+    batch.traceabilityNote = note.trim();
+    await batch.save();
+
+    const io = req.app.get('io');
+    if (io) io.emit('batch:noteUpdated', { batchId: batch._id, batchCode: batch.batchCode });
+
+    res.json({
+      success: true,
+      message: 'Traceability note updated',
+      data: { traceabilityNote: batch.traceabilityNote, noteHistory: batch.noteHistory }
+    });
+  } catch (err) { next(err); }
+}
+
+// @desc  Soft-delete a batch (admin only). Sets isDeleted=true, records who/when/why.
+//        ScanEvent records are preserved. The batch remains restorable.
+// @route DELETE /api/batches/:id
+// @access admin only
+async function softDeleteBatch(req, res, next) {
+  try {
+    if (req.user?.role !== 'admin') {
+      return res.status(403).json({ success: false, error: 'Only admins can archive batches' });
+    }
+
+    const { reason } = req.body; // optional deletion reason
+
+    const batch = await Batch.findById(req.params.id);
+    if (!batch) return res.status(404).json({ success: false, error: 'Batch not found' });
+    if (batch.isDeleted) return res.status(409).json({ success: false, error: 'Batch is already archived' });
+
+    batch.isDeleted  = true;
+    batch.deletedAt  = new Date();
+    batch.deletedBy  = req.user?.username || req.user?.name || 'admin';
+    batch.deleteNote = reason?.trim() || null;
+    await batch.save();
+
+    const io = req.app.get('io');
+    if (io) io.emit('batch:deleted', { batchId: batch._id, batchCode: batch.batchCode });
+
+    res.json({ success: true, message: `Batch ${batch.batchCode} archived`, data: { batchCode: batch.batchCode } });
+  } catch (err) { next(err); }
+}
+
+// @desc  Restore a soft-deleted batch (admin only)
+// @route PATCH /api/batches/:id/restore
+// @access admin only
+async function restoreBatch(req, res, next) {
+  try {
+    if (req.user?.role !== 'admin') {
+      return res.status(403).json({ success: false, error: 'Only admins can restore batches' });
+    }
+
+    const batch = await Batch.findById(req.params.id);
+    if (!batch) return res.status(404).json({ success: false, error: 'Batch not found' });
+    if (!batch.isDeleted) return res.status(409).json({ success: false, error: 'Batch is not archived' });
+
+    batch.isDeleted  = false;
+    batch.deletedAt  = null;
+    batch.deletedBy  = null;
+    batch.deleteNote = null;
+    await batch.save();
+
+    const io = req.app.get('io');
+    if (io) io.emit('batch:restored', { batchId: batch._id, batchCode: batch.batchCode });
+
+    res.json({ success: true, message: `Batch ${batch.batchCode} restored`, data: enrichBatch(batch) });
+  } catch (err) { next(err); }
+}
+
+// @desc  Scan analytics for a batch
 // @route GET /api/batches/:id/scans
 async function getBatchScans(req, res, next) {
   try {
@@ -134,17 +232,28 @@ async function getBatchScans(req, res, next) {
       .sort({ scannedAt: -1 })
       .select('scannedAt deviceType source');
 
-    const mobileCount  = events.filter(e => e.deviceType === 'mobile').length;
-    const desktopCount = events.filter(e => e.deviceType === 'desktop').length;
+    const mobileCount  = events.filter(e => e.deviceType === 'Mobile').length;
+    const desktopCount = events.filter(e => e.deviceType === 'Desktop').length;
+    const tabletCount  = events.filter(e => e.deviceType === 'Tablet').length;
 
     res.json({
       success:    true,
       batchCode:  batch.batchCode,
       totalScans: events.length,
       lastScanAt: events[0]?.scannedAt || null,
-      breakdown:  { mobile: mobileCount, desktop: desktopCount }
+      breakdown:  { mobile: mobileCount, desktop: desktopCount, tablet: tabletCount },
+      recentScans: events.slice(0, 5),
     });
   } catch (err) { next(err); }
 }
 
-module.exports = { createBatch, getAllBatches, getBatchById, recordDispatch, getBatchScans };
+module.exports = {
+  createBatch,
+  getAllBatches,
+  getBatchById,
+  recordDispatch,
+  updateBatchNote,
+  softDeleteBatch,
+  restoreBatch,
+  getBatchScans,
+};

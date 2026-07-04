@@ -6,6 +6,78 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2.0.0] — 2026-07-04
+
+### Batch Management — Detail-Led Workflow
+
+This release replaces the row-level icon toolbar with a professional **detail-led batch management workflow** — the industry-standard pattern used by Shopify, Linear, and Stripe for operational dashboards.
+
+#### Added
+
+**`BatchDetailDrawer` — New Component**
+- **Slide-in drawer panel** opens on any batch row click (right-panel on desktop, full-screen bottom-sheet on mobile)
+- **Three tabbed sections** within the drawer:
+  - **Overview** — expiry urgency bar, quick action buttons, batch identity cards, raw material source, QR preview, scan analytics, audit metadata
+  - **Notes** — editable traceability note (role-gated) with full edit history timeline
+  - **History** — audit lifecycle timeline (creation, note edits, dispatch, archive) + recent QR scan events
+- **Status color strip** at the top of the drawer matching batch status (red/amber/green/blue)
+- **Breadcrumb navigation** in the drawer header
+- **Quick action row**: Copy Trace Link, Download QR, Dispatch — directly accessible without leaving the drawer
+- **Expiry urgency bar** with color-coded shelf-life-remaining indicator
+- **InfoCard components** — themed icon + label + value cards replace the naked label/value grid
+- **Full light + dark mode** support using CSS design tokens (no more hardcoded dark colors)
+- **Admin Danger Zone** in the Notes tab — archived batch with typed batch-code confirmation
+
+**Soft Delete & Audit Trail**
+- Archiving sets `isDeleted: true`, `deletedAt`, `deletedBy`, `deleteNote` — record is preserved, not destroyed
+- All archived batches are hidden from active warehouse views but fully restorable
+- `PATCH /api/batches/:id/restore` endpoint for admin-only restore
+- `batch:deleted` and `batch:restored` real-time socket events emitted on all state changes
+
+**Traceability Note History**
+- Editing the traceability note appends the old note to `noteHistory[]` with actor + timestamp
+- Note history rendered as a timeline in the Notes tab
+- History persists across sessions and is visible to all roles
+
+**RBAC enforcement (backend + frontend)**
+
+| Action | Allowed Roles |
+|---|---|
+| View drawer | All authenticated users |
+| Edit traceability note | `admin`, `manager`, `factory-manager` |
+| Archive batch | `admin` only |
+| Restore batch | `admin` only |
+| Dispatch batch | `admin`, `manager`, `dispatch-coordinator` |
+
+**React Query Optimistic Updates**
+- `updateBatchNote` — optimistic note update with automatic rollback on failure
+- `softDeleteBatch` — optimistic removal from list with rollback
+- `restoreBatch` — cache invalidation on restore
+
+#### Changed
+- **Batch table rows** — clicking anywhere on a row opens the detail drawer (previously no row-click handler)
+- **Action column** — now contains 3 focused icons: View (eye), Download QR, Dispatch; no more edit/delete inline
+- **`useBatches` hook** — added `updateBatchNote`, `softDeleteBatch`, `restoreBatch` mutations
+- **`getAllBatches` query** — now filters `{ isDeleted: { $ne: true } }` to exclude archived batches from all list views
+
+#### Fixed
+- **Batches tab showing 0 results** — backfilled `isDeleted: false` on all 20 pre-existing batch documents that lacked the new field; updated MongoDB query to use `$ne: true` for backward compatibility
+- **Login "Invalid credentials"** — fixed `staff` user with invalid role enum (`production_staff` → `factory-manager`) and missing `isActive` field; one-time migration applied
+- **Duplicate Mongoose index warning** — removed explicit `BatchSchema.index({ batchCode: 1 })` which conflicted with `unique: true` on the schema field
+
+#### Schema Changes (Batch model)
+
+```js
+// New fields added to Batch.model.js
+noteHistory: [{ note: String, editedBy: String, editedAt: Date }]
+isDeleted:   Boolean  // default: false
+deletedAt:   Date     // null until archived
+deletedBy:   String   // username of archiving admin
+deleteNote:  String   // optional reason for archiving
+```
+
+---
+
 ## [1.5.0] — 2026-06-29
 
 ### Admin Panel — Intelligence Upgrade

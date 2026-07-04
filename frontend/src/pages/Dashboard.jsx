@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import CreateBatchModal from '../components/CreateBatchModal';
 import DispatchModal from '../components/DispatchModal';
+import BatchDetailDrawer from '../components/BatchDetailDrawer';
 import ErrorBoundary from '../components/ErrorBoundary';
 import { useBatches } from '../hooks/useBatches';
 import { useDispatch } from '../hooks/useDispatch';
@@ -14,7 +15,8 @@ import client from '../api/client';
 import {
   Package, Truck, QrCode, LayoutDashboard, Bot,
   LogOut, Download, AlertTriangle, CheckCircle, Clock, RefreshCw, Menu, Search, Leaf, Plus,
-  ShieldCheck, Users, XCircle, Copy, ExternalLink, Zap, TrendingUp, Activity, Info
+  ShieldCheck, Users, XCircle, Copy, ExternalLink, Zap, TrendingUp, Activity, Info,
+  Eye, Archive, Pencil
 } from 'lucide-react';
 
 
@@ -325,7 +327,7 @@ function OverviewTab({ batches, loading, onTabSwitch }) {
 }
 
 // ── Tab: Batches (full table + status filter + sort) ────────
-function BatchesTab({ batches, loading, onNewBatch, onDownloadQR, onDispatch, initialFilter = 'all' }) {
+function BatchesTab({ batches, loading, onNewBatch, onDownloadQR, onDispatch, onOpenDrawer, initialFilter = 'all' }) {
   const [scanInfo, setScanInfo]       = useState({});
   const [loadingScans, setLoadingScans] = useState({});
   const [query, setQuery]             = useState('');
@@ -469,7 +471,12 @@ function BatchesTab({ batches, loading, onNewBatch, onDownloadQR, onDispatch, in
                   </tr>
                 )
                 : filtered.map(b => (
-                <tr key={b._id} className="hover:bg-surface-2 transition-colors group" onMouseEnter={() => handleViewScans(b._id)}>
+                <tr
+                  key={b._id}
+                  className="hover:bg-surface-2 transition-colors group cursor-pointer"
+                  onMouseEnter={() => handleViewScans(b._id)}
+                  onClick={() => onOpenDrawer?.(b)}
+                >
                   <td className="px-4 py-4 text-sm font-mono font-medium text-brand">{b.batchCode}</td>
                   <td className="px-4 py-4 text-sm text-text-muted">{b.productName}</td>
                   <td className="px-4 py-4"><StatusBadge status={b.status} /></td>
@@ -489,12 +496,19 @@ function BatchesTab({ batches, loading, onNewBatch, onDownloadQR, onDispatch, in
                   <td className="px-4 py-4 text-xs text-text-muted">
                     {loadingScans[b._id] ? '…' : scanInfo[b._id] ? `${scanInfo[b._id].totalScans} scans` : '—'}
                   </td>
-                  <td className="px-4 py-4">
-                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <td className="px-4 py-4" onClick={e => e.stopPropagation()}>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {/* View detail */}
+                      <button onClick={() => onOpenDrawer?.(b)} title="View details"
+                        className="p-1.5 text-text-muted hover:text-emerald-400 hover:bg-emerald-400/10 rounded-md transition-colors">
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      {/* Download QR */}
                       <button onClick={() => onDownloadQR(b._id, b.batchCode)} title="Download QR"
                         className="p-1.5 text-text-muted hover:text-brand hover:bg-brand/10 rounded-md transition-colors">
                         <Download className="w-4 h-4" />
                       </button>
+                      {/* Dispatch */}
                       {b.status !== 'DISPATCHED' && (
                         <button onClick={() => onDispatch(b)} title="Mark Dispatched"
                           className="p-1.5 text-text-muted hover:text-blue-400 hover:bg-blue-400/10 rounded-md transition-colors">
@@ -1775,9 +1789,10 @@ export default function Dashboard() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [batchToDispatch, setBatchToDispatch] = useState(null);
   const [batchesFilter, setBatchesFilter]     = useState('all'); // cross-tab filter from Overview
+  const [drawerBatch, setDrawerBatch]         = useState(null);  // open detail drawer
   const { logout, getUser }                   = useAuth();
   const user                                  = getUser(); // { username, name, role }
-  const { batches, loading, createBatch, downloadQR, dispatchBatch } = useBatches();
+  const { batches, loading, createBatch, downloadQR, dispatchBatch, fetchBatches } = useBatches();
 
   // Connect to WebSocket for real-time batch updates across all dashboard tabs
   useSocket();
@@ -1932,6 +1947,7 @@ export default function Dashboard() {
                   onNewBatch={() => setShowCreateModal(true)}
                   onDownloadQR={handleDownloadQR}
                   onDispatch={handleDispatch}
+                  onOpenDrawer={setDrawerBatch}
                   initialFilter={batchesFilter}
                 />
               </>
@@ -1976,6 +1992,15 @@ export default function Dashboard() {
         onClose={() => setBatchToDispatch(null)}
         onConfirm={handleConfirmDispatch}
       />
+      {drawerBatch && (
+        <BatchDetailDrawer
+          batch={batches.find(b => b._id === drawerBatch._id) || drawerBatch}
+          onClose={() => setDrawerBatch(null)}
+          onRefresh={fetchBatches}
+          onDispatch={() => { setDrawerBatch(null); setBatchToDispatch(drawerBatch); }}
+          onDownloadQR={() => handleDownloadQR(drawerBatch._id, drawerBatch.batchCode)}
+        />
+      )}
     </div>
   );
 }

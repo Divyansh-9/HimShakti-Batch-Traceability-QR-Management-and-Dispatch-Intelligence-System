@@ -33,6 +33,7 @@
 
 - [What is this?](#-what-is-this)
 - [Feature Highlights](#-feature-highlights)
+- [Batch Management Workflow](#-batch-management-workflow-v200)
 - [Quick Start](#-quick-start)
 - [Environment Variables](#-environment-variables)
 - [Dashboard Features](#-dashboard-features)
@@ -43,6 +44,7 @@
 - [Frontend Structure](#-frontend-structure)
 - [Backend Structure](#-backend-structure)
 - [Seeding Demo Data](#-seeding-demo-data)
+- [Documentation Index](#-documentation-index)
 - [Troubleshooting](#-troubleshooting)
 - [Changelog](#-changelog)
 
@@ -79,14 +81,16 @@ Key capabilities:
 </details>
 
 <details>
-<summary><b>📦 Batches Tab — Full Command Bar</b></summary>
+<summary><b>📦 Batches Tab — Detail-Led Workflow</b></summary>
 
+- **Click any row** to open the `BatchDetailDrawer` — full batch detail without leaving the page
 - **Live search** across batch code, product name, farmer name
 - **Status filter tabs**: All · Urgent · Warning · Ready · Dispatched — live counts
 - **Sort dropdown**: Expiry soonest, Batch Code A→Z, Product A→Z, Status priority
 - **Mini urgency progress bar** on expiry column (red ≤7d, amber ≤30d)
 - **Row count footer** with active filter labels
 - One-click Create Batch modal with form validation
+- **Hover actions per row**: View Detail (eye), Download QR, Mark Dispatched
 
 </details>
 
@@ -134,6 +138,49 @@ Key capabilities:
 - Invite link generation and one-click copy
 
 </details>
+
+---
+
+## 🗂️ Batch Management Workflow (v2.0.0)
+
+HimShakti uses a **detail-led workflow** for batch management — the industry-standard pattern used by Shopify, Linear, and Stripe.
+
+### How it works
+
+```
+Click any batch row → Drawer opens → Inspect → Annotate → Act
+```
+
+### BatchDetailDrawer
+
+A slide-in panel with three tabs:
+
+| Tab | What you see |
+|---|---|
+| **Overview** | Expiry urgency bar · Quick actions · Batch identity cards · Raw material source · QR preview · Scan analytics |
+| **Notes** | Editable traceability note (role-gated) · Complete edit history timeline |
+| **History** | Audit lifecycle events (creation, note edits, dispatch, archive) · Recent QR scans |
+
+### Soft Delete (Audit-Safe Archiving)
+
+Batches are **never hard-deleted**. Archiving sets `isDeleted: true` and preserves all records:
+
+```
+Admin types batch code → confirms → batch hidden from views
+All scan history, note history, and metadata preserved
+Admin can restore at any time via "Restore Batch"
+```
+
+### RBAC Summary
+
+| Action | Roles |
+|---|---|
+| View drawer | All roles |
+| Edit traceability note | `admin`, `manager`, `factory-manager` |
+| Archive / Restore | `admin` only |
+| Dispatch | `admin`, `manager`, `dispatch-coordinator` |
+
+> 📖 Full documentation: [`docs/BATCH_MANAGEMENT.md`](docs/BATCH_MANAGEMENT.md)
 
 ---
 
@@ -752,6 +799,7 @@ Output:
 |---|---|---|
 | [`README.md`](./README.md) | System overview, setup, API reference | ✅ Current |
 | [`CHANGELOG.md`](./CHANGELOG.md) | Full version history | ✅ Current |
+| [`docs/BATCH_MANAGEMENT.md`](./docs/BATCH_MANAGEMENT.md) | Batch management workflow, drawer UI, RBAC, soft delete, API | ✅ v2.0.0 |
 | [`docs/DATABASE.md`](./docs/DATABASE.md) | Full database design, schema reference & Atlas setup | ✅ Current |
 | [`docs/schema-diagram.png`](./docs/schema-diagram.png) | Visual ER diagram — all 4 collections & relationships | ✅ Current |
 | [`frontend/README.md`](./frontend/README.md) | Frontend architecture & component guide | ✅ Current |

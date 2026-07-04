@@ -81,12 +81,26 @@ const BatchSchema = new mongoose.Schema({
 
   // Audit
   traceabilityNote: { type: String, required: true, trim: true },
-  createdBy:        { type: String, required: true, trim: true }
+  createdBy:        { type: String, required: true, trim: true },
+
+  // ── Traceability Note History (append-only audit log of edits) ──
+  noteHistory: [{
+    note:     { type: String, required: true },
+    editedBy: { type: String, required: true },
+    editedAt: { type: Date,   default: Date.now },
+  }],
+
+  // ── Soft Delete (never hard-delete traceability records) ──────────
+  isDeleted:  { type: Boolean, default: false, index: true },
+  deletedAt:  { type: Date,   default: null },
+  deletedBy:  { type: String, default: null },
+  deleteNote: { type: String, default: null },  // reason for deletion
 
 }, { timestamps: true });
 
 BatchSchema.index({ status: 1, expiryDate: 1 });
 BatchSchema.index({ sku: 1 });
-BatchSchema.index({ batchCode: 1 });
+// Compound index for "active batches only" — the most common list query
+BatchSchema.index({ isDeleted: 1, status: 1, expiryDate: 1 });
 
 module.exports = mongoose.model('Batch', BatchSchema);
