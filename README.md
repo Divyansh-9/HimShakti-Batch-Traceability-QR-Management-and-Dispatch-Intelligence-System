@@ -815,7 +815,7 @@ Output:
 
 **HimShakti Food Processing — Batch Traceability & Dispatch Intelligence**
 
-*Built with ❤️ for the Himalayan food ecosystem — Intern 2 · 2026*
+*Built with ❤️ for the Himalayan food ecosystem — By Divyansh · 2026*
 
 [![GitHub](https://img.shields.io/badge/GitHub-Repository-181717?style=flat-square&logo=github)](https://github.com/Divyansh-9/HimShakti-Batch-Traceability-QR-Management-and-Dispatch-Intelligence-System)
 
