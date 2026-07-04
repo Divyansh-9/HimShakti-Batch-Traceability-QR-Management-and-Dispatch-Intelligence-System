@@ -393,38 +393,158 @@ POST /api/batches  ─────► MongoDB insert
 
 ## 🗄️ Database Design
 
+> 📄 **Full reference**: [`docs/DATABASE.md`](./docs/DATABASE.md) — includes complete field specs, index strategy, design rationale, FEFO algorithm, and step-by-step Atlas setup.
+
+### Why MongoDB?
+
+| Requirement | Why MongoDB wins |
+|---|---|
+| **Immutable audit trail** | Denormalize product snapshot into each batch document — no JOIN drift |
+| **Schema flexibility** | Different product types carry different attributes without sparse SQL columns |
+| **QR storage** | 8–12 KB base64 PNG per batch — fits comfortably in a 16 MB document |
+| **Operational simplicity** | Atlas free tier: managed backups, auto-scaling, connection pooling |
+
+### Schema Diagram
+
+![HimShakti MongoDB Schema Diagram](./docs/schema-diagram.png)
+
 ### Collections & Ownership
 
-| Collection | Owner | Intern 2 Access |
-|---|---|---|
-| `products` | Intern 1 | **READ ONLY** |
-| `users` | **Intern 2** | Full read/write |
-| `accessRequests` | **Intern 2** | Full read/write |
-| `batches` | **Intern 2** | Full read/write |
-| `scanEvents` | **Intern 2** | Full read/write |
+| Collection | Owner | Intern 2 Access | Purpose |
+|---|---|---|---|
+| `products` | **Intern 1** | Read-only | Source product catalog — shelf life, SKU |
+| `users` | **Intern 2** | Full read/write | Platform users with RBAC roles |
+| `batches` | **Intern 2** | Full read/write | Core traceability records |
+| `scanEvents` | **Intern 2** | Append-only | QR scan audit log |
+| `accessRequests` | **Intern 2** | Full read/write | Onboarding request & invite flow |
 
-> **Schema Contract**: Changes to `products` require 24hr written notice to the other intern. See [`shared/README.md`](./shared/README.md).
+> ⚠️ **Schema Contract**: Changes to `products` require 24hr written notice. See [`shared/README.md`](./shared/README.md).
 
-### Batch Schema (key fields)
+### Collection Schemas
+
+<details>
+<summary><b>📦 batches</b> — Core traceability record (click to expand)</summary>
 
 ```javascript
 {
-  batchCode:       "HS-2026-06-001",      // Auto-generated
-  productId:       ObjectId,              // Ref → products
-  farmerName:      "Ramesh Thakur",
-  village:         "Munsiyari",
-  quantityKg:      120,
-  packagingDate:   Date,
-  expiryDate:      Date,                  // Computed from product shelf life
-  daysToExpiry:    Number,                // Virtual (live-computed)
-  status:          "active|dispatched",
-  qrCodeData:      "base64 PNG string",   // Generated on create
-  priorityScore:   Number,               // FEFO sort key
-  scanCount:       Number,               // Incremented on each /trace hit
-  dispatchedAt:    Date,
-  dispatchedBy:    String
+  batchCode:        "HS-2026-06-001",  // UNIQUE — auto-generated sequential
+  productId:        ObjectId,          // Soft ref → products (Intern 1)
+  productName:      "Wild Berry Mix",  // Denormalized snapshot (immutable)
+  sku:              "WB-500G",         // Denormalized snapshot (immutable)
+  sourceLotCode:    "LOT-WB-2026-045",
+  farmerName:       "Ramesh Thakur",
+  village:          "Munsiyari",
+  quantityProduced: 120,
+  unit:             "Kg",              // Enum: Kg | Units | Liters
+  yieldPercent:     84.5,             // 0–100 processing efficiency
+  packDate:         Date,
+  expiryDate:       Date,             // Computed by expiryCalculator.js
+  dataSource:       "predicted",      // Enum: predicted | fallback
+  shelfLifeSource:  "predicted",      // Enum: predicted | base | manual
+  status:           "URGENT",         // Enum: READY | WARNING | URGENT | DISPATCHED | EXPIRED
+  priorityScore:    542,              // FEFO sort key — higher = dispatch sooner
+  qrCodeDataUrl:    "data:image/png;base64,...",  // 300x300 PNG
+  qrAbsoluteUrl:    "http://localhost:5001/trace/HS-2026-06-001",
+  dispatchDate:     null,             // Set when dispatched
+  buyerName:        null,             // Set when dispatched
+  traceabilityNote: "Batch of Wild Berry Mix sourced from Ramesh Thakur...",
+  createdBy:        "admin",
+  createdAt:        Date,
+  updatedAt:        Date
 }
 ```
+**Indexes**: `batchCode` (unique), `status+expiryDate` (compound — FEFO queries), `sku`, `productId`
+
+</details>
+
+<details>
+<summary><b>👤 users</b> — Platform users with RBAC (click to expand)</summary>
+
+```javascript
+{
+  username:       "priya.sharma",    // UNIQUE, lowercase
+  passwordHash:   "$2b$10$...",      // bcrypt 10 rounds — never stored plain
+  name:           "Priya Sharma",
+  email:          "priya@himshakti.com",
+  googleEmail:    "priya@gmail.com", // SPARSE UNIQUE — Google SSO link (optional)
+  googleLinkedAt: Date,
+  role:           "factory-manager", // admin | manager | factory-manager | quality-inspector | dispatch-coordinator
+  isActive:       true,
+  createdAt:      Date,
+  updatedAt:      Date
+}
+```
+**Indexes**: `username` (unique), `googleEmail` (sparse unique)
+
+</details>
+
+<details>
+<summary><b>📡 scanEvents</b> — QR scan audit log, append-only (click to expand)</summary>
+
+```javascript
+{
+  batchId:    ObjectId,    // Hard ref → batches._id
+  batchCode:  "HS-2026-06-001",   // Denormalized for fast reads
+  scannedAt:  Date,
+  source:     "buyer",    // Enum: factory | buyer | QA
+  deviceType: "Mobile",   // Enum: Mobile | Tablet | Desktop | Unknown
+  ipHash:     "a3f5b2...", // SHA-256 hashed — never stored plain (NFR-2.3)
+  createdAt:  Date
+}
+```
+**Indexes**: `batchId` (single), `batchId+scannedAt` (compound — paginated history)
+
+</details>
+
+<details>
+<summary><b>🔐 accessRequests</b> — Onboarding & invite flow (click to expand)</summary>
+
+```javascript
+{
+  name:         "Divyansh Uniyal",
+  email:        "divyansh@example.com",  // UNIQUE
+  role:         "factory-manager",
+  status:       "pending",      // Enum: pending | approved | rejected
+  note:         "",             // Rejection reason
+  inviteToken:  "sha256hash",   // SHA-256 hashed raw token
+  inviteExpiry: Date,           // 72 hours from approval
+  inviteUsed:   false,
+  approvedBy:   "admin",
+  createdAt:    Date,
+  updatedAt:    Date
+}
+```
+**Indexes**: `email` (unique)
+
+</details>
+
+### FEFO Priority Score
+
+```
+Days to expiry ≤ 0   → score 1000   (EXPIRED — emergency)
+Days to expiry ≤ 7   → score 500+   (URGENT — dispatch now)
+Days to expiry ≤ 30  → score 200+   (WARNING — dispatch soon)
+Days to expiry > 30  → score 0–70   (READY — normal queue)
+```
+
+Higher score = dispatched first. Computed at batch creation by [`expiryCalculator.js`](./backend/src/services/expiryCalculator.js).
+
+### Setting Up the Database
+
+```bash
+# 1. Create free cluster at cloud.mongodb.com (M0 — free tier)
+# 2. Create DB user: himshakti-admin with readWriteAnyDatabase role
+# 3. Whitelist IP: 0.0.0.0/0 for development
+# 4. Copy connection string to backend/.env:
+
+MONGODB_URI=mongodb+srv://himshakti-admin:<password>@cluster0.xxxxx.mongodb.net/himshakti
+
+# 5. Start backend — Mongoose auto-creates collections + indexes:
+cd backend && npm run dev
+# ✅ [Intern 2] MongoDB Atlas connected — himshakti DB
+```
+
+> 📖 Full step-by-step Atlas guide: [`docs/DATABASE.md → Setting Up the Database`](./docs/DATABASE.md#-setting-up-the-database)
 
 ---
 
@@ -632,6 +752,8 @@ Output:
 |---|---|---|
 | [`README.md`](./README.md) | System overview, setup, API reference | ✅ Current |
 | [`CHANGELOG.md`](./CHANGELOG.md) | Full version history | ✅ Current |
+| [`docs/DATABASE.md`](./docs/DATABASE.md) | Full database design, schema reference & Atlas setup | ✅ Current |
+| [`docs/schema-diagram.png`](./docs/schema-diagram.png) | Visual ER diagram — all 4 collections & relationships | ✅ Current |
 | [`frontend/README.md`](./frontend/README.md) | Frontend architecture & component guide | ✅ Current |
 | [`intern-2/srs.md`](./intern-2/srs.md) | Software Requirements Specification | ✅ Phase 4 |
 | [`intern-2/planning_report.md`](./intern-2/planning_report.md) | Planning & design report | ✅ Phase 2 |
