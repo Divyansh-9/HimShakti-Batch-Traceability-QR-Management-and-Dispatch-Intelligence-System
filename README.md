@@ -223,7 +223,7 @@ npm install
 npm run dev
 ```
 
-Open → **http://localhost:5173**
+Open → **[http://localhost:5173](https://qr-management-system-sigma.vercel.app/)**
 
 ### 4. (Optional) Seed Demo Data
 
@@ -867,7 +867,7 @@ This was caused by a `u.name.split()` crash when any user in MongoDB had a null/
 
 **HimShakti Food Processing — Batch Traceability & Dispatch Intelligence**
 
-*Built with ❤️ for the Himalayan food ecosystem — Intern 2 · 2026*
+*Built with ❤️ for the Himalayan food ecosystem — By Divyansh · 2026*
 
 [![GitHub](https://img.shields.io/badge/GitHub-Repository-181717?style=flat-square&logo=github)](https://github.com/Divyansh-9/HimShakti-Batch-Traceability-QR-Management-and-Dispatch-Intelligence-System)
 
