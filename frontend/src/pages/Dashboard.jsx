@@ -16,7 +16,7 @@ import {
   Package, Truck, QrCode, LayoutDashboard, Bot,
   LogOut, Download, AlertTriangle, CheckCircle, Clock, RefreshCw, Menu, Search, Leaf, Plus,
   ShieldCheck, Users, XCircle, Copy, ExternalLink, Zap, TrendingUp, Activity, Info,
-  Eye, Archive, Pencil
+  Eye, Archive, Pencil, RotateCcw
 } from 'lucide-react';
 
 
@@ -327,16 +327,58 @@ function OverviewTab({ batches, loading, onTabSwitch }) {
 }
 
 // ── Tab: Batches (full table + status filter + sort) ────────
-function BatchesTab({ batches, loading, onNewBatch, onDownloadQR, onDispatch, onOpenDrawer, initialFilter = 'all' }) {
-  const [scanInfo, setScanInfo]       = useState({});
-  const [loadingScans, setLoadingScans] = useState({});
-  const [query, setQuery]             = useState('');
-  const [statusFilter, setStatusFilter] = useState(initialFilter);
-  const [sortBy, setSortBy]           = useState('expiry');
-  const { getBatchScans }             = useBatches();
+function BatchesTab({ batches, loading, onNewBatch, onDownloadQR, onDispatch, onOpenDrawer, onAfterArchive, initialFilter = 'all' }) {
+  const [scanInfo, setScanInfo]               = useState({});
+  const [loadingScans, setLoadingScans]       = useState({});
+  const [query, setQuery]                     = useState('');
+  const [statusFilter, setStatusFilter]       = useState(initialFilter);
+  const [sortBy, setSortBy]                   = useState('expiry');
+  const [archivedBatches, setArchivedBatches] = useState([]);
+  const [loadingArchived, setLoadingArchived] = useState(false);
+  // Increment this to force a re-fetch of the archived list from anywhere
+  const [archivedVersion, setArchivedVersion] = useState(0);
+  const { getBatchScans, fetchArchivedBatches, restoreBatch } = useBatches();
 
   // Sync initialFilter if parent changes it (e.g. clicking from Overview)
   useEffect(() => { setStatusFilter(initialFilter); }, [initialFilter]);
+
+  // Re-fetch archived list whenever we switch to the archived tab OR archivedVersion bumps
+  useEffect(() => {
+    if (statusFilter !== 'archived') return;
+    let cancelled = false;
+    setLoadingArchived(true);
+    fetchArchivedBatches()
+      .then(data => { if (!cancelled) setArchivedBatches(data); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoadingArchived(false); });
+    return () => { cancelled = true; };
+  }, [statusFilter, archivedVersion]);
+
+  // Called after archive action from the drawer — refreshes list and switches tab
+  function refreshArchived() {
+    setArchivedVersion(v => v + 1);
+    setStatusFilter('archived');
+    // Propagate to parent in case it needs to refresh the main batch list too
+    onAfterArchive?.();
+  }
+
+  // Wrap onOpenDrawer to inject the refreshArchived callback for the drawer's onArchived
+  function handleOpenDrawer(batch) {
+    onOpenDrawer?.(batch, refreshArchived);
+  }
+
+  async function handleRestore(batchId, batchCode) {
+    try {
+      await restoreBatch(batchId);
+      // Optimistically remove from local list
+      setArchivedBatches(prev => prev.filter(b => b._id !== batchId));
+      toast.success(`${batchCode} restored to active inventory`);
+    } catch (err) {
+      toast.error(err?.message || 'Restore failed');
+      // Re-fetch to get accurate state
+      setArchivedVersion(v => v + 1);
+    }
+  }
 
   async function handleViewScans(batchId) {
     if (scanInfo[batchId]) return;
@@ -355,6 +397,7 @@ function BatchesTab({ batches, loading, onNewBatch, onDownloadQR, onDispatch, on
     { id: 'WARNING',    label: 'Warning',    count: batches.filter(b => b.status === 'WARNING').length },
     { id: 'READY',      label: 'Ready',      count: batches.filter(b => b.status === 'READY').length },
     { id: 'DISPATCHED', label: 'Dispatched', count: batches.filter(b => b.status === 'DISPATCHED').length },
+    { id: 'archived',   label: 'Archived',   count: archivedBatches.length, icon: true },
   ];
 
   const FILTER_ACCENT = {
@@ -362,6 +405,7 @@ function BatchesTab({ batches, loading, onNewBatch, onDownloadQR, onDispatch, on
     WARNING:    'text-amber-500',
     READY:      'text-green-500',
     DISPATCHED: 'text-blue-500',
+    archived:   'text-rose-400',
     all:        'text-brand',
   };
 
@@ -430,16 +474,100 @@ function BatchesTab({ batches, loading, onNewBatch, onDownloadQR, onDispatch, on
                   ? `border-brand ${FILTER_ACCENT[f.id] || 'text-brand'}`
                   : 'border-transparent text-text-muted hover:text-text-primary hover:border-border'
               }`}>
+              {f.id === 'archived' && <span className="w-1.5 h-1.5 rounded-full bg-rose-400 flex-shrink-0" />}
               {f.label}
               <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${
-                statusFilter === f.id ? 'bg-brand/10 text-brand' : 'bg-surface-2 text-text-muted'
+                statusFilter === f.id
+                  ? f.id === 'archived' ? 'bg-rose-400/10 text-rose-400' : 'bg-brand/10 text-brand'
+                  : 'bg-surface-2 text-text-muted'
               }`}>{f.count}</span>
             </button>
           ))}
         </div>
       </div>
 
-      <div className="overflow-x-auto">
+      {/* ── Archived view ── */}
+      {statusFilter === 'archived' ? (
+        <div className="overflow-x-auto">
+          {/* Archived banner */}
+          <div className="px-4 py-3 bg-rose-500/5 border-b border-rose-500/15 flex items-center gap-2">
+            <Archive className="w-3.5 h-3.5 text-rose-400 flex-shrink-0" />
+            <p className="text-xs text-rose-400 font-medium">
+              Archived batches are hidden from active views. All records and scan history are preserved. Admins can restore them at any time.
+            </p>
+          </div>
+          <table className="min-w-full divide-y divide-border">
+            <thead className="bg-surface-2">
+              <tr>
+                {['Batch Code', 'Product', 'Farmer / Village', 'Archived At', 'Reason', 'Actions'].map(h => (
+                  <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-text-muted uppercase tracking-wider">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {loadingArchived
+                ? [...Array(3)].map((_, i) => <SkeletonRow key={i} />)
+                : archivedBatches.length === 0
+                  ? (
+                    <tr>
+                      <td colSpan={6} className="px-6 py-16 text-center">
+                        <div className="flex flex-col items-center gap-3">
+                          <div className="w-12 h-12 bg-rose-500/5 rounded-full flex items-center justify-center border border-rose-500/15">
+                            <Archive className="w-6 h-6 text-rose-400 opacity-40" />
+                          </div>
+                          <p className="text-text-muted text-sm font-medium">No archived batches</p>
+                          <p className="text-text-muted/60 text-xs">Archived batches will appear here</p>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                  : archivedBatches.map(b => (
+                    <tr key={b._id} className="opacity-70 hover:opacity-100 transition-opacity group">
+                      <td className="px-4 py-4">
+                        <div className="flex items-center gap-2">
+                          <Archive className="w-3 h-3 text-rose-400 flex-shrink-0" />
+                          <span className="text-sm font-mono font-medium text-text-muted">{b.batchCode}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 text-sm text-text-muted">{b.productName}</td>
+                      <td className="px-4 py-4 text-sm text-text-muted">
+                        {b.farmerName}{b.village ? `, ${b.village}` : ''}
+                      </td>
+                      <td className="px-4 py-4 text-xs text-text-muted">
+                        {b.deletedAt ? new Date(b.deletedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+                        {b.deletedBy && <div className="text-[10px] text-text-muted/60">by {b.deletedBy}</div>}
+                      </td>
+                      <td className="px-4 py-4 text-xs text-text-muted italic">{b.deleteNote || '—'}</td>
+                      <td className="px-4 py-4">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleOpenDrawer(b)}
+                            className="p-1.5 text-text-muted hover:text-text-primary hover:bg-surface-2 rounded-lg transition-colors"
+                            title="View details"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleRestore(b._id, b.batchCode)}
+                            className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-amber-500 hover:bg-amber-500/10 border border-amber-500/20 rounded-lg transition-colors"
+                            title="Restore batch"
+                          >
+                            <RotateCcw className="w-3 h-3" /> Restore
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+              }
+            </tbody>
+          </table>
+          {archivedBatches.length > 0 && (
+            <div className="px-4 py-3 bg-surface-2 border-t border-border">
+              <p className="text-xs text-text-muted">{archivedBatches.length} archived batch{archivedBatches.length !== 1 ? 'es' : ''}</p>
+            </div>
+          )}
+        </div>
+      ) : (
         <table className="min-w-full divide-y divide-border">
           <thead className="bg-surface-2">
             <tr>
@@ -475,7 +603,7 @@ function BatchesTab({ batches, loading, onNewBatch, onDownloadQR, onDispatch, on
                   key={b._id}
                   className="hover:bg-surface-2 transition-colors group cursor-pointer"
                   onMouseEnter={() => handleViewScans(b._id)}
-                  onClick={() => onOpenDrawer?.(b)}
+                  onClick={() => handleOpenDrawer(b)}
                 >
                   <td className="px-4 py-4 text-sm font-mono font-medium text-brand">{b.batchCode}</td>
                   <td className="px-4 py-4 text-sm text-text-muted">{b.productName}</td>
@@ -499,7 +627,7 @@ function BatchesTab({ batches, loading, onNewBatch, onDownloadQR, onDispatch, on
                   <td className="px-4 py-4" onClick={e => e.stopPropagation()}>
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       {/* View detail */}
-                      <button onClick={() => onOpenDrawer?.(b)} title="View details"
+                      <button onClick={() => handleOpenDrawer(b)} title="View details"
                         className="p-1.5 text-text-muted hover:text-emerald-400 hover:bg-emerald-400/10 rounded-md transition-colors">
                         <Eye className="w-4 h-4" />
                       </button>
@@ -522,10 +650,10 @@ function BatchesTab({ batches, loading, onNewBatch, onDownloadQR, onDispatch, on
             }
           </tbody>
         </table>
-      </div>
+      )}
 
-      {/* Row count footer */}
-      {!loading && filtered.length > 0 && (
+      {/* Row count footer — only shown in non-archived view */}
+      {!loading && filtered.length > 0 && statusFilter !== 'archived' && (
         <div className="px-6 py-3 border-t border-border bg-surface-2">
           <p className="text-xs text-text-muted">
             Showing <span className="font-semibold text-text-primary">{filtered.length}</span> of <span className="font-semibold text-text-primary">{batches.length}</span> batches
@@ -1582,7 +1710,7 @@ function AdminPanelTab() {
                     <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold flex-shrink-0 border ${
                       ROLE_STYLE[u.role] || 'bg-surface-2 text-text-muted border-border'
                     }`}>
-                      {u.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
+                      {(u.name || u.username || '?').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
                     </div>
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-text-primary truncate">{u.name}</p>
@@ -1605,7 +1733,9 @@ function AdminPanelTab() {
                   {/* Joined */}
                   <div className="col-span-2">
                     <p className="text-xs text-text-muted">
-                      {new Date(u.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })}
+                      {u.createdAt
+                        ? new Date(u.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })
+                        : '—'}
                     </p>
                   </div>
 
@@ -1790,6 +1920,7 @@ export default function Dashboard() {
   const [batchToDispatch, setBatchToDispatch] = useState(null);
   const [batchesFilter, setBatchesFilter]     = useState('all'); // cross-tab filter from Overview
   const [drawerBatch, setDrawerBatch]         = useState(null);  // open detail drawer
+  const [drawerOnArchived, setDrawerOnArchived] = useState(null); // callback after archive from drawer
   const { logout, getUser }                   = useAuth();
   const user                                  = getUser(); // { username, name, role }
   const { batches, loading, createBatch, downloadQR, dispatchBatch, fetchBatches } = useBatches();
@@ -1947,7 +2078,12 @@ export default function Dashboard() {
                   onNewBatch={() => setShowCreateModal(true)}
                   onDownloadQR={handleDownloadQR}
                   onDispatch={handleDispatch}
-                  onOpenDrawer={setDrawerBatch}
+                  onOpenDrawer={(batch, onArchived) => {
+                    setDrawerBatch(batch);
+                    // Store as a function ref using setter form to avoid calling the fn immediately
+                    setDrawerOnArchived(() => onArchived || null);
+                  }}
+                  onAfterArchive={fetchBatches}
                   initialFilter={batchesFilter}
                 />
               </>
@@ -1995,8 +2131,14 @@ export default function Dashboard() {
       {drawerBatch && (
         <BatchDetailDrawer
           batch={batches.find(b => b._id === drawerBatch._id) || drawerBatch}
-          onClose={() => setDrawerBatch(null)}
+          onClose={() => { setDrawerBatch(null); setDrawerOnArchived(null); }}
           onRefresh={fetchBatches}
+          onArchived={() => {
+            setDrawerBatch(null);
+            fetchBatches();
+            drawerOnArchived?.();
+            setDrawerOnArchived(null);
+          }}
           onDispatch={() => { setDrawerBatch(null); setBatchToDispatch(drawerBatch); }}
           onDownloadQR={() => handleDownloadQR(drawerBatch._id, drawerBatch.batchCode)}
         />

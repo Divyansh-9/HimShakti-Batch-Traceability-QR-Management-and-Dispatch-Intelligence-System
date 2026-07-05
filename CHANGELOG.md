@@ -6,7 +6,84 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2.1.0] — 2026-07-05
+
+### Bug Fixes & Reliability Hardening
+
+This release resolves a set of critical runtime bugs discovered during live QA, covering the archive visibility flow, database data integrity, Google OAuth linking, and the Admin Panel crash on first load.
+
+---
+
+#### Fixed — Archive & Restore Flow
+
+**Backend: Silent auth failure on archived batch fetch**
+- `GET /api/batches` is a public route — `req.user` is always `undefined`, so `includeDeleted=true` check silently failed and archived batches never returned
+- **Fix:** Added a dedicated protected route `GET /api/batches/archived` with `protect` middleware — declared **before** `/:id` to prevent Express treating the string `"archived"` as a MongoDB ObjectId
+
+**Frontend: Dead callback chain on archive**
+- `onArchived` in `BatchDetailDrawer` only triggered `fetchBatches()` (active list) — no signal reached `BatchesTab`'s archived state, so the Archived tab never refreshed
+- **Fix:** Threaded a proper `onArchived` callback from `BatchDetailDrawer → Dashboard → BatchesTab`, with an `archivedVersion` counter that forces `useEffect` re-run and auto-switches to the Archived filter tab
+
+---
+
+#### Fixed — Raw Material Editing
+
+- Added `PATCH /api/batches/:id/raw-material` endpoint (admin + manager + factory-manager)
+- Every update appends an entry to `noteHistory[]` with actor, timestamp, and change summary — immutable audit trail
+- Frontend "Correct" button in `BatchDetailDrawer` Overview tab wired to the new endpoint with optimistic update and rollback
+
+---
+
+#### Fixed — User Role Data Corruption
+
+- On initial seed, `admin` user was stored with role `lab_admin` (invalid), `manager` with role `admin`, `staff` with role `production_staff` (not in enum)
+- All three roles caused incorrect UI behaviour: manager saw Admin Panel with "ADMINISTRATOR" badge, admin account couldn't access elevated APIs
+- **Fix:** Corrected all roles directly in MongoDB: `admin → admin`, `manager → manager`, `staff → factory-manager`
+
+---
+
+#### Fixed — Google OAuth Account Linking
+
+- Google Sign-In (`POST /auth/google/token`) validates the access token via Google's `/userinfo` endpoint then looks up users by `googleEmail` field
+- No user had `googleEmail` populated, so all Google logins returned `NOT_LINKED` error
+- **Fix:** Linked `divyanshuniyal185@gmail.com` to the `admin` / `divyansh` account in MongoDB
+
+---
+
+#### Fixed — Missing `divyansh` Admin Account
+
+- The primary admin account (`username: divyansh`, `password: Uniyal@05`) was missing from MongoDB entirely — likely from a prior DB reset that skipped re-seeding this user
+- **Fix:** Created the account with role `admin`, correct bcrypt hash, and Google email linked
+
+---
+
+#### Fixed — Admin Panel White Screen Crash
+
+- `AdminPanelTab` rendered `u.name.split(' ')` — crashed with `TypeError: Cannot read properties of undefined (reading 'split')` when any user record had a `null` / `undefined` `name` field (the `staff` user was upserted without a name)
+- **Fix:** Changed to `(u.name || u.username || '?').split(' ')` — safe fallback chain
+- Also guarded `new Date(u.createdAt)` with a null check to prevent a secondary crash on users without timestamps
+- **DB Fix:** Populated missing `name` and `email` fields for all four user records
+
+---
+
+#### Added — Password Reset Utility
+
+- Inline Node.js reset script to re-hash and upsert `admin` + `manager` passwords from `.env` values directly into MongoDB — useful after any DB reset or `.env` change
+
+---
+
+#### Changed
+
+- `backend/src/controllers/batches.controller.js` — archive, restore, and `updateRawMaterial` methods added
+- `backend/src/routes/batches.routes.js` — `/archived` protected route added before `/:id`
+- `frontend/src/hooks/useBatches.js` — `softDeleteBatch`, `restoreBatch`, `updateRawMaterial` mutations with optimistic updates
+- `frontend/src/pages/Dashboard.jsx` — `onArchived` callback threaded through, `archivedVersion` state, Admin Panel null-safety guards
+- `frontend/src/components/BatchDetailDrawer.jsx` — "Correct" raw material button, Danger Zone wired to callbacks
+
+---
+
 ## [2.0.0] — 2026-07-04
+
 
 ### Batch Management — Detail-Led Workflow
 

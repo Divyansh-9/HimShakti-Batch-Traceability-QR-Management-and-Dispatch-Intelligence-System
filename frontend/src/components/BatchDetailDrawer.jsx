@@ -32,9 +32,10 @@ import {
 } from 'lucide-react';
 
 // ── Role gates ───────────────────────────────────────────────────────
-const CAN_EDIT_NOTE = ['admin', 'manager', 'factory-manager'];
-const CAN_DISPATCH  = ['admin', 'manager', 'dispatch-coordinator'];
-const CAN_DELETE    = ['admin'];
+const CAN_EDIT_NOTE   = ['admin', 'manager', 'factory-manager'];
+const CAN_EDIT_RAW    = ['admin', 'manager', 'factory-manager'];
+const CAN_DISPATCH    = ['admin', 'manager', 'dispatch-coordinator'];
+const CAN_DELETE      = ['admin'];
 
 // ── Status config ────────────────────────────────────────────────────
 const STATUS_CFG = {
@@ -52,6 +53,138 @@ function StatusBadge({ status, size = 'sm' }) {
       <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${cfg.dot}`} />
       {cfg.label}
     </span>
+  );
+}
+
+// ── Inline input for raw-material editing ───────────────────────────
+function RawField({ label, name, value, onChange, type = 'text', suffix = '' }) {
+  return (
+    <div className="bg-background rounded-xl p-3 border border-brand/30 flex flex-col gap-1">
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-brand">{label}</p>
+      <div className="flex items-center gap-1">
+        <input
+          type={type}
+          name={name}
+          defaultValue={value}
+          onChange={onChange}
+          step={type === 'number' ? 'any' : undefined}
+          className="flex-1 min-w-0 bg-transparent text-sm font-bold text-text-primary focus:outline-none"
+        />
+        {suffix && <span className="text-xs text-text-muted flex-shrink-0">{suffix}</span>}
+      </div>
+    </div>
+  );
+}
+
+// ── Raw Material editable section ───────────────────────────────────
+function RawMaterialSection({ batch, canEdit, onUpdated }) {
+  const { updateRawMaterial } = useBatches();
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving]   = useState(false);
+  const [draft, setDraft]     = useState({});
+
+  function startEdit() {
+    setDraft({
+      farmerName:       batch.farmerName       || '',
+      village:          batch.village          || '',
+      sourceLotCode:    batch.sourceLotCode    || '',
+      quantityProduced: batch.quantityProduced || '',
+      unit:             batch.unit             || 'Kg',
+      yieldPercent:     batch.yieldPercent     ?? '',
+      dataSource:       batch.dataSource       || '',
+    });
+    setEditing(true);
+  }
+
+  function handleChange(e) {
+    setDraft(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  }
+
+  async function handleSave() {
+    // Filter out unchanged values
+    const changed = {};
+    for (const [k, v] of Object.entries(draft)) {
+      const orig = batch[k];
+      if (String(v).trim() !== String(orig ?? '').trim()) {
+        changed[k] = v;
+      }
+    }
+    if (Object.keys(changed).length === 0) { setEditing(false); return; }
+
+    setSaving(true);
+    try {
+      await updateRawMaterial(batch._id, changed);
+      toast.success('Raw material data updated');
+      setEditing(false);
+      onUpdated?.();
+    } catch (err) {
+      toast.error(err.message || 'Update failed');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (editing) {
+    return (
+      <div className="border border-brand/20 rounded-xl overflow-hidden">
+        <div className="px-4 py-3 border-b border-brand/15 bg-brand/5 flex items-center justify-between">
+          <p className="text-[10px] font-black text-brand uppercase tracking-widest flex items-center gap-1.5">
+            <Leaf className="w-3 h-3" /> Editing Raw Material Source
+          </p>
+          <span className="text-[10px] text-text-muted">Changes are logged</span>
+        </div>
+        <div className="p-3 grid grid-cols-2 gap-2">
+          <RawField label="Farmer Name" name="farmerName" value={draft.farmerName} onChange={handleChange} />
+          <RawField label="Village"     name="village"     value={draft.village}     onChange={handleChange} />
+          <RawField label="Lot Code"    name="sourceLotCode" value={draft.sourceLotCode} onChange={handleChange} />
+          <div className="flex gap-1.5">
+            <div className="flex-1">
+              <RawField label="Quantity" name="quantityProduced" value={draft.quantityProduced} onChange={handleChange} type="number" />
+            </div>
+            <div className="w-20">
+              <RawField label="Unit" name="unit" value={draft.unit} onChange={handleChange} />
+            </div>
+          </div>
+          <RawField label="Yield %"    name="yieldPercent" value={draft.yieldPercent} onChange={handleChange} type="number" suffix="%" />
+          <RawField label="Data Source" name="dataSource"  value={draft.dataSource}  onChange={handleChange} />
+        </div>
+        <div className="px-3 pb-3 flex gap-2">
+          <button onClick={() => setEditing(false)}
+            className="flex-1 py-2 text-xs font-medium text-text-muted border border-border rounded-lg hover:bg-surface-2 transition-colors">
+            Cancel
+          </button>
+          <button onClick={handleSave} disabled={saving}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-brand hover:bg-brand-hover text-white text-xs font-semibold rounded-lg transition-colors disabled:opacity-50">
+            {saving ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+            {saving ? 'Saving…' : 'Save Changes'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-[10px] font-black text-text-muted uppercase tracking-widest flex items-center gap-1.5">
+          <Leaf className="w-3 h-3" /> Raw Material Source
+        </p>
+        {canEdit && (
+          <button onClick={startEdit}
+            className="flex items-center gap-1 text-xs text-brand hover:text-brand-hover font-semibold transition-colors">
+            <Pencil className="w-3 h-3" /> Correct
+          </button>
+        )}
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <InfoCard icon={User}      label="Farmer"    value={batch.farmerName} />
+        <InfoCard icon={MapPin}    label="Village"   value={batch.village} />
+        <InfoCard icon={Hash}      label="Lot Code"  value={batch.sourceLotCode} mono />
+        <InfoCard icon={Box}       label="Quantity"  value={batch.quantityProduced ? `${batch.quantityProduced} ${batch.unit}` : '—'} />
+        <InfoCard icon={BarChart2} label="Yield %"   value={batch.yieldPercent !== undefined ? `${batch.yieldPercent}%` : '—'} accent />
+        <InfoCard icon={Zap}       label="Data Src"  value={batch.dataSource} />
+      </div>
+    </div>
   );
 }
 
@@ -98,7 +231,7 @@ function ExpiryBar({ days, status }) {
 // ══════════════════════════════════════════════════════════════
 // OVERVIEW TAB
 // ══════════════════════════════════════════════════════════════
-function OverviewTab({ batch, scanData, loadingScans, onDispatch, onDownloadQR, canDispatch }) {
+function OverviewTab({ batch, scanData, loadingScans, onDispatch, onDownloadQR, canDispatch, canEditRaw, onRefresh }) {
   const [qrSrc, setQrSrc]       = useState(null);
   const [loadingQR, setLoadingQR] = useState(false);
   const [showQR, setShowQR]     = useState(false);
@@ -193,20 +326,8 @@ function OverviewTab({ batch, scanData, loadingScans, onDispatch, onDownloadQR, 
         </div>
       </div>
 
-      {/* ── Raw Material Source ── */}
-      <div>
-        <p className="text-[10px] font-black text-text-muted uppercase tracking-widest mb-3 flex items-center gap-1.5">
-          <Leaf className="w-3 h-3" /> Raw Material Source
-        </p>
-        <div className="grid grid-cols-2 gap-2">
-          <InfoCard icon={User}      label="Farmer"    value={batch.farmerName} />
-          <InfoCard icon={MapPin}    label="Village"   value={batch.village} />
-          <InfoCard icon={Hash}      label="Lot Code"  value={batch.sourceLotCode} mono />
-          <InfoCard icon={Box}       label="Quantity"  value={batch.quantityProduced ? `${batch.quantityProduced} ${batch.unit}` : '—'} />
-          <InfoCard icon={BarChart2} label="Yield %"   value={batch.yieldPercent !== undefined ? `${batch.yieldPercent}%` : '—'} accent />
-          <InfoCard icon={Zap}       label="Data Src"  value={batch.dataSource} />
-        </div>
-      </div>
+      {/* ── Raw Material Source — editable ── */}
+      <RawMaterialSection batch={batch} canEdit={canEditRaw} onUpdated={onRefresh} />
 
       {/* ── Dispatch block (if dispatched) ── */}
       {batch.status === 'DISPATCHED' && (
@@ -616,11 +737,12 @@ function HistoryTab({ batch, scanData }) {
 // ══════════════════════════════════════════════════════════════
 // MAIN DRAWER
 // ══════════════════════════════════════════════════════════════
-export default function BatchDetailDrawer({ batch, onClose, onRefresh, onDispatch, onDownloadQR }) {
+export default function BatchDetailDrawer({ batch, onClose, onRefresh, onArchived, onDispatch, onDownloadQR }) {
   const { getUser }  = useAuth();
   const user         = getUser();
   const role         = user?.role || '';
   const canEditNote  = CAN_EDIT_NOTE.includes(role);
+  const canEditRaw   = CAN_EDIT_RAW.includes(role);
   const canDelete    = CAN_DELETE.includes(role);
   const canDispatch  = CAN_DISPATCH.includes(role);
 
@@ -755,6 +877,8 @@ export default function BatchDetailDrawer({ batch, onClose, onRefresh, onDispatc
               onDispatch={onDispatch}
               onDownloadQR={onDownloadQR}
               canDispatch={canDispatch}
+              canEditRaw={canEditRaw}
+              onRefresh={onRefresh}
             />
           )}
           {activeTab === 'notes' && (
@@ -763,7 +887,12 @@ export default function BatchDetailDrawer({ batch, onClose, onRefresh, onDispatc
               canEdit={canEditNote}
               canDelete={canDelete}
               onNoteUpdated={onRefresh}
-              onArchived={() => { handleClose(); onRefresh?.(); }}
+              onArchived={() => {
+                handleClose();
+                onRefresh?.();
+                // Notify parent (Dashboard) so it can refresh the archived list
+                onArchived?.();
+              }}
             />
           )}
           {activeTab === 'history' && (

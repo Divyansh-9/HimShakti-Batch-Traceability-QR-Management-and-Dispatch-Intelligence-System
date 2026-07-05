@@ -793,12 +793,63 @@ Output:
 
 ---
 
+## 🔧 Troubleshooting
+
+### "Invalid credentials" on login
+
+The seeder runs only when the `users` collection is **empty**. If the DB already has users with old hashed passwords (from a previous `.env`), credentials will fail silently.
+
+**Fix — run the inline reset script from `backend/`:**
+
+```bash
+node -e "
+require('dotenv').config({ path: '.env' });
+const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
+const User = require('./src/models/User.model');
+async function run() {
+  await mongoose.connect(process.env.MONGODB_URI);
+  const adminHash   = await bcrypt.hash(process.env.SEED_ADMIN_PASSWORD, 12);
+  const managerHash = await bcrypt.hash(process.env.SEED_MANAGER_PASSWORD, 12);
+  await User.findOneAndUpdate({ username: 'admin' },   { passwordHash: adminHash,   isActive: true }, { upsert: true });
+  await User.findOneAndUpdate({ username: 'manager' }, { passwordHash: managerHash, isActive: true }, { upsert: true });
+  console.log('Done'); process.exit(0);
+}
+run();
+"
+```
+
+### Default Development Credentials
+
+> ⚠️ **Change all passwords before deploying to production.**
+
+| Username | Password | Role | Notes |
+|---|---|---|---|
+| `divyansh` | `Uniyal@05` | Admin | Primary admin — Google OAuth linked |
+| `admin` | `himshakti_admin_2026` | Admin | Backup admin account |
+| `manager` | `himshakti2026` | Manager | Operations manager |
+| `staff` | `himshakti_staff_2026` | Factory Manager | Warehouse staff |
+
+### Google Sign-In fails with "No account linked"
+
+Google OAuth works by matching the returned Gmail address to a user's `googleEmail` field in MongoDB. If no match is found:
+
+1. Log in with your **username + password** first
+2. Go to your profile dropdown → **Google Account** section → click the link icon
+3. From that point, your Gmail can be used to sign in directly
+
+### Admin Panel shows a white screen
+
+This was caused by a `u.name.split()` crash when any user in MongoDB had a null/undefined `name` field. Fixed in **v2.1.0**. If you still see it on an older version, ensure all user documents have a `name` field populated.
+
+---
+
 ## 📄 Documentation Index
 
 | Document | Purpose | Status |
 |---|---|---|
-| [`README.md`](./README.md) | System overview, setup, API reference | ✅ Current |
-| [`CHANGELOG.md`](./CHANGELOG.md) | Full version history | ✅ Current |
+| [`README.md`](./README.md) | System overview, setup, API reference | ✅ v2.1.0 |
+| [`CHANGELOG.md`](./CHANGELOG.md) | Full version history | ✅ v2.1.0 |
 | [`docs/BATCH_MANAGEMENT.md`](./docs/BATCH_MANAGEMENT.md) | Batch management workflow, drawer UI, RBAC, soft delete, API | ✅ v2.0.0 |
 | [`docs/DATABASE.md`](./docs/DATABASE.md) | Full database design, schema reference & Atlas setup | ✅ Current |
 | [`docs/schema-diagram.png`](./docs/schema-diagram.png) | Visual ER diagram — all 4 collections & relationships | ✅ Current |
@@ -808,6 +859,7 @@ Output:
 | [`final_project_report.md`](./final_project_report.md) | Final project report & schema design | ✅ Phase 3 |
 | [`shared/README.md`](./shared/README.md) | Inter-intern DB schema contract | ✅ Active |
 | [`docs/W3_Wireframes.md`](./docs/W3_Wireframes.md) | UI wireframes | ✅ Phase 3 |
+| [`HimShakti_Reflection_Weeks1-4.pptx`](./HimShakti_Reflection_Weeks1-4.pptx) | Weeks 1–4 reflection presentation (20 slides) | ✅ New |
 
 ---
 

@@ -247,12 +247,94 @@ async function getBatchScans(req, res, next) {
   } catch (err) { next(err); }
 }
 
+// @desc  Update raw material source fields (correction workflow)
+// @route PATCH /api/batches/:id/raw-material
+// @access admin, manager, factory-manager
+async function updateRawMaterial(req, res, next) {
+  try {
+    const allowed = ['admin', 'manager', 'factory-manager'];
+    if (!allowed.includes(req.user?.role)) {
+      return res.status(403).json({ success: false, error: 'Insufficient permissions to edit raw material data' });
+    }
+
+    const EDITABLE = ['farmerName', 'village', 'sourceLotCode', 'quantityProduced', 'unit', 'yieldPercent', 'dataSource'];
+    const updates  = {};
+    for (const key of EDITABLE) {
+      if (req.body[key] !== undefined) updates[key] = req.body[key];
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ success: false, error: 'No editable fields provided' });
+    }
+
+    // Basic validation
+    if (updates.yieldPercent !== undefined) {
+      const y = Number(updates.yieldPercent);
+      if (isNaN(y) || y < 0 || y > 100) {
+        return res.status(400).json({ success: false, error: 'yieldPercent must be 0–100' });
+      }
+      updates.yieldPercent = y;
+    }
+    if (updates.quantityProduced !== undefined) {
+      const q = Number(updates.quantityProduced);
+      if (isNaN(q) || q <= 0) {
+        return res.status(400).json({ success: false, error: 'quantityProduced must be a positive number' });
+      }
+      updates.quantityProduced = q;
+    }
+
+    const batch = await Batch.findById(req.params.id);
+    if (!batch) return res.status(404).json({ success: false, error: 'Batch not found' });
+
+    // Append a raw material edit entry to noteHistory for full audit trail
+    const changedFields = Object.keys(updates).join(', ');
+    batch.noteHistory.push({
+      note:     `[Raw Material Correction] Fields updated: ${changedFields}`,
+      editedBy: req.user?.username || req.user?.name || 'unknown',
+      editedAt: new Date(),
+    });
+
+    // Apply updates
+    Object.assign(batch, updates);
+    await batch.save();
+
+    const io = req.app.get('io');
+    if (io) io.emit('batch:updated', { batchId: batch._id, batchCode: batch.batchCode });
+
+    res.json({
+      success: true,
+      message: `Raw material data updated for ${batch.batchCode}`,
+      data: enrichBatch(batch),
+    });
+  } catch (err) { next(err); }
+}
+
+// @desc  Get all archived (soft-deleted) batches — admin only
+// @route GET /api/batches/archived
+// @access admin only
+async function getArchivedBatches(req, res, next) {
+  try {
+    if (req.user?.role !== 'admin') {
+      return res.status(403).json({ success: false, error: 'Only admins can view archived batches' });
+    }
+
+    const batches = await Batch.find({ isDeleted: true })
+      .sort({ deletedAt: -1 })
+      .select('-qrCodeDataUrl');
+
+    const enriched = batches.map(enrichBatch);
+    res.json({ success: true, count: enriched.length, data: enriched });
+  } catch (err) { next(err); }
+}
+
 module.exports = {
   createBatch,
   getAllBatches,
   getBatchById,
   recordDispatch,
   updateBatchNote,
+  updateRawMaterial,
+  getArchivedBatches,
   softDeleteBatch,
   restoreBatch,
   getBatchScans,
