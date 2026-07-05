@@ -70,6 +70,10 @@ This release resolves a set of critical runtime bugs discovered during live QA, 
 
 - Inline Node.js reset script to re-hash and upsert `admin` + `manager` passwords from `.env` values directly into MongoDB — useful after any DB reset or `.env` change
 
+#### Added — Comprehensive `.gitignore`
+
+- Expanded root `.gitignore`: presentations (`*.pptx`, `~$*`), environment secrets (`.env`), `node_modules/`, build output (`dist/`, `.vite/`), OS junk (`.DS_Store`, `Thumbs.db`), IDE files — repository is now clean by default
+
 ---
 
 #### Changed
@@ -79,6 +83,7 @@ This release resolves a set of critical runtime bugs discovered during live QA, 
 - `frontend/src/hooks/useBatches.js` — `softDeleteBatch`, `restoreBatch`, `updateRawMaterial` mutations with optimistic updates
 - `frontend/src/pages/Dashboard.jsx` — `onArchived` callback threaded through, `archivedVersion` state, Admin Panel null-safety guards
 - `frontend/src/components/BatchDetailDrawer.jsx` — "Correct" raw material button, Danger Zone wired to callbacks
+- `.gitignore` — expanded from 3 lines to comprehensive project-wide exclusion rules
 
 ---
 

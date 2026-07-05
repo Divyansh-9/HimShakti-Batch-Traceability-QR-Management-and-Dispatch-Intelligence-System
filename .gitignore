@@ -1,3 +1,35 @@
-# Ignore local agent and guide folders
+# ─── Tooling & Workspace ────────────────────────────────────────
 .agents/
 tbi-guide/
+
+# ─── Presentations & Exported Assets ───────────────────────────
+*.pptx
+*.ppt
+*.pptm
+~$*
+
+# ─── Environment & Secrets ──────────────────────────────────────
+.env
+.env.local
+.env.production
+
+# ─── Node / npm ─────────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-error.log
+
+# ─── Build Output ───────────────────────────────────────────────
+dist/
+build/
+.vite/
+
+# ─── OS & IDE ───────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/settings.json
+*.suo
+*.user
+
+# ─── Logs ───────────────────────────────────────────────────────
+logs/
+*.log
