@@ -859,7 +859,7 @@ This was caused by a `u.name.split()` crash when any user in MongoDB had a null/
 | [`final_project_report.md`](./final_project_report.md) | Final project report & schema design | ✅ Phase 3 |
 | [`shared/README.md`](./shared/README.md) | Inter-intern DB schema contract | ✅ Active |
 | [`docs/W3_Wireframes.md`](./docs/W3_Wireframes.md) | UI wireframes | ✅ Phase 3 |
-| [`HimShakti_Reflection_Weeks1-4.pptx`](./HimShakti_Reflection_Weeks1-4.pptx) | Weeks 1–4 reflection presentation (20 slides) | ✅ New |
+| [`docs/PROMPTS.md`](./docs/PROMPTS.md) | AI prompt engineering log — 3 variations, inputs/outputs, dual-provider architecture | ✅ New |
 
 ---
 

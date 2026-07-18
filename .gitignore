@@ -33,3 +33,6 @@ Thumbs.db
 # ─── Logs ───────────────────────────────────────────────────────
 logs/
 *.log
+
+# ─── Assignment Submissions (local only, never commit) ───────────
+W6_AuthAPICollection_TBI-26100026.json
