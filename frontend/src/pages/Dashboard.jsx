@@ -986,7 +986,7 @@ function QRTab({ batches, loading, onDownloadQR }) {
 
 // ── Tab: AI Audit — structured JSON card layout ──────────────────
 function AIAuditTab({ batchCount }) {
-  const { report, fromCache, generatedAt, loading, error, runAudit } = useAIAudit();
+  const { report, fromCache, generatedAt, provider, loading, error, runAudit } = useAIAudit();
 
   const SEVERITY_COLOR = {
     HIGH:   'bg-red-500/10 text-red-500 border-red-500/20',
@@ -1025,16 +1025,59 @@ function AIAuditTab({ batchCount }) {
             </div>
             <div>
               <h2 className="font-semibold text-text-primary">AI Dispatch Audit</h2>
-              <p className="text-xs text-text-muted mt-0.5">Gemini 2.5 Flash · structured JSON output · NVIDIA fallback</p>
+              {/* ── Dynamic live status chips ── */}
+              <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                {/* Chip 1: Provider — reflects which model actually ran */}
+                {loading ? (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-brand/10 text-brand border border-brand/20 animate-pulse">
+                    <RefreshCw className="w-2.5 h-2.5 animate-spin" />
+                    Analysing…
+                  </span>
+                ) : provider === 'nvidia' ? (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                    <Zap className="w-2.5 h-2.5" />
+                    NVIDIA LLaMA 3.1
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-500/10 text-teal-600 border border-teal-500/20">
+                    <CheckCircle className="w-2.5 h-2.5" />
+                    Gemini 2.5 Flash
+                  </span>
+                )}
+
+                {/* Chip 2: Cache / freshness status */}
+                {report && !loading && (
+                  fromCache && generatedAt ? (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-surface-2 text-text-muted border border-border">
+                      <Clock className="w-2.5 h-2.5" />
+                      {getCacheLabel()}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-500/10 text-green-600 border border-green-500/20">
+                      <Zap className="w-2.5 h-2.5" />
+                      Just generated
+                    </span>
+                  )
+                )}
+
+                {/* Chip 3: Batch scope */}
+                {report && !loading && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-surface-2 text-text-muted border border-border">
+                    <Activity className="w-2.5 h-2.5" />
+                    {report.totalAnalyzed ?? batchCount} batches
+                  </span>
+                )}
+
+                {/* Chip 3 (idle state): scope hint */}
+                {!report && !loading && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-surface-2 text-text-muted border border-border">
+                    NVIDIA fallback
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {report && fromCache && (
-              <span className="hidden sm:flex items-center gap-1.5 text-xs text-text-muted bg-surface-2 border border-border px-3 py-1.5 rounded-lg">
-                <Clock className="w-3 h-3" />
-                {getCacheLabel()}
-              </span>
-            )}
             <button
               onClick={runAudit}
               disabled={loading}

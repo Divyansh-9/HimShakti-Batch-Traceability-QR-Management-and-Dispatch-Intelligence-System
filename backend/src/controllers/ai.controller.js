@@ -21,6 +21,7 @@ async function runAudit(req, res, next) {
       success:     true,
       fromCache:   result.fromCache,
       generatedAt: result.generatedAt || result.cachedAt,
+      provider:    result.provider || 'gemini',
       batchCount:  enriched.length,
       report:      result.report
     });

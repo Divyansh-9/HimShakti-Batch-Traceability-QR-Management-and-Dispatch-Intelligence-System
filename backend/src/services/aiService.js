@@ -16,7 +16,7 @@ async function runDispatchAudit(batches) {
   const cacheTTL = parseInt(process.env.GEMINI_CACHE_TTL_HOURS || '4') * 60 * 60 * 1000;
 
   if (aiCache.report && (Date.now() - aiCache.generatedAt) < cacheTTL) {
-    return { report: aiCache.report, fromCache: true, cachedAt: new Date(aiCache.generatedAt) };
+    return { report: aiCache.report, fromCache: true, cachedAt: new Date(aiCache.generatedAt), provider: aiCache.provider || 'gemini' };
   }
 
   const batchSummary = batches.map(b => ({
@@ -104,6 +104,7 @@ Rules:
   }
 
   let rawText = null;
+  let provider = 'gemini';
   try {
     const model  = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
     const result = await model.generateContent(prompt);
@@ -113,6 +114,7 @@ Rules:
     console.warn(`[AI] Triggering NVIDIA Fallback...`);
     try {
       rawText = await callNvidiaFallback(prompt);
+      provider = 'nvidia';
     } catch (nvidiaErr) {
       console.error(`[AI] NVIDIA Fallback also failed: ${nvidiaErr.message}`);
       throw new Error(`429: Both AI providers are currently unavailable. Please wait and try again.`);
@@ -127,8 +129,8 @@ Rules:
     throw new Error('AI returned an unexpected format. Please try again.');
   }
 
-  aiCache = { report, generatedAt: Date.now() };
-  return { report, fromCache: false, generatedAt: new Date() };
+  aiCache = { report, generatedAt: Date.now(), provider };
+  return { report, fromCache: false, generatedAt: new Date(), provider };
 }
 
 function clearAICache() {
