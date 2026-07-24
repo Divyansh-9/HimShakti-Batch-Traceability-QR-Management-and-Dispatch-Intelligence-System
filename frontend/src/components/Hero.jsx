@@ -19,7 +19,6 @@ export default function Hero() {
           alt="Himalayan terraced farmland — origin of HimShakti products"
           className="w-full h-full object-cover object-center"
         />
-        {/* Layered overlays: heavy left fade for text, vertical bottom fade into page */}
         <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/55 to-black/10" />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent opacity-80" />
       </div>
@@ -28,9 +27,9 @@ export default function Hero() {
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full py-32">
         <div className="max-w-2xl">
 
-          {/* Eyebrow */}
+          {/* Eyebrow badge — upgraded glass specular */}
           <div
-            className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm text-white/80 text-xs font-semibold uppercase tracking-widest px-3 py-1.5 rounded-full mb-6 border border-white/15"
+            className="glass-card inline-flex items-center gap-2 text-white/80 text-xs font-semibold uppercase tracking-widest px-3 py-1.5 rounded-full mb-6 glass-shimmer-hover relative overflow-hidden"
             style={{ animation: 'heroFadeUp 0.6s ease both' }}
           >
             <span className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse" />
@@ -59,23 +58,26 @@ export default function Hero() {
             className="mt-8 flex flex-col sm:flex-row gap-3"
             style={{ animation: 'heroFadeUp 0.6s ease 0.3s both' }}
           >
+            {/* Primary CTA — brand glass with glow */}
             <Link
               to="/dashboard"
-              className="inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-brand hover:bg-brand-hover text-white font-bold rounded-xl transition-all duration-200 shadow-lg shadow-brand/30 hover:-translate-y-0.5"
+              className="glass-btn-primary glass-shimmer-hover relative inline-flex items-center justify-center gap-2 px-8 py-3.5 text-white font-bold rounded-xl overflow-hidden"
             >
               View Dashboard <ArrowRight className="w-4 h-4" />
             </Link>
+
+            {/* Secondary CTA — true liquid glass pill */}
             <Link
               to="/about"
-              className="inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-white/10 hover:bg-white/20 text-white font-semibold rounded-xl transition-all duration-200 border border-white/20 backdrop-blur-sm"
+              className="glass-btn inline-flex items-center justify-center gap-2 px-8 py-3.5 text-white font-semibold rounded-xl"
             >
               Learn More
             </Link>
           </div>
 
-          {/* Mini stats */}
+          {/* Mini stats — wrapped in a glass strip */}
           <div
-            className="mt-12 flex flex-wrap gap-6"
+            className="mt-12 glass-card inline-flex flex-wrap gap-6 px-6 py-4 rounded-2xl"
             style={{ animation: 'heroFadeUp 0.6s ease 0.4s both' }}
           >
             {STATS.map(s => (
@@ -88,8 +90,8 @@ export default function Hero() {
         </div>
       </div>
 
-      {/* ── Sourced badge ── */}
-      <div className="absolute bottom-10 right-8 bg-black/50 backdrop-blur-md rounded-xl px-4 py-3 border border-white/10">
+      {/* ── Sourced badge — glass-card ── */}
+      <div className="glass-card absolute bottom-10 right-8 rounded-xl px-4 py-3">
         <p className="text-white/60 text-xs font-semibold uppercase tracking-widest mb-0.5">Sourced from</p>
         <p className="text-white font-bold text-sm">Uttarakhand, India 🏔</p>
       </div>

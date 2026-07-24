@@ -32,7 +32,38 @@
     --status-warning: #d97706;
     --status-pending: #2563eb;
     --status-error: #dc2626;
+
+    /* ── Glass token system — Light Mode ────────────────────── */
+    /* Fill: white tint — readable frosted glass on bright backgrounds */
+    --glass-fill:            rgba(255, 255, 255, 0.12);
+    --glass-fill-strong:     rgba(255, 255, 255, 0.20);
+
+    /* Specular: bright top-edge highlight — light hitting glass surface */
+    --glass-specular:        rgba(255, 255, 255, 0.70);
+    --glass-specular-subtle: rgba(255, 255, 255, 0.35);
+
+    /* Border: crisp glass edge — high contrast on bright backgrounds */
+    --glass-border:          rgba(255, 255, 255, 0.35);
+    --glass-border-subtle:   rgba(255, 255, 255, 0.18);
+
+    /* Shadow: light and airy — minimal depth on bright scene */
+    --glass-shadow:          0 8px 32px rgba(0, 0, 0, 0.10), 0 2px 8px rgba(0, 0, 0, 0.06);
+    --glass-shadow-strong:   0 16px 48px rgba(0, 0, 0, 0.16), 0 4px 12px rgba(0, 0, 0, 0.08);
+
+    /* Blur filter */
+    --glass-blur:            blur(20px) saturate(180%);
+    --glass-blur-heavy:      blur(32px) saturate(200%);
+
+    /* Inner glow: specular inset — simulates light trapped inside glass */
+    --glass-inset:           inset 0 1px 0 rgba(255, 255, 255, 0.60), inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+
+    /* Brand glass: orange-tinted primary buttons */
+    --glass-brand-fill:   rgba(234, 88, 12, 0.85);
+    --glass-brand-glow:   0 0 24px rgba(234, 88, 12, 0.40), 0 4px 16px rgba(234, 88, 12, 0.25);
+    --glass-brand-border: rgba(251, 146, 60, 0.50);
+    --glass-brand-inset:  inset 0 1px 0 rgba(255, 200, 150, 0.35);
   }
+
   :root[data-theme="dark"] {
     --bg-primary: #0f172a;
     --bg-surface: #16213e;
@@ -47,7 +78,162 @@
     --status-warning: #facc15;
     --status-pending: #60a5fa;
     --status-error: #f87171;
+
+    /* ── Glass token system — Dark Mode ─────────────────────── */
+    /* Fill: near-transparent tinted black — dark glass is barely-there.
+       0.12 white on dark bg looks foggy/washed out; 0.05 keeps it physical. */
+    --glass-fill:            rgba(255, 255, 255, 0.05);
+    --glass-fill-strong:     rgba(255, 255, 255, 0.09);
+
+    /* Specular: significantly dimmer — glass in a dark scene catches less
+       ambient light. 0.70 (light mode) in dark produces an ugly bright stripe. */
+    --glass-specular:        rgba(255, 255, 255, 0.14);
+    --glass-specular-subtle: rgba(255, 255, 255, 0.07);
+
+    /* Border: lower contrast — 0.35 white on dark reads as a harsh neon line. */
+    --glass-border:          rgba(255, 255, 255, 0.12);
+    --glass-border-subtle:   rgba(255, 255, 255, 0.06);
+
+    /* Shadow: much deeper — dark surfaces have no ambient brightness to soften
+       edges. Without stronger shadow, dark glass floats invisibly into bg. */
+    --glass-shadow:          0 8px 32px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.30);
+    --glass-shadow-strong:   0 16px 48px rgba(0, 0, 0, 0.60), 0 4px 12px rgba(0, 0, 0, 0.40);
+
+    /* Blur: extra saturation compensates for dark content behind being desaturated */
+    --glass-blur:            blur(20px) saturate(220%);
+    --glass-blur-heavy:      blur(32px) saturate(240%);
+
+    /* Inner glow: dimmed to match dark specular values */
+    --glass-inset:           inset 0 1px 0 rgba(255, 255, 255, 0.12), inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+
+    /* Brand glass: same orange — brand identity consistent across themes */
+    --glass-brand-fill:   rgba(234, 88, 12, 0.85);
+    --glass-brand-glow:   0 0 24px rgba(234, 88, 12, 0.40), 0 4px 16px rgba(234, 88, 12, 0.25);
+    --glass-brand-border: rgba(251, 146, 60, 0.50);
+    --glass-brand-inset:  inset 0 1px 0 rgba(255, 200, 150, 0.35);
   }
+}
+
+/* ════════════════════════════════════════════════════════════
+   GLASS UTILITY CLASSES
+   All classes reference only CSS variables — zero hardcoded rgba.
+   ════════════════════════════════════════════════════════════ */
+
+/* Base glass panel */
+.glass {
+  background: var(--glass-fill);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), var(--glass-inset);
+}
+
+/* Navbar glass — full-width bar (scrolled state + dashboard) */
+.glass-nav {
+  background: var(--glass-fill);
+  backdrop-filter: var(--glass-blur-heavy);
+  -webkit-backdrop-filter: var(--glass-blur-heavy);
+  border-bottom: 1px solid var(--glass-border-subtle);
+  box-shadow: var(--glass-shadow), var(--glass-inset);
+}
+
+/* Floating pill nav — hero pages before scroll */
+.glass-pill-nav {
+  background: var(--glass-fill);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: 9999px;
+  box-shadow: var(--glass-shadow-strong), var(--glass-inset);
+}
+
+/* Ghost glass button — secondary CTAs (Learn More) */
+.glass-btn {
+  background: var(--glass-fill);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), var(--glass-inset);
+  transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+}
+.glass-btn:hover {
+  background: var(--glass-fill-strong);
+  box-shadow: var(--glass-shadow-strong), var(--glass-inset);
+  transform: translateY(-1px);
+}
+
+/* Brand glass button — Sign In, View Dashboard */
+.glass-btn-primary {
+  background: var(--glass-brand-fill);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-brand-border);
+  box-shadow: var(--glass-brand-glow), var(--glass-brand-inset);
+  transition: filter 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+}
+.glass-btn-primary:hover {
+  filter: brightness(1.08);
+  box-shadow: var(--glass-brand-glow), var(--glass-brand-inset);
+  transform: translateY(-1px);
+}
+
+/* Sidebar glass panel */
+.glass-sidebar {
+  background: var(--glass-fill);
+  backdrop-filter: var(--glass-blur-heavy);
+  -webkit-backdrop-filter: var(--glass-blur-heavy);
+  border-right: 1px solid var(--glass-border-subtle);
+  box-shadow: var(--glass-shadow);
+}
+
+/* Stat / info card glass */
+.glass-card {
+  background: var(--glass-fill-strong);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), var(--glass-inset);
+}
+
+/* Floating dropdown / panel glass */
+.glass-dropdown {
+  background: var(--glass-fill-strong);
+  backdrop-filter: var(--glass-blur-heavy);
+  -webkit-backdrop-filter: var(--glass-blur-heavy);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow-strong), var(--glass-inset);
+}
+
+/* ── Animations ──────────────────────────────────────────── */
+
+/* Shimmer sweep — subtle specular highlight moving across surface on hover */
+@keyframes glass-shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
+}
+.glass-shimmer-hover:hover::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    105deg,
+    transparent 40%,
+    rgba(255, 255, 255, 0.18) 50%,
+    transparent 60%
+  );
+  background-size: 200% 100%;
+  animation: glass-shimmer 0.6s ease;
+  pointer-events: none;
+}
+
+/* Appear animation — scale + blur in for dropdowns and panels */
+@keyframes glass-appear {
+  from { opacity: 0; transform: translateY(-6px) scale(0.97); filter: blur(4px); }
+  to   { opacity: 1; transform: translateY(0)   scale(1);    filter: blur(0); }
+}
+.glass-appear {
+  animation: glass-appear 0.18s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 /* ── Dashboard tab animations ──────────────────────────────── */
@@ -59,7 +245,7 @@
   animation: dashTabIn 0.25s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-/* Navbar user dropdown */
+/* Navbar user dropdown (legacy — kept for compat) */
 @keyframes fadeSlideIn {
   from { opacity: 0; transform: translateY(-6px) scale(0.97); }
   to   { opacity: 1; transform: translateY(0)   scale(1); }
