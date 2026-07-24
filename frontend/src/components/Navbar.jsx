@@ -15,8 +15,10 @@ const GoogleSVG = () => (
   </svg>
 );
 
+// Pages where the navbar starts transparent and transitions on scroll
 const HERO_ROUTES = ['/', '/about', '/login'];
 
+// Role display config
 const ROLE_META = {
   admin:                  { label: 'Administrator', color: 'bg-rose-500/15 text-rose-400 border-rose-500/30' },
   manager:                { label: 'Manager',       color: 'bg-brand/15 text-brand border-brand/30' },
@@ -48,6 +50,7 @@ export default function Navbar() {
   const transparent = isHeroPage && !scrolled;
   const isDashboard = location.pathname === '/dashboard';
 
+  // Auth — uses hs_token + hs_user (matching useAuth.js)
   const token      = localStorage.getItem('hs_token');
   const isLoggedIn = token && isTokenValid(token);
   const user       = (() => {
@@ -55,10 +58,11 @@ export default function Navbar() {
     catch { return null; }
   })();
 
+  // Google link state — persisted in localStorage so it survives nav
   const [googleEmail,    setGoogleEmail]    = useState(() => localStorage.getItem('hs_google_email') || '');
-  const [googleLinking,  setGoogleLinking]  = useState(false);
-  const [showGoogleForm, setShowGoogleForm] = useState(false);
-  const [googleInput,    setGoogleInput]    = useState('');
+  const [googleLinking,  setGoogleLinking]  = useState(false); // loading state
+  const [showGoogleForm, setShowGoogleForm] = useState(false); // inline form visible
+  const [googleInput,    setGoogleInput]    = useState('');    // controlled input value
 
   async function handleGoogleLink() {
     if (!googleInput.trim()) return;
@@ -100,6 +104,7 @@ export default function Navbar() {
   const isActive = (path) => location.pathname === path;
   const roleMeta = ROLE_META[user?.role] || ROLE_META['manager'];
 
+  // Scroll listener
   useEffect(() => {
     if (!isHeroPage) { setScrolled(true); return; }
     setScrolled(window.scrollY > 70);
@@ -108,6 +113,7 @@ export default function Navbar() {
     return () => window.removeEventListener('scroll', onScroll);
   }, [isHeroPage]);
 
+  // Close user menu on outside click
   useEffect(() => {
     function onClickOut(e) {
       if (userMenuRef.current && !userMenuRef.current.contains(e.target)) {
@@ -131,11 +137,22 @@ export default function Navbar() {
     { name: 'About', path: '/about' },
   ];
 
-  // ── Dashboard navbar: glass full-width bar ──────────────────
+  // ── Style tokens ────────────────────────────────────────────
+  const navBg = transparent
+    ? 'bg-transparent border-transparent'
+    : 'bg-surface/95 backdrop-blur-md border-b border-border shadow-sm';
+  const logoTxt  = transparent ? 'text-white' : 'text-brand';
+  const logoSub  = transparent ? 'text-white/80' : 'text-text-primary';
+  const linkBase = transparent
+    ? 'border-transparent text-white/80 hover:text-white hover:border-white/40'
+    : 'border-transparent text-text-muted hover:border-border hover:text-text-primary';
+  const linkActive = transparent ? 'border-white text-white' : 'border-brand text-brand';
+
+  // ── Dashboard-specific: slim app bar with user context ──────
   if (isDashboard && isLoggedIn) {
     return (
       <nav
-        className="glass-nav fixed top-0 left-0 right-0 z-50"
+        className="fixed top-0 left-0 right-0 z-50 bg-surface/95 backdrop-blur-md border-b border-border shadow-sm"
         style={{ height: 72 }}
       >
         <div className="flex items-center justify-between h-full px-4 sm:px-6">
@@ -162,31 +179,32 @@ export default function Navbar() {
           <div className="flex items-center gap-2">
             <ThemeToggle />
 
+            {/* User avatar + dropdown */}
             <div className="relative" ref={userMenuRef}>
-              {/* Avatar button — glass pill */}
               <button
                 onClick={() => setUserMenuOpen(v => !v)}
-                className="glass-btn relative flex items-center gap-2.5 pl-2 pr-3 py-1.5 rounded-xl overflow-hidden glass-shimmer-hover"
+                className="flex items-center gap-2.5 pl-2 pr-3 py-1.5 rounded-xl hover:bg-surface-2 transition-colors border border-transparent hover:border-border group"
               >
+                {/* Avatar circle */}
                 <div className="w-8 h-8 rounded-lg bg-brand flex items-center justify-center shadow-sm flex-shrink-0">
                   <span className="text-white text-xs font-bold">{getInitials(user?.name)}</span>
                 </div>
                 <div className="hidden sm:block text-left min-w-0">
-                  <p className="text-sm font-semibold text-white leading-none truncate max-w-[120px]">
+                  <p className="text-sm font-semibold text-text-primary leading-none truncate max-w-[120px]">
                     {user?.name || user?.username || 'User'}
                   </p>
                   <span className={`inline-block mt-0.5 px-1.5 py-px rounded text-[9px] font-bold uppercase tracking-wider border ${roleMeta.color}`}>
                     {roleMeta.label}
                   </span>
                 </div>
-                <ChevronDown className={`w-3.5 h-3.5 text-white/70 transition-transform duration-200 ${userMenuOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`w-3.5 h-3.5 text-text-muted transition-transform duration-200 ${userMenuOpen ? 'rotate-180' : ''}`} />
               </button>
 
-              {/* Dropdown — glass-dropdown */}
+              {/* Dropdown */}
               {userMenuOpen && (
-                <div className="glass-dropdown glass-appear absolute right-0 top-[calc(100%+8px)] w-72 rounded-2xl overflow-hidden z-50">
+                <div className="absolute right-0 top-[calc(100%+8px)] w-72 bg-surface border border-border rounded-2xl shadow-2xl shadow-black/20 overflow-hidden z-50 animate-[fadeSlideIn_0.15s_ease]">
                   {/* User info header */}
-                  <div className="px-4 pt-4 pb-3 border-b border-white/10">
+                  <div className="px-4 pt-4 pb-3 border-b border-border bg-surface-2/50">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-xl bg-brand flex items-center justify-center shadow-md flex-shrink-0">
                         <span className="text-white text-sm font-bold">{getInitials(user?.name)}</span>
@@ -206,14 +224,14 @@ export default function Navbar() {
                     <Link
                       to="/"
                       onClick={() => setUserMenuOpen(false)}
-                      className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm text-text-muted hover:bg-white/10 hover:text-text-primary transition-colors"
+                      className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm text-text-muted hover:bg-surface-2 hover:text-text-primary transition-colors"
                     >
                       <LayoutDashboard className="w-4 h-4" />
                       Back to Home
                     </Link>
                     {user?.role === 'admin' && (
                       <button
-                        className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm text-text-muted hover:bg-white/10 hover:text-text-primary transition-colors"
+                        className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm text-text-muted hover:bg-surface-2 hover:text-text-primary transition-colors"
                         onClick={() => { navigate('/dashboard?tab=admin'); setUserMenuOpen(false); }}
                       >
                         <Shield className="w-4 h-4 text-rose-400" />
@@ -222,11 +240,13 @@ export default function Navbar() {
                     )}
                   </div>
 
-                  {/* Google account section */}
-                  <div className="px-3 py-2.5 border-t border-white/10">
+                  {/* ── Link Google Account section ── */}
+                  <div className="px-3 py-2.5 border-t border-border">
                     <p className="text-[10px] font-bold text-text-muted uppercase tracking-widest mb-2">Google Account</p>
+
                     {googleEmail ? (
-                      <div className="bg-white/5 rounded-xl px-3 py-2.5 flex items-center gap-2">
+                      // Already linked — show email + unlink option
+                      <div className="bg-surface-2 rounded-xl px-3 py-2.5 flex items-center gap-2">
                         <GoogleSVG />
                         <div className="flex-1 min-w-0">
                           <p className="text-[10px] text-text-muted font-medium">Linked</p>
@@ -235,12 +255,14 @@ export default function Navbar() {
                         <button
                           onClick={handleGoogleUnlink}
                           disabled={googleLinking}
+                          title="Unlink Google account"
                           className="p-1.5 rounded-lg text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-40"
                         >
                           <Unlink className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     ) : showGoogleForm ? (
+                      // Inline input — no window.prompt
                       <div className="space-y-2">
                         <input
                           type="email"
@@ -249,28 +271,29 @@ export default function Navbar() {
                           onKeyDown={e => e.key === 'Enter' && handleGoogleLink()}
                           placeholder="your@gmail.com"
                           autoFocus
-                          className="w-full px-3 py-2 text-xs bg-white/10 border border-white/20 rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand/40"
+                          className="w-full px-3 py-2 text-xs bg-surface-2 border border-border rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand/30"
                         />
                         <div className="flex gap-1.5">
                           <button
                             onClick={handleGoogleLink}
                             disabled={googleLinking || !googleInput.trim()}
-                            className="flex-1 py-1.5 glass-btn-primary text-white text-[11px] font-bold rounded-lg transition-all disabled:opacity-40"
+                            className="flex-1 py-1.5 bg-brand hover:bg-brand-hover text-white text-[11px] font-bold rounded-lg transition-all disabled:opacity-40"
                           >
                             {googleLinking ? 'Linking…' : 'Link Account'}
                           </button>
                           <button
                             onClick={() => { setShowGoogleForm(false); setGoogleInput(''); }}
-                            className="px-2.5 py-1.5 text-text-muted text-[11px] border border-white/20 rounded-lg hover:bg-white/10 transition-colors"
+                            className="px-2.5 py-1.5 text-text-muted text-[11px] border border-border rounded-lg hover:bg-surface-2 transition-colors"
                           >
                             Cancel
                           </button>
                         </div>
                       </div>
                     ) : (
+                      // Unlinked state — invite to link
                       <button
                         onClick={() => setShowGoogleForm(true)}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-text-muted hover:bg-white/10 hover:text-text-primary transition-colors border border-dashed border-white/15"
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-text-muted hover:bg-surface-2 hover:text-text-primary transition-colors border border-dashed border-border"
                       >
                         <GoogleSVG />
                         Link Google account
@@ -279,7 +302,7 @@ export default function Navbar() {
                   </div>
 
                   {/* Sign out */}
-                  <div className="p-1.5 border-t border-white/10">
+                  <div className="p-1.5 border-t border-border">
                     <button
                       onClick={handleLogout}
                       className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm text-red-400 hover:bg-red-500/10 transition-colors font-medium"
@@ -297,105 +320,105 @@ export default function Navbar() {
     );
   }
 
-  // ── Public navbar: pill (transparent) → full-width glass (scrolled) ──
+  // ── Default Navbar (Home / About / Login public pages) ──────
   return (
     <nav
-      className="fixed top-0 left-0 right-0 z-50"
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${navBg}`}
       style={{ height: 72 }}
     >
-      {/* The bar itself — pill before scroll, full-width after */}
-      <div
-        className={`transition-all duration-300 ease-out ${
-          transparent
-            ? 'glass-pill-nav absolute left-1/2 -translate-x-1/2 top-3 w-[min(860px,calc(100%-32px))] flex items-center justify-between px-5 h-[52px]'
-            : 'glass-nav absolute inset-x-0 top-0 flex items-center justify-between px-4 sm:px-8 h-full'
-        }`}
-      >
-        {/* Brand */}
-        <Link to="/" className="flex items-center gap-0">
-          <span className="text-2xl font-bold tracking-tight text-white">
-            HimShakti
-          </span>
-          <span className="text-lg font-medium ml-2 text-white/80">
-            Traceability
-          </span>
-        </Link>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full">
+        <div className="flex justify-between h-full items-center">
 
-        {/* Desktop links */}
-        <div className="hidden md:flex items-center gap-1">
-          {publicLinks.map(link => (
-            <Link
-              key={link.name}
-              to={link.path}
-              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200 ${
-                isActive(link.path)
-                  ? 'bg-white/20 text-white'
-                  : 'text-white/75 hover:bg-white/10 hover:text-white'
-              }`}
-            >
-              {link.name}
-            </Link>
-          ))}
-          {isLoggedIn && (
-            <Link
-              to="/dashboard"
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200 ${
-                isActive('/dashboard')
-                  ? 'bg-white/20 text-white'
-                  : 'text-white/75 hover:bg-white/10 hover:text-white'
-              }`}
-            >
-              <LayoutDashboard className="w-3.5 h-3.5" />
-              Dashboard
-            </Link>
-          )}
-        </div>
+          {/* Brand */}
+          <Link to="/" className="flex items-center gap-0">
+            <span className={`text-2xl font-bold tracking-tight transition-colors duration-300 ${logoTxt}`}>
+              HimShakti
+            </span>
+            <span className={`text-lg font-medium ml-2 transition-colors duration-300 ${logoSub}`}>
+              Traceability
+            </span>
+          </Link>
 
-        {/* Right actions */}
-        <div className="flex items-center gap-2">
-          <ThemeToggle />
-          {isLoggedIn ? (
-            <button
-              onClick={handleLogout}
-              className="glass-btn inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium text-white/80"
-            >
-              <LogOut className="w-3.5 h-3.5" /> Sign Out
-            </button>
-          ) : (
-            <Link
-              to="/login"
-              className="glass-btn-primary glass-shimmer-hover relative inline-flex items-center gap-1.5 px-5 py-2 rounded-full text-sm font-bold text-white overflow-hidden"
-            >
-              <LogIn className="w-3.5 h-3.5" /> Sign In
-            </Link>
-          )}
-        </div>
-      </div>
-
-      {/* Mobile toggle — always visible outside the pill/bar */}
-      <div className="flex items-center md:hidden absolute right-4 top-1/2 -translate-y-1/2 space-x-2">
-        <ThemeToggle />
-        <button
-          onClick={() => setIsOpen(!isOpen)}
-          className="p-2 rounded-full text-white hover:bg-white/10 transition-colors"
-          aria-label="Toggle menu"
-        >
-          {isOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-        </button>
-      </div>
-
-      {/* Mobile Drawer — glass panel */}
-      {isOpen && (
-        <div className="md:hidden glass-nav glass-appear absolute inset-x-0 top-[72px] pb-4">
-          <div className="pt-2 space-y-1">
+          {/* Desktop Nav */}
+          <div className="hidden md:flex md:items-center md:space-x-8">
             {publicLinks.map(link => (
               <Link
                 key={link.name}
                 to={link.path}
-                className={`block pl-4 pr-4 py-3 text-base font-medium rounded-xl mx-2 ${
+                className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-all duration-300 h-[72px] ${
+                  isActive(link.path) ? linkActive : linkBase
+                }`}
+              >
+                {link.name}
+              </Link>
+            ))}
+
+            {isLoggedIn && (
+              <Link
+                to="/dashboard"
+                className={`inline-flex items-center gap-1.5 px-1 pt-1 border-b-2 text-sm font-medium transition-all duration-300 h-[72px] ${
+                  isActive('/dashboard') ? linkActive : linkBase
+                }`}
+              >
+                <LayoutDashboard className="w-3.5 h-3.5" />
+                Dashboard
+              </Link>
+            )}
+
+            <div className="flex items-center ml-4 space-x-3 pl-4 border-l border-white/20">
+              <ThemeToggle />
+              {isLoggedIn ? (
+                <button
+                  onClick={handleLogout}
+                  className={`inline-flex items-center gap-1.5 justify-center font-medium rounded-lg transition-all duration-300 px-4 py-2 text-sm border ${
+                    transparent
+                      ? 'text-white/80 border-white/30 hover:bg-white/10 hover:text-white'
+                      : 'text-text-muted border-border hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/30'
+                  }`}
+                >
+                  <LogOut className="w-3.5 h-3.5" /> Sign Out
+                </button>
+              ) : (
+                <Link
+                  to="/login"
+                  className={`inline-flex items-center gap-1.5 justify-center font-semibold rounded-lg transition-all duration-300 px-4 py-2 text-sm ${
+                    transparent
+                      ? 'bg-brand text-white hover:bg-brand-hover shadow-lg shadow-brand/30'
+                      : 'bg-brand text-white hover:bg-brand-hover'
+                  }`}
+                >
+                  <LogIn className="w-3.5 h-3.5" /> Sign In
+                </Link>
+              )}
+            </div>
+          </div>
+
+          {/* Mobile toggle */}
+          <div className="flex items-center md:hidden space-x-3">
+            <ThemeToggle />
+            <button
+              onClick={() => setIsOpen(!isOpen)}
+              className={`p-2 rounded-md transition-colors ${transparent ? 'text-white hover:bg-white/10' : 'text-text-muted hover:bg-surface-2'}`}
+              aria-label="Toggle menu"
+            >
+              {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile Drawer */}
+      {isOpen && (
+        <div className="md:hidden bg-surface/95 backdrop-blur-md border-b border-border shadow-lg">
+          <div className="pt-2 pb-4 space-y-1">
+            {publicLinks.map(link => (
+              <Link
+                key={link.name}
+                to={link.path}
+                className={`block pl-3 pr-4 py-3 border-l-4 text-base font-medium ${
                   isActive(link.path)
-                    ? 'bg-white/15 text-white'
-                    : 'text-white/70 hover:bg-white/10 hover:text-white'
+                    ? 'bg-brand/10 border-brand text-brand'
+                    : 'border-transparent text-text-muted hover:bg-surface-2 hover:text-text-primary'
                 }`}
                 onClick={() => setIsOpen(false)}
               >
@@ -403,30 +426,25 @@ export default function Navbar() {
               </Link>
             ))}
             {isLoggedIn && (
-              <Link
-                to="/dashboard"
-                className={`block pl-4 pr-4 py-3 text-base font-medium rounded-xl mx-2 ${
-                  isActive('/dashboard') ? 'bg-white/15 text-white' : 'text-white/70 hover:bg-white/10 hover:text-white'
+              <Link to="/dashboard"
+                className={`block pl-3 pr-4 py-3 border-l-4 text-base font-medium ${
+                  isActive('/dashboard') ? 'bg-brand/10 border-brand text-brand' : 'border-transparent text-text-muted hover:bg-surface-2 hover:text-text-primary'
                 }`}
                 onClick={() => setIsOpen(false)}
               >
                 Dashboard
               </Link>
             )}
-            <div className="pt-4 pb-2 border-t border-white/10 px-4">
+            <div className="pt-4 pb-2 border-t border-border px-4">
               {isLoggedIn ? (
-                <button
-                  onClick={handleLogout}
-                  className="w-full flex justify-center items-center gap-2 px-4 py-2 glass-btn rounded-full text-base font-medium text-red-400"
-                >
+                <button onClick={handleLogout}
+                  className="w-full flex justify-center items-center gap-2 px-4 py-2 border border-border rounded-lg text-base font-medium text-red-400 hover:bg-red-500/10">
                   <LogOut className="w-4 h-4" /> Sign Out
                 </button>
               ) : (
-                <Link
-                  to="/login"
-                  className="w-full flex justify-center items-center px-4 py-2 glass-btn-primary rounded-full text-base font-bold text-white"
-                  onClick={() => setIsOpen(false)}
-                >
+                <Link to="/login"
+                  className="w-full flex justify-center items-center px-4 py-2 rounded-lg text-base font-medium text-white bg-brand hover:bg-brand-hover"
+                  onClick={() => setIsOpen(false)}>
                   Sign In
                 </Link>
               )}
