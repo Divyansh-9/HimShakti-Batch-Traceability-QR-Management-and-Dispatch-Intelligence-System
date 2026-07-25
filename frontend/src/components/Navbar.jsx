@@ -138,9 +138,12 @@ export default function Navbar() {
   ];
 
   // ── Style tokens ────────────────────────────────────────────
+  // Pass 1: scrolled state uses .navbar-scrolled (frosted glass blur)
+  // instead of the previous hard bg-surface/95 color swap.
+  // transparent state is unchanged — bg-transparent on hero pages.
   const navBg = transparent
     ? 'bg-transparent border-transparent'
-    : 'bg-surface/95 backdrop-blur-md border-b border-border shadow-sm';
+    : 'navbar-scrolled shadow-sm';
   const logoTxt  = transparent ? 'text-white' : 'text-brand';
   const logoSub  = transparent ? 'text-white/80' : 'text-text-primary';
   const linkBase = transparent
@@ -368,9 +371,10 @@ export default function Navbar() {
             <div className="flex items-center ml-4 space-x-3 pl-4 border-l border-white/20">
               <ThemeToggle />
               {isLoggedIn ? (
+                // Pass 1: btn-glossy + btn-secondary-glossy — neutral glow, light sweep
                 <button
                   onClick={handleLogout}
-                  className={`inline-flex items-center gap-1.5 justify-center font-medium rounded-lg transition-all duration-300 px-4 py-2 text-sm border ${
+                  className={`btn-glossy btn-secondary-glossy inline-flex items-center gap-1.5 justify-center font-medium rounded-lg transition-all duration-300 px-4 py-2 text-sm border ${
                     transparent
                       ? 'text-white/80 border-white/30 hover:bg-white/10 hover:text-white'
                       : 'text-text-muted border-border hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/30'
@@ -379,9 +383,10 @@ export default function Navbar() {
                   <LogOut className="w-3.5 h-3.5" /> Sign Out
                 </button>
               ) : (
+                // Pass 1: btn-glossy + btn-primary-glossy — orange glow, light sweep
                 <Link
                   to="/login"
-                  className={`inline-flex items-center gap-1.5 justify-center font-semibold rounded-lg transition-all duration-300 px-4 py-2 text-sm ${
+                  className={`btn-glossy btn-primary-glossy inline-flex items-center gap-1.5 justify-center font-semibold rounded-lg transition-all duration-300 px-4 py-2 text-sm ${
                     transparent
                       ? 'bg-brand text-white hover:bg-brand-hover shadow-lg shadow-brand/30'
                       : 'bg-brand text-white hover:bg-brand-hover'

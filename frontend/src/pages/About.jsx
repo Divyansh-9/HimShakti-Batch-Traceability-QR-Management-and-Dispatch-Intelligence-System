@@ -66,19 +66,31 @@ function Reveal({ children, delay = 0, className = '' }) {
   );
 }
 
-// ─── Stat Counter Card ────────────────────────────────────────
+// ─── Stat Counter Card ──────────────────────────────────
 function StatCard({ icon: Icon, value, suffix = '', label, color, active }) {
   const numericValue = parseFloat(value.replace(/[^0-9.]/g, '')) || 0;
   const count = useCountUp(numericValue, 1200, active);
   const displayValue = typeof value === 'string' && value.includes('+')
     ? `${count}+` : value.includes('%') ? `${count}%` : count;
 
+  // Pass 2: derive semantic glow from the color class string
+  const glowClass = color.includes('brand') ? 'glass-card-brand'
+    : color.includes('green') ? 'glass-card-ready'
+    : color.includes('blue') ? 'glass-card-blue'
+    : color.includes('amber') ? 'glass-card-warning'
+    : 'glass-card-brand';
+  const badgeClass = color.includes('brand') ? 'icon-badge-brand'
+    : color.includes('green') ? 'icon-badge-ready'
+    : color.includes('blue') ? 'icon-badge-blue'
+    : color.includes('amber') ? 'icon-badge-warning'
+    : 'icon-badge-brand';
+
   return (
-    <div className={`bg-surface border border-border rounded-2xl p-4 sm:p-6 flex flex-col gap-2 sm:gap-3 hover:shadow-md transition-shadow duration-300`}>
-      <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center ${color}`}>
+    <div className={`glass-card glass-card-border ${glowClass} rounded-2xl p-4 sm:p-6 flex flex-col gap-2 sm:gap-3`}>
+      {/* Pass 2: icon-badge semantic glow, scales on parent hover */}
+      <div className={`icon-badge ${badgeClass} w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center ${color}`}>
         <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
       </div>
-      {/* text-2xl on 320px prevents "Uttarakhand" overflowing card bounds */}
       <p className="text-2xl sm:text-3xl font-extrabold text-text-primary tabular-nums break-words leading-tight">
         {active ? displayValue : '—'}
       </p>
@@ -230,10 +242,12 @@ export default function About() {
             </Reveal>
             <Reveal delay={300}>
               <div className="mt-8 flex flex-col sm:flex-row gap-3">
-                <Link to="/login" className="inline-flex items-center gap-2 px-7 py-3.5 bg-brand hover:bg-brand-hover text-white font-bold rounded-xl transition-all duration-200 hover:-translate-y-0.5 shadow-lg shadow-brand/30">
+                {/* Pass 1: primary CTA — orange glow + diagonal sweep */}
+                <Link to="/login" className="btn-glossy btn-primary-glossy inline-flex items-center gap-2 px-7 py-3.5 bg-brand hover:bg-brand-hover text-white font-bold rounded-xl transition-all duration-200 shadow-lg shadow-brand/30">
                   Access the Platform <ArrowRight className="w-4 h-4" />
                 </Link>
-                <a href="#mission" className="inline-flex items-center gap-2 px-7 py-3.5 bg-white/10 hover:bg-white/20 text-white font-semibold rounded-xl transition-all duration-200 border border-white/20 backdrop-blur-sm">
+                {/* Pass 1: secondary anchor CTA — neutral sweep */}
+                <a href="#mission" className="btn-glossy btn-secondary-glossy inline-flex items-center gap-2 px-7 py-3.5 bg-white/10 hover:bg-white/20 text-white font-semibold rounded-xl transition-all duration-200 border border-white/20 backdrop-blur-sm">
                   Learn More <ChevronDown className="w-4 h-4" />
                 </a>
               </div>
@@ -264,8 +278,8 @@ export default function About() {
               </div>
             </Reveal>
 
-            {/* Animated stat cards */}
-            <div ref={statsRef} className="grid grid-cols-2 gap-4">
+            {/* Animated stat cards — Pass 2: card-grid-ambient + glass */}
+            <div ref={statsRef} className="card-grid-ambient grid grid-cols-2 gap-4">
               {[
                 { icon: MapPin,   color: 'bg-brand/10 text-brand',          value: 'Uttarakhand', label: 'Region of Operation'  },
                 { icon: Users,    color: 'bg-green-500/10 text-green-500',  value: '15+',         label: 'Farmer Partners'      },
@@ -300,14 +314,20 @@ export default function About() {
                 return (
                   <div key={s.label} className="flex sm:items-center flex-col sm:flex-row flex-1">
                     <div
-                      className={`flex-1 bg-background border ${s.border} rounded-2xl p-4 sm:p-5 flex flex-col gap-3 hover:shadow-md hover:-translate-y-1 transition-all duration-300 cursor-default`}
+                      className={`flex-1 glass-card glass-card-border ${
+                        s.color.includes('green') ? 'glass-card-ready'
+                        : s.color.includes('brand') ? 'glass-card-brand'
+                        : s.color.includes('blue') ? 'glass-card-blue'
+                        : s.color.includes('amber') ? 'glass-card-warning'
+                        : 'glass-card-brand'
+                      } rounded-2xl p-4 sm:p-5 flex flex-col gap-3 cursor-default`}
                       style={{
                         opacity: chainInView ? 1 : 0,
                         transform: chainInView ? 'translateY(0)' : 'translateY(20px)',
-                        transition: `opacity 0.5s ease ${idx * 120}ms, transform 0.5s ease ${idx * 120}ms, box-shadow 0.2s, translate 0.2s`,
+                        transition: `opacity 0.5s ease ${idx * 120}ms, transform 0.5s ease ${idx * 120}ms, box-shadow 0.2s`,
                       }}
                     >
-                      <div className={`w-10 h-10 ${s.color} rounded-xl flex items-center justify-center`}>
+                      <div className={`icon-badge w-10 h-10 ${s.color} rounded-xl flex items-center justify-center`}>
                         <Icon className="w-5 h-5 text-white" />
                       </div>
                       <div>
@@ -466,10 +486,12 @@ export default function About() {
               </div>
               {/* w-full on mobile so buttons don't fight flex-shrink-0 in column mode */}
               <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto flex-shrink-0 relative">
-                <Link to="/login" className="inline-flex items-center justify-center px-7 py-3.5 min-h-[44px] bg-white text-brand font-bold rounded-xl hover:bg-white/90 transition-all duration-200 shadow-lg hover:-translate-y-0.5 w-full sm:w-auto">
+                {/* Pass 1: white-on-brand btn — secondary-glossy */}
+                <Link to="/login" className="btn-glossy btn-secondary-glossy inline-flex items-center justify-center px-7 py-3.5 min-h-[44px] bg-white text-brand font-bold rounded-xl hover:bg-white/90 transition-all duration-200 shadow-lg w-full sm:w-auto">
                   Sign In
                 </Link>
-                <Link to="/" className="inline-flex items-center justify-center px-7 py-3.5 min-h-[44px] bg-white/15 text-white font-semibold rounded-xl hover:bg-white/25 transition-all duration-200 border border-white/20 w-full sm:w-auto">
+                {/* Pass 1: ghost btn — secondary-glossy */}
+                <Link to="/" className="btn-glossy btn-secondary-glossy inline-flex items-center justify-center px-7 py-3.5 min-h-[44px] bg-white/15 text-white font-semibold rounded-xl hover:bg-white/25 transition-all duration-200 border border-white/20 w-full sm:w-auto">
                   Back to Home
                 </Link>
               </div>

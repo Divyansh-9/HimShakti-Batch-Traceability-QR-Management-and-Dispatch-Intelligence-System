@@ -19,6 +19,8 @@ export default function Hero() {
           alt="Himalayan terraced farmland — origin of HimShakti products"
           className="w-full h-full object-cover object-center"
         />
+        {/* Pass 3: hero-ambient-light — breathing orange radial glow, z-index 1, below dark overlays */}
+        <div className="hero-ambient-light" />
         {/* Layered overlays: heavy left fade for text, vertical bottom fade into page */}
         <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/55 to-black/10" />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent opacity-80" />
@@ -59,15 +61,17 @@ export default function Hero() {
             className="mt-8 flex flex-col sm:flex-row gap-3"
             style={{ animation: 'heroFadeUp 0.6s ease 0.3s both' }}
           >
+            {/* Pass 1: btn-primary-glossy — orange glow + diagonal sweep */}
             <Link
               to="/dashboard"
-              className="inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-brand hover:bg-brand-hover text-white font-bold rounded-xl transition-all duration-200 shadow-lg shadow-brand/30 hover:-translate-y-0.5"
+              className="btn-glossy btn-primary-glossy inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-brand hover:bg-brand-hover text-white font-bold rounded-xl transition-all duration-200 shadow-lg shadow-brand/30"
             >
               View Dashboard <ArrowRight className="w-4 h-4" />
             </Link>
+            {/* Pass 1: btn-secondary-glossy — neutral glow + diagonal sweep */}
             <Link
               to="/about"
-              className="inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-white/10 hover:bg-white/20 text-white font-semibold rounded-xl transition-all duration-200 border border-white/20 backdrop-blur-sm"
+              className="btn-glossy btn-secondary-glossy inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-white/10 hover:bg-white/20 text-white font-semibold rounded-xl transition-all duration-200 border border-white/20 backdrop-blur-sm"
             >
               Learn More
             </Link>

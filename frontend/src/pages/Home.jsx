@@ -72,19 +72,21 @@ export default function Home() {
             </p>
           </div>
 
-          {/* Steps grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* Steps grid — Pass 2: card-grid-ambient + glass-card + stagger */}
+          <div className="card-grid-ambient grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {STEPS.map((step, idx) => {
               const Icon = step.icon;
+              const stagger = ['card-stagger-1','card-stagger-2','card-stagger-3','card-stagger-4'][idx];
               return (
                 <div key={step.number} className="relative group">
                   {/* Connector line between steps */}
                   {idx < STEPS.length - 1 && (
                     <div className="hidden lg:block absolute top-8 left-[calc(100%-12px)] w-6 h-px bg-border z-10" />
                   )}
-                  <div className="bg-surface border border-border rounded-2xl p-6 h-full hover:border-brand/40 hover:shadow-md transition-all duration-200">
+                  <div className={`glass-card glass-card-border glass-card-brand ${stagger} rounded-2xl p-6 h-full`}>
                     <div className="flex items-start justify-between mb-4">
-                      <div className="w-10 h-10 bg-brand/10 text-brand rounded-xl flex items-center justify-center flex-shrink-0">
+                      {/* Pass 2: icon-badge brand glow, scales on card hover */}
+                      <div className="icon-badge icon-badge-brand w-10 h-10 bg-brand/10 text-brand rounded-xl flex items-center justify-center flex-shrink-0">
                         <Icon className="w-5 h-5" />
                       </div>
                       <span className="text-3xl font-black text-border select-none">{step.number}</span>
@@ -98,15 +100,19 @@ export default function Home() {
           </div>
         </section>
 
-        {/* ── Trust Pillars ── */}
+        {/* ── Trust Pillars — Pass 2: glass-card + semantic icon-badge ── */}
         <section className="border-t border-border bg-surface">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {PILLARS.map(p => {
+            <div className="card-grid-ambient grid grid-cols-1 md:grid-cols-3 gap-8">
+              {PILLARS.map((p, idx) => {
                 const Icon = p.icon;
+                const badgeClass = idx === 0 ? 'icon-badge-brand' : idx === 1 ? 'icon-badge-ready' : 'icon-badge-warning';
+                const glowClass = idx === 0 ? 'glass-card-brand' : idx === 1 ? 'glass-card-ready' : 'glass-card-warning';
+                const stagger = ['card-stagger-1','card-stagger-2','card-stagger-3'][idx];
                 return (
-                  <div key={p.title} className="flex gap-4">
-                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${p.color}`}>
+                  <div key={p.title} className={`glass-card glass-card-border ${glowClass} ${stagger} rounded-2xl p-6 flex gap-4`}>
+                    {/* Pass 2: icon-badge semantic glow, scales on card hover */}
+                    <div className={`icon-badge ${badgeClass} w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${p.color}`}>
                       <Icon className="w-5 h-5" />
                     </div>
                     <div>
@@ -128,15 +134,17 @@ export default function Home() {
               <p className="text-white/70 mt-2">Sign in to manage batches, QR codes, and dispatch intelligence.</p>
             </div>
             <div className="flex flex-col sm:flex-row gap-3 flex-shrink-0">
+              {/* Pass 1: white-on-brand btn — secondary-glossy (neutral sweep on white bg) */}
               <Link
                 to="/login"
-                className="inline-flex items-center justify-center px-7 py-3 bg-white text-brand font-bold rounded-xl hover:bg-white/90 transition-all duration-200 shadow-lg hover:-translate-y-0.5"
+                className="btn-glossy btn-secondary-glossy inline-flex items-center justify-center px-7 py-3 bg-white text-brand font-bold rounded-xl hover:bg-white/90 transition-all duration-200 shadow-lg"
               >
                 Sign In
               </Link>
+              {/* Pass 1: ghost btn — secondary-glossy neutral sweep */}
               <Link
                 to="/about"
-                className="inline-flex items-center justify-center px-7 py-3 bg-white/15 text-white font-semibold rounded-xl hover:bg-white/25 transition-all duration-200 border border-white/20"
+                className="btn-glossy btn-secondary-glossy inline-flex items-center justify-center px-7 py-3 bg-white/15 text-white font-semibold rounded-xl hover:bg-white/25 transition-all duration-200 border border-white/20"
               >
                 Learn More
               </Link>
