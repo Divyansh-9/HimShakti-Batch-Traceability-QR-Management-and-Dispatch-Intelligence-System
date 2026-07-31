@@ -368,3 +368,80 @@
 @media (prefers-reduced-motion: reduce) {
   .urgent-pulse { animation: none; }
 }
+
+/* ── Mobile / Touch optimizations ───────────────────────────── */
+
+/* Prevent horizontal overflow on mobile */
+html, body {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+/* Momentum scrolling for touch devices */
+.overflow-y-auto {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Minimum touch target size for accessibility */
+button, a {
+  min-height: 44px;
+}
+/* Exception for small inline badges/chips */
+.badge-touch-exempt {
+  min-height: unset;
+}
+
+/* Safe area insets for notched phones (iPhone X+) */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Mobile bottom nav safe area */
+nav[class*="fixed bottom-0"] {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  height: calc(60px + env(safe-area-inset-bottom, 0px));
+}
+
+/* ── Responsive table improvements ──────────────────────────── */
+/* Tables scroll horizontally on mobile instead of breaking layout */
+.table-mobile-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ── Mobile card hover: disable lift on touch (no hover state) ── */
+@media (hover: none) {
+  .glass-card:hover   { transform: none; }
+  .btn-glossy:hover   { transform: none; }
+  .btn-glossy:hover::before { transform: translateX(-110%); }
+}
+
+/* ── Sidebar transition improvement for mobile ───────────────── */
+@media (max-width: 767px) {
+  /* Ensure sidebar never pushes content on mobile */
+  aside.sidebar-premium {
+    width: 260px !important;
+  }
+  /* Main content always full-width on mobile */
+  main {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+}
+
+/* ── FilterTabBar mobile scroll ──────────────────────────────── */
+.nav-tab-group {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE */
+}
+.nav-tab-group::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+
+/* ── Mobile Typography Scale ─────────────────────────────────── */
+@media (max-width: 640px) {
+  /* Prevent zoom on input focus on iOS */
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+}
