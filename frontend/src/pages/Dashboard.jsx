@@ -120,7 +120,7 @@ function TabBanner({ tabId, action }) {
   if (!m) return null;
   return (
     // Negative margins break out of main's p-4/p-6 padding — true full-bleed
-    <div className="-mx-4 -mt-4 sm:-mx-6 sm:-mt-6 mb-4 sm:mb-6 relative overflow-hidden" style={{ height: 140 }}>
+    <div className="tab-banner -mx-4 -mt-4 sm:-mx-6 sm:-mt-6 mb-6 relative overflow-hidden" style={{ height: 176 }}>
       {/* Photography layer */}
       <img
         src={m.image} alt=""
@@ -139,14 +139,14 @@ function TabBanner({ tabId, action }) {
 
       {/* Content — pinned to bottom-left */}
       <div className="absolute inset-0 flex items-end z-10">
-        <div className="w-full px-4 sm:px-6 sm:px-8 pb-4 sm:pb-5 flex items-end justify-between">
+        <div className="w-full px-6 sm:px-8 pb-5 flex items-end justify-between">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <span className={`w-1.5 h-1.5 rounded-full ${m.accentBar} animate-pulse`} />
               <span className={`text-[10px] font-black uppercase tracking-widest ${m.accentLight}`}>{m.eyebrow}</span>
             </div>
-            <h2 className="text-xl sm:text-2xl font-extrabold text-white leading-tight drop-shadow-md">{m.title}</h2>
-            <p className="text-xs sm:text-sm text-white/65 mt-0.5 max-w-md leading-relaxed drop-shadow-sm hidden sm:block">{m.desc}</p>
+            <h2 className="text-2xl font-extrabold text-white leading-tight drop-shadow-md">{m.title}</h2>
+            <p className="text-sm text-white/65 mt-0.5 max-w-md leading-relaxed drop-shadow-sm hidden sm:block">{m.desc}</p>
           </div>
           {action && <div className="flex-shrink-0 ml-6 mb-0.5">{action}</div>}
         </div>
@@ -251,12 +251,23 @@ function OverviewTab({ batches, loading, onTabSwitch }) {
   const ready      = batches.filter(b => b.status === 'READY').length;
   const active     = batches.filter(b => b.status !== 'DISPATCHED').length;
 
-  // Main KPI cards
+  // Main KPI cards — Need Attention dynamically switches to red when urgent > 0
+  const needAttentionUrgent = urgent > 0;
   const kpis = [
     { label: 'Total Batches',  value: total,      icon: Package,       color: 'text-brand',     bg: 'bg-brand/5',      bar: 'bg-brand',      border: 'border-l-4 border-brand',      sub: 'across all product lines' },
     { label: 'Active Stock',   value: active,     icon: Leaf,          color: 'text-green-500', bg: 'bg-green-500/5',  bar: 'bg-green-500',  border: 'border-l-4 border-green-500',  sub: 'batches in warehouse' },
     { label: 'Dispatched',     value: dispatched, icon: Truck,         color: 'text-blue-500',  bg: 'bg-blue-500/5',   bar: 'bg-blue-500',   border: 'border-l-4 border-blue-500',   sub: 'shipments completed' },
-    { label: 'Need Attention', value: urgent + warning, icon: AlertTriangle, color: 'text-amber-500', bg: 'bg-amber-500/5', bar: 'bg-amber-500', border: 'border-l-4 border-amber-500', sub: 'urgent or warning status' },
+    {
+      label: 'Need Attention',
+      value: urgent + warning,
+      icon: AlertTriangle,
+      // Red accent when urgent items exist, amber when only warnings
+      color: needAttentionUrgent ? 'text-red-500'   : 'text-amber-500',
+      bg:    needAttentionUrgent ? 'bg-red-500/5'   : 'bg-amber-500/5',
+      bar:   needAttentionUrgent ? 'bg-red-500'     : 'bg-amber-500',
+      border:needAttentionUrgent ? 'border-l-4 border-red-500' : 'border-l-4 border-amber-500',
+      sub: urgent > 0 ? `${urgent} urgent · ${warning} warning` : `${warning} warning status`,
+    },
   ];
 
   // Status breakdown — clickable, navigates to filtered batches
@@ -268,14 +279,20 @@ function OverviewTab({ batches, loading, onTabSwitch }) {
   ];
 
   // Pass 2: map kpi color class to glass glow variant
-  const GLOW_MAP = { 'text-brand': 'glass-card-brand', 'text-green-500': 'glass-card-ready', 'text-blue-500': 'glass-card-blue', 'text-amber-500': 'glass-card-warning' };
+  const GLOW_MAP = {
+    'text-brand':     'glass-card-brand',
+    'text-green-500': 'glass-card-ready',
+    'text-blue-500':  'glass-card-blue',
+    'text-amber-500': 'glass-card-warning',
+    'text-red-500':   'glass-card-urgent',
+  };
 
   return (
     <div className="space-y-4 sm:space-y-5">
       {/* KPI Cards — Pass 2: card-grid-ambient gives backdrop-filter something to blur */}
       <div className="card-grid-ambient grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {kpis.map((kpi, idx) => (
-          <div key={kpi.label} className={`glass-card glass-card-border ${GLOW_MAP[kpi.color] || 'glass-card-brand'} ${'card-stagger-' + (idx+1)} rounded-xl p-3 sm:p-5 ${kpi.border} cursor-default`}>
+          <div key={kpi.label} className={`glass-card glass-card-border ${GLOW_MAP[kpi.color] || 'glass-card-brand'} ${'card-stagger-' + (idx+1)} rounded-xl p-3 sm:p-5 ${kpi.border} cursor-default transition-all duration-500`}>
             <div className="flex items-start justify-between mb-2 sm:mb-3">
               <p className="text-text-muted text-[10px] sm:text-xs font-semibold uppercase tracking-wide leading-tight">{kpi.label}</p>
               {/* Pass 2: icon-badge inner glow, scales on card hover via CSS */}
@@ -285,9 +302,19 @@ function OverviewTab({ batches, loading, onTabSwitch }) {
             </div>
             {loading
               ? <div className="skeleton-shimmer h-7 sm:h-9 w-12 sm:w-16 rounded" />
-              : <p className={`text-2xl sm:text-3xl font-extrabold text-text-primary tracking-tight inline-block${kpi.label === 'Need Attention' && urgent > 0 ? ' urgent-pulse' : ''}`}>
-                  <AnimatedStat value={kpi.value} />
-                </p>
+              : <div className="flex items-center gap-2">
+                  <p className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${
+                    kpi.label === 'Need Attention' && urgent > 0
+                      ? 'text-red-500'
+                      : 'text-text-primary'
+                  }`}>
+                    <AnimatedStat value={kpi.value} />
+                  </p>
+                  {/* Notification dot — only on Need Attention when urgent > 0 */}
+                  {kpi.label === 'Need Attention' && urgent > 0 && (
+                    <span className="kpi-alert-dot" aria-label="Urgent items need action" />
+                  )}
+                </div>
             }
             <p className="text-[10px] sm:text-xs text-text-muted mt-1 sm:mt-1.5 leading-tight">{kpi.sub}</p>
           </div>
@@ -1364,7 +1391,24 @@ function AdminPanelTab() {
   const [rejectNote,  setRejectNote]  = useState('');
   const [inviteLink,  setInviteLink]  = useState(null);
   const [actionLoad,  setActionLoad]  = useState(null);
+  const [resending,   setResending]   = useState(false);   // resend invite email
   const [togglingId,  setTogglingId]  = useState(null);
+  const [showRawLink, setShowRawLink] = useState(false);   // toggle raw URL in modal
+
+  // Converts raw SMTP errors into clean, actionable messages
+  function emailErrorToFriendly(raw = '') {
+    const r = raw.toLowerCase();
+    if (r.includes('535') || r.includes('badcredentials') || r.includes('username and password') || r.includes('invalid login'))
+      return { reason: 'Wrong App Password', fix: 'Your Gmail App Password is incorrect or expired. Go to myaccount.google.com/apppasswords, create a new one, and update EMAIL_PASS in backend/.env (and Render env vars).' };
+    if (r.includes('534') || r.includes('less secure') || r.includes('allow less secure'))
+      return { reason: '2-Step Verification not enabled', fix: 'Gmail requires 2-Step Verification before App Passwords work. Enable it at myaccount.google.com/security, then create an App Password.' };
+    if (r.includes('econnrefused') || r.includes('etimedout') || r.includes('enotfound'))
+      return { reason: 'Cannot reach mail server', fix: 'The SMTP host is unreachable. Check EMAIL_HOST and EMAIL_PORT in backend/.env. For Gmail use smtp.gmail.com port 465.' };
+    if (r.includes('not configured') || r.includes('email_host') || r.includes('email_user'))
+      return { reason: 'Email not configured', fix: 'Add EMAIL_HOST, EMAIL_USER and EMAIL_PASS to backend/.env. See the .env.example file for the exact format.' };
+    return { reason: 'Email delivery failed', fix: raw.length > 120 ? raw.slice(0, 120) + '…' : (raw || 'Unknown error. Check backend logs for details.') };
+  }
+
   const [activeView,  setActiveView]  = useState('users');
 
   // Users Roster filters
@@ -1400,18 +1444,36 @@ function AdminPanelTab() {
     setActionLoad(id);
     try {
       const data = await client(`/auth/requests/${id}/approve`, { method: 'POST' });
-      // Store email delivery result alongside the link so the modal can show status
+      setShowRawLink(false);
       setInviteLink({
+        id,
         link:       data.inviteLink,
         name,
         emailSent:  data.emailSent,
         emailError: data.emailError,
-        email:      data.emailSent ? data.inviteLink.split('token=')[0] : null, // not the email addr, just existence flag
+        toEmail:    data.emailSent ? (data.inviteLink || '') : '',
       });
-      toast.success(data.emailSent ? `Approved — invite email sent!` : 'Approved — share the link manually');
+      toast.success(data.emailSent ? `✅ Invite emailed to ${name}!` : 'Approved — share the link manually');
       fetchRequests(); fetchUsers();
     } catch (err) { toast.error(err.message); }
     finally { setActionLoad(null); }
+  }
+
+  async function handleResendInvite() {
+    if (!inviteLink?.id) return;
+    setResending(true);
+    try {
+      const data = await client(`/auth/requests/${inviteLink.id}/resend`, { method: 'POST' });
+      setShowRawLink(false);
+      setInviteLink(prev => ({
+        ...prev,
+        link:      data.inviteLink,
+        emailSent: data.emailSent,
+        emailError: data.emailError,
+      }));
+      toast.success(data.emailSent ? 'New invite email sent!' : 'Token refreshed — share link manually.');
+    } catch (err) { toast.error(err.message); }
+    finally { setResending(false); }
   }
 
   async function handleReject(id) {
@@ -1503,7 +1565,7 @@ function AdminPanelTab() {
                 </div>
                 <div>
                   <h3 className="font-bold text-text-primary leading-tight">
-                    {inviteLink.emailSent ? 'Invite Email Sent!' : 'Approved — Share Link Manually'}
+                    {inviteLink.emailSent ? '✅ Invite Sent!' : 'Approved — Share Link'}
                   </h3>
                   <p className="text-text-muted text-xs mt-0.5">
                     For <strong>{inviteLink.name}</strong> — link expires in 48 hours
@@ -1514,58 +1576,105 @@ function AdminPanelTab() {
 
             <div className="px-6 py-5 space-y-4">
 
-              {/* ── Email delivery status banner ── */}
+              {/* ── Email delivered (happy path) ── */}
               {inviteLink.emailSent ? (
-                <div className="flex items-start gap-3 bg-green-500/8 border border-green-500/20 rounded-xl px-4 py-3">
-                  <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />
+                <div className="flex items-start gap-3 bg-green-500/8 border border-green-500/20 rounded-xl px-4 py-4">
+                  <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-sm font-semibold text-green-600 dark:text-green-400">Email delivered</p>
-                    <p className="text-xs text-text-muted mt-0.5">
-                      {inviteLink.name} received a branded invite email with a direct &ldquo;Set Your Password&rdquo; button. No manual sharing needed.
+                    <p className="text-sm font-bold text-green-600 dark:text-green-400">Email delivered successfully</p>
+                    <p className="text-xs text-text-muted mt-1 leading-relaxed">
+                      <strong>{inviteLink.name}</strong> has received a branded invite email with a
+                      &ldquo;Set Your Password&rdquo; button. They'll also verify their email via OTP.
                     </p>
+                    <p className="text-xs text-text-muted mt-2">No manual action needed from you.</p>
                   </div>
                 </div>
               ) : (
-                <div className="flex items-start gap-3 bg-amber-500/8 border border-amber-500/20 rounded-xl px-4 py-3">
-                  <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                /* ── Email not sent (fallback) ── */
+                <div className="space-y-3">
+                  {/* Error card */}
+                  {(() => {
+                    const { reason, fix } = emailErrorToFriendly(inviteLink.emailError);
+                    return (
+                      <div className="border border-red-500/20 rounded-xl overflow-hidden">
+                        {/* Reason header */}
+                        <div className="flex items-center gap-2.5 bg-red-500/8 px-4 py-3 border-b border-red-500/15">
+                          <div className="w-7 h-7 rounded-lg bg-red-500/15 flex items-center justify-center flex-shrink-0">
+                            <AlertTriangle className="w-3.5 h-3.5 text-red-400" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold text-red-500">{reason}</p>
+                            <p className="text-[10px] text-text-muted mt-0.5 uppercase tracking-wide font-semibold">Email delivery failed</p>
+                          </div>
+                        </div>
+                        {/* Fix instructions */}
+                        <div className="px-4 py-3 bg-surface-2">
+                          <p className="text-xs font-semibold text-text-muted uppercase tracking-widest mb-1.5">How to fix</p>
+                          <p className="text-xs text-text-primary leading-relaxed">{fix}</p>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Invite link box */}
                   <div>
-                    <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">Email not sent</p>
-                    <p className="text-xs text-text-muted mt-0.5">
-                      {inviteLink.emailError || 'Email delivery is not configured.'}{' '}
-                      Please share the link below manually.
-                    </p>
+                    <p className="text-xs font-semibold text-text-muted uppercase tracking-widest mb-2">Invite Link — Share Manually</p>
+                    <div className="bg-surface-2 border border-border rounded-xl px-4 py-3 flex items-center gap-3">
+                      <code className="text-xs text-text-muted flex-1 break-all leading-relaxed">{inviteLink.link}</code>
+                      <button
+                        onClick={() => { navigator.clipboard.writeText(inviteLink.link); toast.success('Copied!'); }}
+                        className="flex-shrink-0 p-2 hover:bg-surface rounded-lg transition-colors text-brand"
+                        title="Copy to clipboard"
+                      >
+                        <Copy className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
 
-              {/* ── Invite link (always shown as fallback) ── */}
-              <div>
-                <p className="text-xs font-semibold text-text-muted uppercase tracking-widest mb-2">Invite Link</p>
-                <div className="bg-surface-2 border border-border rounded-xl px-4 py-3 flex items-center gap-3">
-                  <code className="text-xs text-text-muted flex-1 break-all leading-relaxed">{inviteLink.link}</code>
+              {/* ── Show/hide raw link (when email sent) ── */}
+              {inviteLink.emailSent && (
+                <div>
                   <button
-                    onClick={() => { navigator.clipboard.writeText(inviteLink.link); toast.success('Copied!'); }}
-                    className="flex-shrink-0 p-2 hover:bg-surface rounded-lg transition-colors text-brand"
-                    title="Copy to clipboard"
+                    onClick={() => setShowRawLink(v => !v)}
+                    className="text-xs text-text-muted hover:text-text-primary transition-colors underline underline-offset-2"
                   >
-                    <Copy className="w-4 h-4" />
+                    {showRawLink ? 'Hide invite link' : 'Show invite link (backup)'}
                   </button>
+                  {showRawLink && (
+                    <div className="mt-2 bg-surface-2 border border-border rounded-xl px-4 py-3 flex items-center gap-3">
+                      <code className="text-xs text-text-muted flex-1 break-all leading-relaxed">{inviteLink.link}</code>
+                      <button
+                        onClick={() => { navigator.clipboard.writeText(inviteLink.link); toast.success('Copied!'); }}
+                        className="flex-shrink-0 p-2 hover:bg-surface rounded-lg transition-colors text-brand"
+                      >
+                        <Copy className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
                 </div>
-              </div>
+              )}
 
               {/* ── Actions ── */}
               <div className="flex gap-2.5 pt-1">
+                {!inviteLink.emailSent && (
+                  <button
+                    onClick={() => { navigator.clipboard.writeText(inviteLink.link); toast.success('Copied!'); }}
+                    className="flex-1 py-2.5 bg-brand hover:bg-brand-hover text-white text-sm font-bold rounded-xl transition-all flex items-center justify-center gap-2"
+                  >
+                    <Copy className="w-4 h-4" /> Copy Link
+                  </button>
+                )}
                 <button
-                  onClick={() => { navigator.clipboard.writeText(inviteLink.link); toast.success('Copied!'); }}
-                  className="flex-1 py-2.5 bg-brand hover:bg-brand-hover text-white text-sm font-bold rounded-xl transition-all flex items-center justify-center gap-2"
+                  onClick={handleResendInvite}
+                  disabled={resending}
+                  className={`py-2.5 border border-border text-text-muted hover:text-text-primary hover:border-brand/40 text-sm font-medium rounded-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50 ${
+                    inviteLink.emailSent ? 'flex-1' : 'px-4'
+                  }`}
                 >
-                  <Copy className="w-4 h-4" /> Copy Link
-                </button>
-                <button
-                  onClick={() => window.open(inviteLink.link, '_blank')}
-                  className="flex-1 py-2.5 border border-border text-text-muted hover:text-text-primary text-sm font-medium rounded-xl transition-all flex items-center justify-center gap-2"
-                >
-                  <ExternalLink className="w-4 h-4" /> Open
+                  <RefreshCw className={`w-4 h-4 ${resending ? 'animate-spin' : ''}`} />
+                  {resending ? 'Sending…' : 'Resend Email'}
                 </button>
               </div>
 
@@ -1573,7 +1682,7 @@ function AdminPanelTab() {
                 onClick={() => setInviteLink(null)}
                 className="w-full text-sm text-text-muted hover:text-text-primary transition-colors py-1"
               >
-                Close
+                {inviteLink.emailSent ? 'Done' : 'Close'}
               </button>
             </div>
           </div>
@@ -2059,7 +2168,7 @@ export default function Dashboard() {
         <aside className={`
           sidebar-premium overflow-hidden
           fixed top-[72px] left-0 bottom-0 z-30 w-64 flex-shrink-0 transition-transform duration-300
-          md:relative md:top-0 md:bottom-auto md:translate-x-0 md:flex md:w-56
+          md:relative md:top-0 md:bottom-auto md:translate-x-0 md:w-56
           ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
         `}>
           {/* Mountain watermark */}

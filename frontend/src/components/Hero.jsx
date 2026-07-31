@@ -22,7 +22,7 @@ export default function Hero() {
         {/* Pass 3: hero-ambient-light — breathing orange radial glow, z-index 1, below dark overlays */}
         <div className="hero-ambient-light" />
         {/* Layered overlays: heavy left fade for text, vertical bottom fade into page */}
-        <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/65 to-black/20" />
+        <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/55 to-black/10" />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent opacity-80" />
       </div>
 
@@ -58,7 +58,7 @@ export default function Hero() {
 
           {/* CTAs */}
           <div
-            className="mt-7 sm:mt-8 flex flex-col xs:flex-row gap-3"
+            className="mt-7 sm:mt-8 flex flex-col sm:flex-row gap-3"
             style={{ animation: 'heroFadeUp 0.6s ease 0.3s both' }}
           >
             {/* Pass 1: btn-primary-glossy — orange glow + diagonal sweep */}
@@ -79,13 +79,13 @@ export default function Hero() {
 
           {/* Mini stats */}
           <div
-            className="mt-10 sm:mt-12 grid grid-cols-4 gap-3 sm:flex sm:flex-wrap sm:gap-6"
+            className="mt-10 sm:mt-12 flex flex-wrap gap-4 sm:gap-6"
             style={{ animation: 'heroFadeUp 0.6s ease 0.4s both' }}
           >
             {STATS.map(s => (
               <div key={s.label} className="flex flex-col">
                 <span className="text-xl sm:text-2xl font-extrabold text-white">{s.value}</span>
-                <span className="text-[10px] sm:text-xs text-white/50 mt-0.5 leading-tight">{s.label}</span>
+                <span className="text-[10px] sm:text-xs text-white/50 mt-0.5">{s.label}</span>
               </div>
             ))}
           </div>

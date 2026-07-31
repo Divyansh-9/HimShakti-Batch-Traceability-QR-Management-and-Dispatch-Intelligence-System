@@ -21,24 +21,18 @@
 'use strict';
 const nodemailer = require('nodemailer');
 
-// ── Transporter (lazy-init so missing config silently degrades) ──────────────
-let _transporter = null;
-
+// ── Transporter (created fresh each call so .env changes take effect on restart) ─
 function getTransporter() {
-  if (_transporter) return _transporter;
-
   const { EMAIL_HOST, EMAIL_PORT, EMAIL_SECURE, EMAIL_USER, EMAIL_PASS } = process.env;
   if (!EMAIL_HOST || !EMAIL_USER || !EMAIL_PASS) return null; // email not configured
 
-  _transporter = nodemailer.createTransport({
+  return nodemailer.createTransport({
     host:   EMAIL_HOST,
     port:   parseInt(EMAIL_PORT || '465', 10),
     secure: EMAIL_SECURE !== 'false', // true by default (port 465)
     auth:   { user: EMAIL_USER, pass: EMAIL_PASS },
     tls:    { rejectUnauthorized: process.env.NODE_ENV === 'production' },
   });
-
-  return _transporter;
 }
 
 // ── Branded HTML email template ──────────────────────────────────────────────
@@ -269,4 +263,112 @@ async function sendRejectionEmail({ toEmail, toName, role, note, rejectedBy }) {
   return { sent: true };
 }
 
-module.exports = { sendApprovalEmail, sendRejectionEmail };
+module.exports = { sendApprovalEmail, sendRejectionEmail, sendOtpEmail };
+
+// ── OTP verification email ───────────────────────────────────────────────────
+function buildOtpHtml({ recipientName, otp, username }) {
+  const BRAND_COLOR = '#e8632a';
+  const GREEN       = '#1a4731';
+  const digits      = otp.split('');
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Verify your HimShakti account</title>
+</head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:'Segoe UI',Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:40px 0;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+
+        <!-- Header -->
+        <tr>
+          <td style="background:${GREEN};padding:28px 40px;">
+            <div style="display:inline-block;background:${BRAND_COLOR};width:36px;height:36px;border-radius:9px;text-align:center;line-height:36px;vertical-align:middle;">
+              <span style="color:#fff;font-size:14px;font-weight:900;">HS</span>
+            </div>
+            <span style="color:#fff;font-size:15px;font-weight:700;margin-left:10px;vertical-align:middle;">HimShakti Traceability</span>
+          </td>
+        </tr>
+
+        <!-- Body -->
+        <tr>
+          <td style="padding:40px 40px 32px;">
+            <div style="display:inline-block;background:#eff6ff;border:1px solid #bfdbfe;border-radius:100px;padding:4px 14px;margin-bottom:24px;">
+              <span style="color:#1d4ed8;font-size:12px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;">🔐 Verify Your Email</span>
+            </div>
+
+            <h1 style="margin:0 0 8px;font-size:24px;font-weight:800;color:#111827;line-height:1.2;">
+              Almost there, ${recipientName.split(' ')[0]}!
+            </h1>
+            <p style="margin:0 0 28px;font-size:15px;color:#6b7280;line-height:1.6;">
+              Enter this 6-digit code to verify your email and complete your HimShakti account setup.
+              Your username is <strong style="color:#111827;">${username}</strong>.
+            </p>
+
+            <!-- OTP boxes -->
+            <div style="text-align:center;margin-bottom:28px;">
+              <table cellpadding="0" cellspacing="0" style="margin:0 auto;">
+                <tr>
+                  ${digits.map(d => `
+                  <td style="padding:0 5px;">
+                    <div style="width:52px;height:64px;background:#f9fafb;border:2px solid #e5e7eb;border-radius:12px;text-align:center;line-height:64px;font-size:32px;font-weight:900;color:#111827;font-family:'Courier New',monospace;letter-spacing:-0.02em;">
+                      ${d}
+                    </div>
+                  </td>`).join('')}
+                </tr>
+              </table>
+              <p style="margin:12px 0 0;font-size:12px;color:#9ca3af;">Expires in <strong>10 minutes</strong></p>
+            </div>
+
+            <div style="background:#fafafa;border:1px solid #e5e7eb;border-radius:12px;padding:14px 18px;">
+              <p style="margin:0;font-size:12px;color:#9ca3af;line-height:1.6;">
+                🔒 <strong style="color:#6b7280;">Security note:</strong> This code is single-use and expires in 10 minutes.
+                If you did not request this, please ignore this email — your account has not been created.
+              </p>
+            </div>
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="padding:20px 40px 28px;background:#fafafa;border-top:1px solid #f3f4f6;">
+            <p style="margin:0;font-size:11px;color:#d1d5db;text-align:center;">
+              © 2026 HimShakti Food Processing Pvt. Ltd., Uttarakhand, India<br/>
+              This is an automated message — please do not reply.
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
+/**
+ * Send the 6-digit OTP verification email after account activation.
+ */
+async function sendOtpEmail({ toEmail, toName, otp, username }) {
+  const transporter = getTransporter();
+  if (!transporter) {
+    console.warn('[Email] Not configured — skipping OTP email.');
+    return { sent: false, reason: 'Email not configured' };
+  }
+
+  const fromName = process.env.EMAIL_FROM_NAME || 'HimShakti Traceability';
+  const fromAddr = process.env.EMAIL_FROM_ADDR || process.env.EMAIL_USER;
+
+  await transporter.sendMail({
+    from:    `"${fromName}" <${fromAddr}>`,
+    to:      `"${toName}" <${toEmail}>`,
+    subject: `${otp} — Your HimShakti verification code`,
+    html:    buildOtpHtml({ recipientName: toName, otp, username }),
+    text:    `Hi ${toName},\n\nYour HimShakti verification code is: ${otp}\n\nThis code expires in 10 minutes.\n\n— HimShakti Team`,
+  });
+
+  return { sent: true };
+}
+

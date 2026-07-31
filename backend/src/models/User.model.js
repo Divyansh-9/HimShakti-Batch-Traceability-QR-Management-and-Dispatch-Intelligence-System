@@ -14,7 +14,11 @@ const userSchema = new mongoose.Schema({
     enum:    ['admin', 'manager', 'factory-manager', 'quality-inspector', 'dispatch-coordinator'],
     default: 'factory-manager',
   },
-  isActive: { type: Boolean, default: true },
+  isActive:       { type: Boolean, default: true },
+  // Email verification via OTP (set during account activation)
+  emailVerified:  { type: Boolean, default: false },
+  otpCode:        { type: String,  default: null },   // 6-digit hashed OTP
+  otpExpiry:      { type: Date,    default: null },   // OTP valid for 10 minutes
 }, { timestamps: true });
 
 // Compare plain password against stored hash

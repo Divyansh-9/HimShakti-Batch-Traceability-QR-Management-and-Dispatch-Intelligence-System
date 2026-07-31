@@ -3,7 +3,7 @@ const bcrypt        = require('bcryptjs');
 const User          = require('../models/User.model');
 const AccessRequest = require('../models/AccessRequest.model');
 const { generateToken } = require('../middleware/auth');
-const { sendApprovalEmail, sendRejectionEmail } = require('../services/emailService');
+const { sendApprovalEmail, sendRejectionEmail, sendOtpEmail } = require('../services/emailService');
 
 // ─────────────────────────────────────────────────────────────────
 // POST /auth/login
@@ -179,6 +179,7 @@ async function reject(req, res, next) {
 // ─────────────────────────────────────────────────────────────────
 // POST /auth/activate  [public]
 // New user sets their password using the one-time invite token.
+// After account is created, a 6-digit OTP is sent to verify email.
 // ─────────────────────────────────────────────────────────────────
 async function activate(req, res, next) {
   try {
@@ -220,12 +221,20 @@ async function activate(req, res, next) {
       username = `${baseUsername}${suffix++}`;
     }
 
+    // Generate 6-digit OTP — raw for email, SHA-256 stored in DB
+    const rawOtp    = String(Math.floor(100000 + Math.random() * 900000));
+    const hashedOtp = crypto.createHash('sha256').update(rawOtp).digest('hex');
+
+    // Create user account (emailVerified: false until OTP confirmed)
     await User.create({
       username,
-      passwordHash: await bcrypt.hash(password, 12),
-      name:         request.name,
-      email:        request.email,
-      role:         request.role,
+      passwordHash:  await bcrypt.hash(password, 12),
+      name:          request.name,
+      email:         request.email,
+      role:          request.role,
+      emailVerified: false,
+      otpCode:       hashedOtp,
+      otpExpiry:     new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
     });
 
     // Invalidate the invite token — one use only
@@ -233,11 +242,122 @@ async function activate(req, res, next) {
     request.inviteToken = undefined;
     await request.save();
 
+    // Send OTP email (non-blocking — account is created regardless)
+    let otpSent = false;
+    try {
+      const result = await sendOtpEmail({
+        toEmail:  request.email,
+        toName:   request.name,
+        otp:      rawOtp,
+        username,
+      });
+      otpSent = result.sent;
+    } catch (emailErr) {
+      console.error('[Email] OTP email failed:', emailErr.message);
+    }
+
+    return res.json({
+      success:     true,
+      message:     'Account created — please verify your email with the OTP sent to you.',
+      requiresOtp: true,
+      otpSent,
+      username,
+      email:       request.email,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// POST /auth/verify-otp  [public]
+// Verifies the 6-digit OTP. Marks the account as emailVerified.
+// ─────────────────────────────────────────────────────────────────
+async function verifyOtp(req, res, next) {
+  try {
+    const { username, otp } = req.body;
+    if (!username || !otp) {
+      return res.status(400).json({ success: false, error: 'username and otp are required' });
+    }
+
+    const user = await User.findOne({ username: username.toLowerCase().trim() });
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    // Already verified
+    if (user.emailVerified) {
+      return res.json({ success: true, message: 'Email already verified. You can sign in.' });
+    }
+
+    // Check expiry
+    if (!user.otpExpiry || user.otpExpiry < new Date()) {
+      return res.status(400).json({ success: false, error: 'OTP has expired. Please request a new one.' });
+    }
+
+    // Compare hashed OTP
+    const hashedInput = crypto.createHash('sha256').update(String(otp)).digest('hex');
+    if (hashedInput !== user.otpCode) {
+      return res.status(400).json({ success: false, error: 'Incorrect OTP. Please check and try again.' });
+    }
+
+    // Mark verified, clear OTP fields
+    user.emailVerified = true;
+    user.otpCode       = null;
+    user.otpExpiry     = null;
+    await user.save();
+
     return res.json({
       success:  true,
-      message:  'Account activated successfully',
-      username,
+      message:  'Email verified successfully! You can now sign in.',
+      username: user.username,
     });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// POST /auth/verify-otp/resend  [public]
+// Re-generates and re-sends the OTP for a given username.
+// Rate-limit friendly — only works if account exists & not verified.
+// ─────────────────────────────────────────────────────────────────
+async function resendOtp(req, res, next) {
+  try {
+    const { username } = req.body;
+    if (!username) {
+      return res.status(400).json({ success: false, error: 'username is required' });
+    }
+
+    const user = await User.findOne({ username: username.toLowerCase().trim() });
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+    if (user.emailVerified) {
+      return res.json({ success: true, message: 'Email already verified. Please sign in.' });
+    }
+
+    // Generate fresh OTP
+    const rawOtp    = String(Math.floor(100000 + Math.random() * 900000));
+    const hashedOtp = crypto.createHash('sha256').update(rawOtp).digest('hex');
+    user.otpCode   = hashedOtp;
+    user.otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
+    await user.save();
+
+    let otpSent = false;
+    try {
+      const result = await sendOtpEmail({
+        toEmail:  user.email,
+        toName:   user.name,
+        otp:      rawOtp,
+        username: user.username,
+      });
+      otpSent = result.sent;
+    } catch (emailErr) {
+      console.error('[Email] Resend OTP failed:', emailErr.message);
+    }
+
+    return res.json({ success: true, otpSent, message: 'A new OTP has been sent to your email.' });
   } catch (err) {
     next(err);
   }
@@ -339,5 +459,65 @@ async function linkGoogle(req, res, next) {
   }
 }
 
-module.exports = { login, requestAccess, listRequests, approve, reject, activate, listUsers, toggleUserStatus, linkGoogle };
+// ─────────────────────────────────────────────────────────────────
+// POST /auth/requests/:id/resend  [admin only]
+// Re-generates invite token and re-sends approval email.
+// Useful when email failed on first attempt or link expired.
+// ─────────────────────────────────────────────────────────────────
+async function resendInvite(req, res, next) {
+  try {
+    const request = await AccessRequest.findById(req.params.id);
+    if (!request) return res.status(404).json({ success: false, error: 'Request not found' });
+    if (request.status !== 'approved') {
+      return res.status(409).json({ success: false, error: 'Request is not in approved state' });
+    }
+    // Check if already activated
+    const user = await User.findOne({ email: request.email });
+    if (user) {
+      return res.status(409).json({ success: false, error: 'User has already activated their account.' });
+    }
+
+    // Re-generate fresh 48h token
+    const rawToken    = crypto.randomBytes(32).toString('hex');
+    const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+    request.inviteToken  = hashedToken;
+    request.inviteExpiry = new Date(Date.now() + 48 * 60 * 60 * 1000);
+    request.inviteUsed   = false;
+    await request.save();
+
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const inviteLink  = `${frontendUrl}/invite?token=${rawToken}`;
+
+    let emailResult = { sent: false, reason: 'no email on record' };
+    if (request.email) {
+      try {
+        emailResult = await sendApprovalEmail({
+          toEmail:    request.email,
+          toName:     request.name,
+          role:       request.role,
+          inviteLink,
+          approvedBy: req.user.username,
+        });
+      } catch (emailErr) {
+        console.error('[Email] Resend invite failed:', emailErr.message);
+        emailResult = { sent: false, reason: emailErr.message };
+      }
+    }
+
+    return res.json({
+      success:    true,
+      message:    emailResult.sent
+        ? `New invite email sent to ${request.email}`
+        : 'Token refreshed — email not sent. Share the link manually.',
+      inviteLink,
+      expiresIn:  '48 hours',
+      emailSent:  emailResult.sent,
+      emailError: emailResult.sent ? undefined : emailResult.reason,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { login, requestAccess, listRequests, approve, reject, activate, verifyOtp, resendOtp, resendInvite, listUsers, toggleUserStatus, linkGoogle };
 

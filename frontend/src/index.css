@@ -352,9 +352,41 @@
   background-size: 200% 100%;
 }
 
-/* ── Pass 4: Urgent pulse glow — exactly 2 elements ─────────── */
-/* Applied to: (1) Need Attention KPI count, (2) FEFO urgent badge.
-   NOT applied to individual batch table row status badges. */
+/* ── Pass 4: KPI Alert Dot — professional notification indicator ── */
+/* Small pulsing dot next to the "Need Attention" count.
+   Uses a ping/ripple pattern (like iOS badge) — far cleaner than
+   a box-shadow glow directly on text. */
+@keyframes kpiDotPing {
+  0%    { transform: scale(1);   opacity: 0.85; }
+  70%   { transform: scale(2.2); opacity: 0;    }
+  100%  { transform: scale(2.2); opacity: 0;    }
+}
+/* Outer ripple layer */
+.kpi-alert-dot {
+  position: relative;
+  display: inline-block;
+  width:  8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ef4444;         /* solid red core */
+  flex-shrink: 0;
+  align-self: center;
+  margin-bottom: 2px;          /* optical alignment with number baseline */
+}
+/* Ripple ring via ::before */
+.kpi-alert-dot::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: #ef4444;
+  animation: kpiDotPing 1.6s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+:root[data-theme="dark"] .kpi-alert-dot        { background: #f87171; }
+:root[data-theme="dark"] .kpi-alert-dot::before { background: #f87171; }
+
+/* ── Pass 4: Urgent pulse glow — kept for FEFO badge only ─────── */
+/* NOTE: no longer applied to the KPI number — use .kpi-alert-dot instead */
 @keyframes urgentPulse {
   0%, 100% { box-shadow: 0 0 4px  rgba(220,38,38,0.50); }
   50%       { box-shadow: 0 0 14px rgba(220,38,38,0.85); }
@@ -366,7 +398,8 @@
 .urgent-pulse { animation: urgentPulse 2s ease-in-out infinite; border-radius: 4px; }
 :root[data-theme="dark"] .urgent-pulse { animation: urgentPulseDark 2s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) {
-  .urgent-pulse { animation: none; }
+  .urgent-pulse           { animation: none; }
+  .kpi-alert-dot::before  { animation: none; }
 }
 
 /* ── Mobile / Touch optimizations ───────────────────────────── */
@@ -382,13 +415,28 @@ html, body {
   -webkit-overflow-scrolling: touch;
 }
 
-/* Minimum touch target size for accessibility */
-button, a {
-  min-height: 44px;
-}
-/* Exception for small inline badges/chips */
-.badge-touch-exempt {
-  min-height: unset;
+/* ── Mobile-only touch target & sizing ──────────────────────── */
+@media (max-width: 767px) {
+  /* Minimum touch target size for accessibility (iOS HIG: 44x44pt) */
+  button, a {
+    min-height: 44px;
+  }
+
+  /* Ensure sidebar never pushes content on mobile */
+  aside.sidebar-premium {
+    width: 260px !important;
+  }
+
+  /* Main content always full-width on mobile */
+  main {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  /* TabBanner — shorter on mobile (176px on desktop) */
+  .tab-banner {
+    height: 120px !important;
+  }
 }
 
 /* Safe area insets for notched phones (iPhone X+) */
@@ -416,18 +464,6 @@ nav[class*="fixed bottom-0"] {
   .btn-glossy:hover::before { transform: translateX(-110%); }
 }
 
-/* ── Sidebar transition improvement for mobile ───────────────── */
-@media (max-width: 767px) {
-  /* Ensure sidebar never pushes content on mobile */
-  aside.sidebar-premium {
-    width: 260px !important;
-  }
-  /* Main content always full-width on mobile */
-  main {
-    width: 100% !important;
-    min-width: 0 !important;
-  }
-}
 
 /* ── FilterTabBar mobile scroll ──────────────────────────────── */
 .nav-tab-group {
