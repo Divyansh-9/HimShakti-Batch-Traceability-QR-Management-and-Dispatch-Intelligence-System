@@ -102,7 +102,7 @@ async function approve(req, res, next) {
     request.approvedBy   = req.user.username;
     await request.save();
 
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const frontendUrl = process.env.FRONTEND_URL || 'https://himshakti2026-bb904.web.app';
     const inviteLink  = `${frontendUrl}/invite?token=${rawToken}`;
 
     // ── Auto-send approval email ──────────────────────────────────────────
@@ -486,7 +486,7 @@ async function resendInvite(req, res, next) {
     request.inviteUsed   = false;
     await request.save();
 
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const frontendUrl = process.env.FRONTEND_URL || 'https://himshakti2026-bb904.web.app';
     const inviteLink  = `${frontendUrl}/invite?token=${rawToken}`;
 
     let emailResult = { sent: false, reason: 'no email on record' };
