@@ -412,4 +412,113 @@ async function sendOtpEmail({ toEmail, toName, otp, username }) {
   }
 }
 
-module.exports = { sendApprovalEmail, sendRejectionEmail, sendOtpEmail };
+
+/**
+ * Send a 6-digit password-reset OTP email.
+ * Returns { sent: true } or { sent: false, reason: '...' }
+ */
+async function sendPasswordResetOtpEmail({ toEmail, toName, otp, username }) {
+  const transport = detectTransport();
+  if (!transport) {
+    console.warn('[Email] Not configured — skipping password-reset OTP email.');
+    return { sent: false, reason: 'Email not configured' };
+  }
+
+  console.log(`[Email] Sending password-reset OTP via ${transport} to ${toEmail}`);
+
+  const BRAND_COLOR = '#e8632a';
+  const GREEN       = '#1a4731';
+  const digits      = otp.split('');
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reset your HimShakti password</title>
+</head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:'Segoe UI',Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:40px 0;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+
+        <!-- Header -->
+        <tr>
+          <td style="background:${GREEN};padding:28px 40px;">
+            <div style="display:inline-block;background:${BRAND_COLOR};width:36px;height:36px;border-radius:9px;text-align:center;line-height:36px;vertical-align:middle;">
+              <span style="color:#fff;font-size:14px;font-weight:900;">HS</span>
+            </div>
+            <span style="color:#fff;font-size:15px;font-weight:700;margin-left:10px;vertical-align:middle;">HimShakti Traceability</span>
+          </td>
+        </tr>
+
+        <!-- Body -->
+        <tr>
+          <td style="padding:40px 40px 32px;">
+            <div style="display:inline-block;background:#fef2f2;border:1px solid #fecaca;border-radius:100px;padding:4px 14px;margin-bottom:24px;">
+              <span style="color:#991b1b;font-size:12px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;">🔑 Password Reset</span>
+            </div>
+
+            <h1 style="margin:0 0 8px;font-size:24px;font-weight:800;color:#111827;line-height:1.2;">
+              Reset your password, ${toName.split(' ')[0]}
+            </h1>
+            <p style="margin:0 0 28px;font-size:15px;color:#6b7280;line-height:1.6;">
+              We received a password reset request for username <strong style="color:#111827;">${username}</strong>.
+              Use the code below to reset your password. This code expires in <strong>5 minutes</strong>.
+            </p>
+
+            <!-- OTP digit boxes -->
+            <div style="text-align:center;margin-bottom:28px;">
+              <table cellpadding="0" cellspacing="0" style="margin:0 auto;">
+                <tr>
+                  ${digits.map(d => `
+                  <td style="padding:0 5px;">
+                    <div style="width:52px;height:64px;background:#fef2f2;border:2px solid #fca5a5;border-radius:12px;text-align:center;line-height:64px;font-size:32px;font-weight:900;color:#991b1b;font-family:'Courier New',monospace;">
+                      ${d}
+                    </div>
+                  </td>`).join('')}
+                </tr>
+              </table>
+              <p style="margin:12px 0 0;font-size:12px;color:#9ca3af;">Expires in <strong>5 minutes</strong></p>
+            </div>
+
+            <div style="background:#fafafa;border:1px solid #e5e7eb;border-radius:12px;padding:14px 18px;">
+              <p style="margin:0;font-size:12px;color:#9ca3af;line-height:1.6;">
+                🔒 <strong style="color:#6b7280;">Security note:</strong> If you did not request a password reset,
+                please ignore this email. Your password will not be changed.
+              </p>
+            </div>
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="padding:20px 40px 28px;background:#fafafa;border-top:1px solid #f3f4f6;">
+            <p style="margin:0;font-size:11px;color:#d1d5db;text-align:center;">
+              © 2026 HimShakti Food Processing Pvt. Ltd., Uttarakhand, India<br/>
+              This is an automated message — please do not reply.
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+  try {
+    return await sendEmail({
+      from:    getFrom(),
+      to:      toEmail,
+      subject: `${otp} — Reset your HimShakti password`,
+      html,
+      text: `Hi ${toName},\n\nYour HimShakti password reset code is: ${otp}\n\nThis code expires in 5 minutes.\nUsername: ${username}\n\nIf you did not request this, please ignore this email.\n\n— HimShakti Team`,
+    });
+  } catch (err) {
+    console.error(`[Email] Password-reset OTP email failed:`, err.message);
+    return { sent: false, reason: err.message };
+  }
+}
+
+module.exports = { sendApprovalEmail, sendRejectionEmail, sendOtpEmail, sendPasswordResetOtpEmail };
+

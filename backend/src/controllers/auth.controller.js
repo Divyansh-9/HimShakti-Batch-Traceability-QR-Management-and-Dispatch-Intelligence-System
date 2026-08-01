@@ -3,7 +3,8 @@ const bcrypt        = require('bcryptjs');
 const User          = require('../models/User.model');
 const AccessRequest = require('../models/AccessRequest.model');
 const { generateToken } = require('../middleware/auth');
-const { sendApprovalEmail, sendRejectionEmail, sendOtpEmail } = require('../services/emailService');
+const jwt = require('jsonwebtoken');
+const { sendApprovalEmail, sendRejectionEmail, sendOtpEmail, sendPasswordResetOtpEmail } = require('../services/emailService');
 
 // ─────────────────────────────────────────────────────────────────
 // POST /auth/login
@@ -519,5 +520,198 @@ async function resendInvite(req, res, next) {
   }
 }
 
-module.exports = { login, requestAccess, listRequests, approve, reject, activate, verifyOtp, resendOtp, resendInvite, listUsers, toggleUserStatus, linkGoogle };
+// ─────────────────────────────────────────────────────────────────
+// DELETE /auth/requests/:id  [admin only]
+// Permanently removes an access request record.
+// If the invite was never activated, also removes the pending User doc.
+// ─────────────────────────────────────────────────────────────────
+async function removeRequest(req, res, next) {
+  try {
+    const request = await AccessRequest.findById(req.params.id);
+    if (!request) return res.status(404).json({ success: false, error: 'Request not found' });
+
+    // If invite was sent but account never activated, clean up the unverified User too
+    if (request.email && !request.inviteUsed) {
+      await User.deleteOne({ email: request.email, emailVerified: false });
+    }
+
+    await request.deleteOne();
+
+    return res.json({
+      success: true,
+      message: `Request for ${request.name} (${request.email}) removed.`,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// POST /auth/forgot-password
+// Step 1: find user by username or email, generate 6-digit OTP,
+//         hash it, store in user doc, send to their email.
+// ─────────────────────────────────────────────────────────────────
+async function forgotPassword(req, res, next) {
+  try {
+    const { identifier } = req.body; // username OR email
+    if (!identifier) {
+      return res.status(400).json({ success: false, error: 'Username or email is required' });
+    }
+
+    const id = identifier.toLowerCase().trim();
+    const user = await User.findOne({
+      $or: [{ username: id }, { email: id }],
+      isActive: true,
+    });
+
+    // Always respond with the same message to prevent user enumeration
+    const GENERIC_MSG = 'If that account exists and has an email linked, an OTP has been sent.';
+
+    if (!user) return res.json({ success: true, message: GENERIC_MSG });
+
+    if (!user.email) {
+      // Account exists but has no email — send a 422 so frontend can show a specific message
+      return res.status(422).json({
+        success: false,
+        code: 'NO_EMAIL',
+        error: 'This account has no email address linked. Contact your administrator to reset your password.',
+      });
+    }
+
+    // Generate 6-digit numeric OTP
+    const otp    = String(Math.floor(100000 + Math.random() * 900000));
+    const hashed = await bcrypt.hash(otp, 10);
+
+    user.otpCode     = hashed;
+    user.otpExpiry   = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+    user.otpAttempts = 0;
+    await user.save();
+
+    await sendPasswordResetOtpEmail({
+      toEmail:  user.email,
+      toName:   user.name,
+      otp,
+      username: user.username,
+    });
+
+    // Return masked email so frontend can display it
+    const [local, domain] = user.email.split('@');
+    const maskedEmail = local.slice(0, 2) + '***@' + domain;
+
+    return res.json({ success: true, message: GENERIC_MSG, maskedEmail, username: user.username });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// POST /auth/verify-reset-otp
+// Step 2: verify the OTP (max 5 attempts), return a short-lived
+//         resetToken (signed JWT, single-use, 5-min expiry).
+// ─────────────────────────────────────────────────────────────────
+async function verifyResetOtp(req, res, next) {
+  try {
+    const { identifier, otp } = req.body;
+    if (!identifier || !otp) {
+      return res.status(400).json({ success: false, error: 'Identifier and OTP are required' });
+    }
+
+    const id = identifier.toLowerCase().trim();
+    const user = await User.findOne({
+      $or: [{ username: id }, { email: id }],
+      isActive: true,
+    });
+
+    if (!user || !user.otpCode) {
+      return res.status(400).json({ success: false, error: 'OTP not found or already used. Please request a new one.' });
+    }
+
+    // Check expiry
+    if (user.otpExpiry < new Date()) {
+      user.otpCode = null; user.otpExpiry = null; user.otpAttempts = 0;
+      await user.save();
+      return res.status(400).json({ success: false, error: 'OTP has expired. Please request a new one.' });
+    }
+
+    // Check attempt limit
+    if (user.otpAttempts >= 5) {
+      user.otpCode = null; user.otpExpiry = null; user.otpAttempts = 0;
+      await user.save();
+      return res.status(429).json({ success: false, error: 'Too many incorrect attempts. Please request a new OTP.' });
+    }
+
+    const valid = await bcrypt.compare(String(otp).trim(), user.otpCode);
+    if (!valid) {
+      user.otpAttempts += 1;
+      await user.save();
+      const remaining = 5 - user.otpAttempts;
+      return res.status(400).json({
+        success: false,
+        error: `Incorrect OTP. ${remaining} attempt${remaining !== 1 ? 's' : ''} remaining.`,
+      });
+    }
+
+    // OTP correct — clear it and issue a short-lived reset token
+    const resetToken = jwt.sign(
+      { sub: user._id.toString(), purpose: 'password-reset' },
+      process.env.JWT_SECRET || 'hs-secret',
+      { expiresIn: '5m' }
+    );
+
+    user.otpCode      = null;
+    user.otpExpiry    = null;
+    user.otpAttempts  = 0;
+    user.resetToken   = resetToken; // store so it can be invalidated after use
+    user.resetTokenExpiry = new Date(Date.now() + 5 * 60 * 1000);
+    await user.save();
+
+    return res.json({ success: true, resetToken });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// POST /auth/reset-password
+// Step 3: verify resetToken, update passwordHash, clear token.
+// ─────────────────────────────────────────────────────────────────
+async function resetPassword(req, res, next) {
+  try {
+    const { resetToken, newPassword } = req.body;
+    if (!resetToken || !newPassword) {
+      return res.status(400).json({ success: false, error: 'Reset token and new password are required' });
+    }
+    if (newPassword.length < 8) {
+      return res.status(400).json({ success: false, error: 'Password must be at least 8 characters' });
+    }
+
+    let payload;
+    try {
+      payload = jwt.verify(resetToken, process.env.JWT_SECRET || 'hs-secret');
+    } catch {
+      return res.status(401).json({ success: false, error: 'Reset link has expired. Please start over.' });
+    }
+
+    if (payload.purpose !== 'password-reset') {
+      return res.status(401).json({ success: false, error: 'Invalid reset token.' });
+    }
+
+    const user = await User.findById(payload.sub);
+    if (!user || user.resetToken !== resetToken) {
+      return res.status(401).json({ success: false, error: 'Reset token already used or invalid. Please start over.' });
+    }
+
+    // Update password
+    user.passwordHash    = await bcrypt.hash(newPassword, 12);
+    user.resetToken      = null;
+    user.resetTokenExpiry = null;
+    await user.save();
+
+    return res.json({ success: true, message: 'Password reset successfully. You can now sign in.' });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { login, requestAccess, listRequests, approve, reject, activate, verifyOtp, resendOtp, resendInvite, removeRequest, listUsers, toggleUserStatus, linkGoogle, forgotPassword, verifyResetOtp, resetPassword };
 

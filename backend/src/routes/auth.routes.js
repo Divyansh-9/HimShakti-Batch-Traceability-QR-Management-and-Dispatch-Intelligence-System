@@ -12,11 +12,17 @@ router.post('/verify-otp',          ctrl.verifyOtp);          // NEW: verify ema
 router.post('/verify-otp/resend',   ctrl.resendOtp);          // NEW: resend OTP
 router.post('/google/token',        googleLogin);
 
+// Forgot password (public — 3-step OTP flow)
+router.post('/forgot-password',     ctrl.forgotPassword);
+router.post('/verify-reset-otp',    ctrl.verifyResetOtp);
+router.post('/reset-password',      ctrl.resetPassword);
+
 // Admin only
 router.get( '/requests',              protect, requireAdmin, ctrl.listRequests);
 router.post('/requests/:id/approve',  protect, requireAdmin, ctrl.approve);
 router.post('/requests/:id/reject',   protect, requireAdmin, ctrl.reject);
-router.post('/requests/:id/resend',   protect, requireAdmin, ctrl.resendInvite); // NEW: resend invite
+router.post('/requests/:id/resend',   protect, requireAdmin, ctrl.resendInvite);
+router.delete('/requests/:id',        protect, requireAdmin, ctrl.removeRequest); // DELETE request record
 router.get( '/users',                 protect, requireAdmin, ctrl.listUsers);
 router.patch('/users/:id/toggle',     protect, requireAdmin, ctrl.toggleUserStatus);
 

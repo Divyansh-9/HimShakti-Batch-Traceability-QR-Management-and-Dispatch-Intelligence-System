@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react';
+﻿import { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import CreateBatchModal from '../components/CreateBatchModal';
@@ -1391,9 +1391,11 @@ function AdminPanelTab() {
   const [rejectNote,  setRejectNote]  = useState('');
   const [inviteLink,  setInviteLink]  = useState(null);
   const [actionLoad,  setActionLoad]  = useState(null);
-  const [resending,   setResending]   = useState(false);   // resend invite email
+  const [resending,   setResending]   = useState(false);
   const [togglingId,  setTogglingId]  = useState(null);
-  const [showRawLink, setShowRawLink] = useState(false);   // toggle raw URL in modal
+  const [showRawLink, setShowRawLink] = useState(false);
+  const [removeId,    setRemoveId]    = useState(null);    // which request card shows confirm
+  const [removeLoad,  setRemoveLoad]  = useState(null);    // loading state for delete
 
   // Converts raw SMTP errors into clean, actionable messages
   function emailErrorToFriendly(raw = '') {
@@ -1409,12 +1411,13 @@ function AdminPanelTab() {
     return { reason: 'Email delivery failed', fix: raw.length > 120 ? raw.slice(0, 120) + '…' : (raw || 'Unknown error. Check backend logs for details.') };
   }
 
+
   const [activeView,  setActiveView]  = useState('users');
 
   // Users Roster filters
   const [userSearch,   setUserSearch]   = useState('');
   const [roleFilter,   setRoleFilter]   = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all'); // 'all' | 'active' | 'inactive'
+  const [statusFilter, setStatusFilter] = useState('all');
 
   // Access Requests filter
   const [reqFilter,    setReqFilter]    = useState('pending');
@@ -1490,6 +1493,17 @@ function AdminPanelTab() {
     finally { setActionLoad(null); }
   }
 
+  async function handleRemove(id, name) {
+    setRemoveLoad(id);
+    try {
+      await client(`/auth/requests/${id}`, { method: 'DELETE' });
+      toast.success(`${name} removed.`);
+      setRemoveId(null);
+      fetchRequests(); fetchUsers();
+    } catch (err) { toast.error(err.message); }
+    finally { setRemoveLoad(null); }
+  }
+
   async function handleToggle(userId) {
     setTogglingId(userId);
     try {
@@ -1504,14 +1518,68 @@ function AdminPanelTab() {
   const approved = requests.filter(r => r.status === 'approved');
   const rejected = requests.filter(r => r.status === 'rejected');
 
-  // Visible requests by filter
-  const visibleRequests = requests.filter(r =>
-    reqFilter === 'all' ? true : r.status === reqFilter
-  );
 
-  // Role distribution
-  const allRoles = [...new Set(users.map(u => u.role))];
-  const roleCounts = allRoles.reduce((acc, r) => ({ ...acc, [r]: users.filter(u => u.role === r).length }), {});
+
+  // ── Unified People list (merge activated users + all requests) ─────────────
+  // Build a single merged list: activated users first, then request-only entries
+  const activatedEmails = new Set(users.map(u => u.email));
+
+  const peopleFromUsers = users.map(u => ({
+    _id:       u._id,
+    kind:      'user',            // has an actual account
+    name:      u.name || u.username,
+    email:     u.email,
+    username:  u.username,
+    role:      u.role,
+    isActive:  u.isActive,
+    emailVerified: u.emailVerified,
+    createdAt: u.createdAt,
+    _user:     u,                 // raw user doc
+  }));
+
+  // Requests whose email doesn't already have an activated account
+  const peopleFromRequests = requests
+    .filter(r => !activatedEmails.has(r.email))
+    .map(r => ({
+      _id:       r._id,
+      kind:      'request',
+      name:      r.name,
+      email:     r.email,
+      username:  null,
+      role:      r.role,
+      isActive:  null,
+      reqStatus: r.status,       // 'pending' | 'approved' | 'rejected'
+      createdAt: r.createdAt,
+      approvedBy: r.approvedBy,
+      _request:  r,
+    }));
+
+  const allPeople = [...peopleFromUsers, ...peopleFromRequests];
+
+  // Filters
+  const [peopleSearch,  setPeopleSearch]  = useState('');
+  const [peopleFilter,  setPeopleFilter]  = useState('all'); // 'all'|'active'|'invite-sent'|'pending'|'rejected'
+
+  const filteredPeople = allPeople.filter(p => {
+    const q = peopleSearch.toLowerCase();
+    const matchSearch = !q ||
+      p.name?.toLowerCase().includes(q) ||
+      p.email?.toLowerCase().includes(q) ||
+      p.username?.toLowerCase().includes(q);
+    if (!matchSearch) return false;
+    if (peopleFilter === 'all')         return true;
+    if (peopleFilter === 'active')      return p.kind === 'user' && p.isActive;
+    if (peopleFilter === 'inactive')    return p.kind === 'user' && !p.isActive;
+    if (peopleFilter === 'invite-sent') return p.kind === 'request' && p.reqStatus === 'approved';
+    if (peopleFilter === 'pending')     return p.kind === 'request' && p.reqStatus === 'pending';
+    if (peopleFilter === 'rejected')    return p.kind === 'request' && p.reqStatus === 'rejected';
+    return true;
+  });
+
+  // Role distribution across all people
+  const allRoles = [...new Set(allPeople.map(p => p.role).filter(Boolean))];
+  const roleCounts = allRoles.reduce((acc, r) => ({ ...acc, [r]: allPeople.filter(p => p.role === r).length }), {});
+
   const ROLE_DOT = {
     'admin':                'bg-rose-400',
     'manager':              'bg-brand',
@@ -1519,22 +1587,6 @@ function AdminPanelTab() {
     'quality-inspector':    'bg-teal-400',
     'dispatch-coordinator': 'bg-blue-400',
   };
-
-  // User roster filter
-  const ROLE_FILTERS = [
-    { id: 'all', label: 'All', count: users.length },
-    ...allRoles.map(r => ({ id: r, label: ROLE_LABEL[r] || r, count: roleCounts[r] || 0 })),
-  ];
-
-  const filteredUsers = users.filter(u => {
-    const matchSearch = !userSearch ||
-      u.name?.toLowerCase().includes(userSearch.toLowerCase()) ||
-      u.email?.toLowerCase().includes(userSearch.toLowerCase()) ||
-      u.username?.toLowerCase().includes(userSearch.toLowerCase());
-    const matchRole   = roleFilter === 'all' || u.role === roleFilter;
-    const matchStatus = statusFilter === 'all' || (statusFilter === 'active' ? u.isActive : !u.isActive);
-    return matchSearch && matchRole && matchStatus;
-  });
 
   return (
     <div className="space-y-5">
@@ -1549,7 +1601,6 @@ function AdminPanelTab() {
             className="bg-surface border border-border rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden"
             onClick={e => e.stopPropagation()}
           >
-            {/* ── Header ── */}
             <div className={`px-6 pt-6 pb-5 border-b border-border ${
               inviteLink.emailSent ? 'bg-green-500/5' : 'bg-amber-500/5'
             }`}>
@@ -1711,7 +1762,7 @@ function AdminPanelTab() {
             <p className="text-3xl font-extrabold text-text-primary">{stats.pendingRequests}</p>
             <p className="text-xs text-text-muted mt-1">
               {stats.pendingRequests > 0
-                ? <button onClick={() => { setActiveView('requests'); setReqFilter('pending'); }}
+                ? <button onClick={() => setPeopleFilter('pending')}
                     className="text-amber-500 hover:text-amber-400 font-semibold">Review now →</button>
                 : 'all caught up'}
             </p>
@@ -1738,47 +1789,39 @@ function AdminPanelTab() {
       )}
 
       {/* ── Role Distribution Bar ── */}
-      {!loadingU && users.length > 0 && (
+      {!loadingU && allPeople.length > 0 && (
         <div className="bg-surface border border-border rounded-xl p-4">
           <div className="flex items-center justify-between mb-3">
             <p className="text-xs font-semibold text-text-muted uppercase tracking-wide">Role Distribution</p>
-            <p className="text-xs text-text-muted">{users.length} total users</p>
+            <p className="text-xs text-text-muted">{allPeople.length} total people</p>
           </div>
           <div className="flex h-2 rounded-full overflow-hidden mb-3 gap-0.5">
             {allRoles.map(role => (
               <div key={role} title={`${ROLE_LABEL[role] || role}: ${roleCounts[role]}`}
                 className={`${ROLE_DOT[role] || 'bg-surface-2'} transition-all duration-700 cursor-pointer`}
-                style={{ width: `${(roleCounts[role] / users.length) * 100}%`, minWidth: 4 }}
-                onClick={() => setRoleFilter(role === roleFilter ? 'all' : role)}
+                style={{ width: `${(roleCounts[role] / allPeople.length) * 100}%`, minWidth: 4 }}
               />
             ))}
           </div>
           <div className="flex flex-wrap gap-2">
             {allRoles.map(role => (
               <button key={role}
-                onClick={() => { setRoleFilter(role === roleFilter ? 'all' : role); setActiveView('users'); }}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[10px] font-bold uppercase tracking-wide transition-all ${
-                  roleFilter === role
-                    ? (ROLE_STYLE[role] || 'bg-surface-2 text-text-muted border-border') + ' shadow-sm'
-                    : 'bg-surface border-border text-text-muted hover:text-text-primary'
-                }`}>
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[10px] font-bold uppercase tracking-wide transition-all bg-surface border-border text-text-muted hover:text-text-primary">
                 <span className={`w-1.5 h-1.5 rounded-full ${ROLE_DOT[role] || 'bg-surface-2'}`} />
                 {ROLE_LABEL[role] || role}
                 <span className="font-black">{roleCounts[role]}</span>
               </button>
             ))}
-            {roleFilter !== 'all' && (
-              <button onClick={() => setRoleFilter('all')} className="text-[10px] text-brand hover:text-brand-hover font-semibold">Clear ×</button>
-            )}
           </div>
         </div>
       )}
+
 
       {/* ── Section Navigation ── */}
       <div className="flex items-center justify-between">
         <div className="flex gap-0 bg-surface-2 border border-border p-1 rounded-xl w-fit">
           {[
-            { id: 'users',    label: 'Users Roster', icon: Users,       count: users.length },
+            { id: 'users',    label: 'Users Roster',    icon: Users,       count: users.length + peopleFromRequests.filter(p => p.reqStatus === 'approved').length },
             { id: 'requests', label: 'Access Requests', icon: ShieldCheck, count: pending.length, pulse: pending.length > 0 },
           ].map(v => (
             <button key={v.id} onClick={() => setActiveView(v.id)}
@@ -1800,290 +1843,359 @@ function AdminPanelTab() {
         </button>
       </div>
 
-      {/* ══════════════════════════════════════════════════════
-          VIEW: Users Roster
-      ══════════════════════════════════════════════════════ */}
-      {activeView === 'users' && (
-        <div className="bg-surface border border-border rounded-2xl overflow-hidden">
-          {/* Command bar */}
-          <div className="px-4 pt-4 pb-0 border-b border-border">
-            {/* Row 1: search + status toggle */}
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-3">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
-                <input type="text" value={userSearch} onChange={e => setUserSearch(e.target.value)}
-                  placeholder="Search by name, email, username…"
-                  className="w-full pl-9 pr-4 py-2 bg-surface border border-border rounded-lg text-sm text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-brand/50 focus:border-brand transition-colors" />
+      {/* ══ VIEW: Users Roster ══ */}
+      {activeView === 'users' && (() => {
+        const rosterRows = [
+          // Activated users
+          ...users.map(u => ({
+            _id: u._id, kind: 'user', name: u.name || u.username,
+            email: u.email, username: u.username, role: u.role,
+            isActive: u.isActive, createdAt: u.createdAt, _user: u,
+          })),
+          // Invite-sent (approved but not yet activated)
+          ...requests
+            .filter(r => r.status === 'approved' && !new Set(users.map(u => u.email)).has(r.email))
+            .map(r => ({
+              _id: r._id, kind: 'invite', name: r.name, email: r.email,
+              username: null, role: r.role, isActive: null,
+              createdAt: r.createdAt, _request: r,
+            })),
+        ];
+
+        const filteredRoster = rosterRows.filter(p => {
+          const matchSearch = !userSearch ||
+            p.name?.toLowerCase().includes(userSearch.toLowerCase()) ||
+            p.email?.toLowerCase().includes(userSearch.toLowerCase()) ||
+            p.username?.toLowerCase().includes(userSearch.toLowerCase());
+          const matchStatus =
+            statusFilter === 'all'      ? true :
+            statusFilter === 'active'   ? (p.kind === 'user' && p.isActive) :
+            statusFilter === 'inactive' ? (p.kind === 'user' && !p.isActive) :
+            statusFilter === 'pending'  ? p.kind === 'invite' : true;
+          const matchRole = roleFilter === 'all' || p.role === roleFilter;
+          return matchSearch && matchStatus && matchRole;
+        });
+
+        const rosterRoles = [...new Set(rosterRows.map(p => p.role).filter(Boolean))];
+        const rosterRoleCounts = rosterRoles.reduce((acc, r) => ({ ...acc, [r]: rosterRows.filter(p => p.role === r).length }), {});
+
+        return (
+          <div className="bg-surface border border-border rounded-2xl overflow-hidden">
+            {/* Command bar */}
+            <div className="px-4 pt-4 pb-0 border-b border-border">
+              {/* Row 1: search + status toggle */}
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-3">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
+                  <input type="text" value={userSearch} onChange={e => setUserSearch(e.target.value)}
+                    placeholder="Search by name, email, username..."
+                    className="w-full pl-9 pr-4 py-2 bg-surface border border-border rounded-lg text-sm text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-brand/50 focus:border-brand transition-colors" />
+                </div>
+                <div className="flex gap-1 bg-surface-2 border border-border p-0.5 rounded-lg flex-shrink-0">
+                  {[
+                    { id: 'all',      label: 'All' },
+                    { id: 'active',   label: 'Active' },
+                    { id: 'inactive', label: 'Inactive' },
+                    { id: 'pending',  label: 'Invite Sent' },
+                  ].map(s => (
+                    <button key={s.id} onClick={() => setStatusFilter(s.id)}
+                      className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                        statusFilter === s.id
+                          ? s.id === 'active'   ? 'bg-green-500/15 text-green-500 shadow-sm'
+                          : s.id === 'inactive' ? 'bg-red-500/15 text-red-400 shadow-sm'
+                          : s.id === 'pending'  ? 'bg-blue-500/15 text-blue-500 shadow-sm'
+                                                : 'bg-surface text-text-primary shadow-sm'
+                          : 'text-text-muted hover:text-text-primary'
+                      }`}>{s.label}</button>
+                  ))}
+                </div>
               </div>
-              {/* Active/Inactive toggle */}
-              <div className="flex gap-1 bg-surface-2 border border-border p-0.5 rounded-lg flex-shrink-0">
+
+              {/* Row 2: role filter tabs */}
+              <div className="flex gap-0 overflow-x-auto">
                 {[
-                  { id: 'all',      label: 'All' },
-                  { id: 'active',   label: 'Active' },
-                  { id: 'inactive', label: 'Inactive' },
-                ].map(s => (
-                  <button key={s.id} onClick={() => setStatusFilter(s.id)}
-                    className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                      statusFilter === s.id
-                        ? s.id === 'active'   ? 'bg-green-500/15 text-green-500 shadow-sm'
-                        : s.id === 'inactive' ? 'bg-red-500/15 text-red-400 shadow-sm'
-                                              : 'bg-surface text-text-primary shadow-sm'
-                        : 'text-text-muted hover:text-text-primary'
-                    }`}>{s.label}</button>
+                  { id: 'all', label: 'All', count: filteredRoster.length, dot: null },
+                  ...rosterRoles.map(r => ({ id: r, label: ROLE_LABEL[r] || r, count: rosterRows.filter(p => p.role === r).length, dot: ROLE_DOT[r] })),
+                ].map(rf => (
+                  <button key={rf.id} onClick={() => setRoleFilter(rf.id)}
+                    className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold border-b-2 whitespace-nowrap transition-all ${
+                      roleFilter === rf.id
+                        ? 'border-brand text-brand'
+                        : 'border-transparent text-text-muted hover:text-text-primary'
+                    }`}>
+                    {rf.dot && <span className={`w-1.5 h-1.5 rounded-full ${rf.dot}`} />}
+                    {rf.label}
+                    <span className={`text-[10px] font-black px-1 py-0.5 rounded-full ml-0.5 ${
+                      roleFilter === rf.id ? 'bg-brand/10 text-brand' : 'bg-surface-2 text-text-muted'
+                    }`}>{rf.count}</span>
+                  </button>
                 ))}
               </div>
             </div>
 
-            {/* Row 2: Role filter tabs */}
-            <div className="flex gap-0 overflow-x-auto">
-              {ROLE_FILTERS.map(f => (
-                <button key={f.id} onClick={() => setRoleFilter(f.id)}
-                  className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold border-b-2 whitespace-nowrap transition-all ${
-                    roleFilter === f.id
-                      ? 'border-brand text-brand'
-                      : 'border-transparent text-text-muted hover:text-text-primary hover:border-border'
-                  }`}>
-                  {f.id !== 'all' && <span className={`w-1.5 h-1.5 rounded-full ${ROLE_DOT[f.id] || 'bg-surface-2'}`} />}
-                  {f.label}
-                  <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${
-                    roleFilter === f.id ? 'bg-brand/10 text-brand' : 'bg-surface-2 text-text-muted'
-                  }`}>{f.count}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Table */}
-          {loadingU ? (
-            <div className="p-4 space-y-2">
-              {[...Array(4)].map((_, i) => (
-                <div key={i} className="flex items-center gap-4 animate-pulse py-2">
-                  <div className="w-9 h-9 rounded-xl bg-surface-2 flex-shrink-0" />
-                  <div className="flex-1 space-y-2"><div className="h-3 bg-surface-2 rounded w-1/3" /><div className="h-2.5 bg-surface-2 rounded w-1/4" /></div>
-                  <div className="h-5 bg-surface-2 rounded w-16" />
-                  <div className="h-5 bg-surface-2 rounded w-20" />
-                </div>
-              ))}
-            </div>
-          ) : filteredUsers.length === 0 ? (
-            <div className="text-center py-12">
-              <Users className="w-10 h-10 text-text-muted/30 mx-auto mb-3" />
-              <p className="text-text-muted text-sm">No users match these filters</p>
-              {(userSearch || roleFilter !== 'all' || statusFilter !== 'all') && (
-                <button onClick={() => { setUserSearch(''); setRoleFilter('all'); setStatusFilter('all'); }}
-                  className="mt-2 text-xs text-brand hover:text-brand-hover font-semibold">Clear filters</button>
-              )}
-            </div>
-          ) : (
-            <>
-              {/* Table Header */}
-              <div className="grid grid-cols-12 gap-3 px-5 py-3 bg-surface-2 border-b border-border text-[10px] font-bold uppercase tracking-widest text-text-muted">
-                <div className="col-span-4">User</div>
-                <div className="col-span-2">Username</div>
-                <div className="col-span-2">Role</div>
-                <div className="col-span-2">Joined</div>
-                <div className="col-span-1">Status</div>
-                <div className="col-span-1 text-right">Action</div>
-              </div>
-
-              {filteredUsers.map((u, i) => (
-                <div key={u._id}
-                  className={`grid grid-cols-12 gap-3 px-5 py-3.5 items-center transition-colors hover:bg-surface-2/50 ${
-                    i < filteredUsers.length - 1 ? 'border-b border-border' : ''
-                  } ${!u.isActive ? 'opacity-60' : ''}`}>
-
-                  {/* Name + email */}
-                  <div className="col-span-4 flex items-center gap-3 min-w-0">
-                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold flex-shrink-0 border ${
-                      ROLE_STYLE[u.role] || 'bg-surface-2 text-text-muted border-border'
-                    }`}>
-                      {(u.name || u.username || '?').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
+            {/* Table */}
+            {loadingU ? (
+              <div className="divide-y divide-border">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="flex items-center gap-4 px-5 py-4">
+                    <div className="w-9 h-9 rounded-xl bg-surface-2 animate-pulse flex-shrink-0" />
+                    <div className="flex-1 space-y-1.5">
+                      <div className="h-3 bg-surface-2 rounded animate-pulse w-32" />
+                      <div className="h-2.5 bg-surface-2 rounded animate-pulse w-44" />
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-text-primary truncate">{u.name}</p>
-                      <p className="text-xs text-text-muted truncate">{u.email || '—'}</p>
-                    </div>
+                    <div className="h-6 w-20 bg-surface-2 rounded-full animate-pulse" />
+                    <div className="h-6 w-16 bg-surface-2 rounded animate-pulse" />
+                    <div className="h-8 w-20 bg-surface-2 rounded animate-pulse" />
                   </div>
-
-                  {/* Username */}
-                  <div className="col-span-2">
-                    <span className="text-xs font-mono text-text-muted bg-surface-2 px-2 py-0.5 rounded">@{u.username}</span>
-                  </div>
-
-                  {/* Role badge */}
-                  <div className="col-span-2">
-                    <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide border ${
-                      ROLE_STYLE[u.role] || 'bg-surface-2 text-text-muted border-border'
-                    }`}>{ROLE_LABEL[u.role] || u.role}</span>
-                  </div>
-
-                  {/* Joined */}
-                  <div className="col-span-2">
-                    <p className="text-xs text-text-muted">
-                      {u.createdAt
-                        ? new Date(u.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })
-                        : '—'}
-                    </p>
-                  </div>
-
-                  {/* Status */}
-                  <div className="col-span-1">
-                    <span className={`inline-flex items-center gap-1 text-[10px] font-bold ${u.isActive ? 'text-green-500' : 'text-red-400'}`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${u.isActive ? 'bg-green-500 animate-pulse' : 'bg-red-400/60'}`} />
-                      {u.isActive ? 'Active' : 'Off'}
-                    </span>
-                  </div>
-
-                  {/* Toggle */}
-                  <div className="col-span-1 flex justify-end">
-                    <button onClick={() => handleToggle(u._id)} disabled={togglingId === u._id}
-                      title={u.isActive ? 'Deactivate user' : 'Activate user'}
-                      className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold border transition-all disabled:opacity-40 ${
-                        u.isActive
-                          ? 'border-red-400/30 text-red-400 hover:bg-red-500/10'
-                          : 'border-green-500/30 text-green-500 hover:bg-green-500/10'
-                      }`}>
-                      {togglingId === u._id ? '…' : u.isActive ? 'Disable' : 'Enable'}
-                    </button>
-                  </div>
-                </div>
-              ))}
-
-              {/* Footer */}
-              <div className="px-5 py-3 border-t border-border bg-surface-2">
-                <p className="text-xs text-text-muted">
-                  Showing <span className="font-semibold text-text-primary">{filteredUsers.length}</span> of <span className="font-semibold text-text-primary">{users.length}</span> users
-                  {roleFilter !== 'all' && <> · role: <span className="font-semibold">{ROLE_LABEL[roleFilter] || roleFilter}</span></>}
-                  {statusFilter !== 'all' && <> · status: <span className="font-semibold capitalize">{statusFilter}</span></>}
-                </p>
+                ))}
               </div>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* ══════════════════════════════════════════════════════
-          VIEW: Access Requests
-      ══════════════════════════════════════════════════════ */}
-      {activeView === 'requests' && (
-        <div className="bg-surface border border-border rounded-2xl overflow-hidden">
-          {/* Request filter tabs */}
-          <div className="px-4 pt-0 border-b border-border">
-            <div className="flex gap-0 overflow-x-auto">
-              {[
-                { id: 'pending',  label: 'Pending',  count: pending.length,  pulse: pending.length > 0 },
-                { id: 'approved', label: 'Approved', count: approved.length },
-                { id: 'rejected', label: 'Rejected', count: rejected.length },
-                { id: 'all',      label: 'All',      count: requests.length },
-              ].map(f => (
-                <button key={f.id} onClick={() => setReqFilter(f.id)}
-                  className={`relative flex items-center gap-1.5 px-4 py-3 text-xs font-semibold border-b-2 whitespace-nowrap transition-all ${
-                    reqFilter === f.id
-                      ? f.id === 'pending'  ? 'border-amber-500 text-amber-500'
-                      : f.id === 'approved' ? 'border-green-500 text-green-500'
-                      : f.id === 'rejected' ? 'border-red-500 text-red-400'
-                                            : 'border-brand text-brand'
-                      : 'border-transparent text-text-muted hover:text-text-primary'
-                  }`}>
-                  {f.pulse && <span className="absolute top-2 right-1 w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse" />}
-                  {f.label}
-                  <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${
-                    reqFilter === f.id ? 'bg-brand/10 text-brand' : 'bg-surface-2 text-text-muted'
-                  }`}>{f.count}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Request Cards */}
-          <div className="p-4">
-            {loadingR ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {[...Array(2)].map((_, i) => <div key={i} className="bg-surface-2 rounded-xl h-36 animate-pulse" />)}
-              </div>
-            ) : visibleRequests.length === 0 ? (
-              <div className="text-center py-12">
-                <CheckCircle className="w-10 h-10 text-green-400/40 mx-auto mb-3" />
-                <p className="text-text-muted text-sm font-medium">
-                  {reqFilter === 'pending' ? 'All caught up — no pending requests' : `No ${reqFilter} requests`}
-                </p>
+            ) : filteredRoster.length === 0 ? (
+              <div className="text-center py-14">
+                <Users className="w-10 h-10 text-text-muted/30 mx-auto mb-3" />
+                <p className="text-text-muted text-sm">No users found</p>
+                {(userSearch || roleFilter !== 'all' || statusFilter !== 'all') && (
+                  <button onClick={() => { setUserSearch(''); setRoleFilter('all'); setStatusFilter('all'); }}
+                    className="mt-2 text-xs text-brand font-semibold">Clear filters</button>
+                )}
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {visibleRequests.map(r => (
-                  <div key={r._id} className={`bg-surface rounded-xl p-5 border border-l-4 ${
-                    r.status === 'pending'  ? 'border-amber-400/20 border-l-amber-400' :
-                    r.status === 'approved' ? 'border-green-500/20 border-l-green-500' :
-                                             'border-red-400/20 border-l-red-400'
-                  }`}>
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="min-w-0">
-                        <p className="font-semibold text-text-primary truncate">{r.name}</p>
-                        <p className="text-text-muted text-xs truncate">{r.email}</p>
-                      </div>
-                      <span className={`ml-2 flex-shrink-0 px-2.5 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-wide ${STATUS_BADGE[r.status]}`}>
-                        {r.status}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-2 mb-4">
-                      <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border ${ROLE_STYLE[r.role] || 'bg-surface-2 text-text-muted border-border'}`}>
-                        {ROLE_LABEL[r.role] || r.role}
-                      </span>
-                      <span className="text-text-muted text-xs">
-                        {new Date(r.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                      </span>
-                    </div>
-
-                    {r.approvedBy && <p className="text-text-muted text-[10px] mb-1">By: {r.approvedBy}</p>}
-                    {r.note && <p className="text-text-muted text-[10px] italic mb-3">"{r.note}"</p>}
-
-                    {/* Actions — only show for pending */}
-                    {r.status === 'pending' && (
-                      rejectId === r._id ? (
-                        <div className="space-y-2">
-                          <textarea value={rejectNote} onChange={e => setRejectNote(e.target.value)}
-                            placeholder="Reason for rejection (optional)" rows={2}
-                            className="w-full px-3 py-2 text-xs bg-surface-2 border border-border rounded-lg text-text-primary placeholder:text-text-muted resize-none focus:outline-none focus:ring-2 focus:ring-red-400/30" />
-                          <div className="flex gap-2">
-                            <button onClick={() => handleReject(r._id)} disabled={actionLoad === r._id}
-                              className="flex-1 py-2 bg-red-500 hover:bg-red-600 text-white text-xs font-bold rounded-lg transition-all disabled:opacity-50">
-                              {actionLoad === r._id ? 'Rejecting…' : 'Confirm Reject'}
-                            </button>
-                            <button onClick={() => { setRejectId(null); setRejectNote(''); }}
-                              className="px-3 py-2 border border-border text-text-muted text-xs rounded-lg hover:bg-surface-2 transition-colors">Cancel</button>
+              <>
+                <div className="hidden md:grid grid-cols-[2.2fr_1.4fr_1fr_1fr_1fr_1.2fr] gap-4 px-5 py-3 border-b border-border bg-surface-2/60">
+                  {['USER', 'USERNAME', 'ROLE', 'JOINED', 'STATUS', 'ACTION'].map(h => (
+                    <p key={h} className="text-[10px] font-bold text-text-muted uppercase tracking-widest">{h}</p>
+                  ))}
+                </div>
+                <div className="divide-y divide-border">
+                  {filteredRoster.map(p => {
+                    const initials = (p.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+                    const avatarColor =
+                      p.role === 'admin'                 ? 'bg-rose-500/15 text-rose-500'
+                      : p.role === 'manager'              ? 'bg-brand/15 text-brand'
+                      : p.role === 'factory-manager'      ? 'bg-amber-500/15 text-amber-500'
+                      : p.role === 'quality-inspector'    ? 'bg-teal-500/15 text-teal-500'
+                      : p.role === 'dispatch-coordinator' ? 'bg-blue-500/15 text-blue-500'
+                      :                                    'bg-surface-2 text-text-muted';
+                    const joinDate = p.createdAt
+                      ? new Date(p.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })
+                      : '--';
+                    return (
+                      <div key={p._id}
+                        className="grid grid-cols-1 md:grid-cols-[2.2fr_1.4fr_1fr_1fr_1fr_1.2fr] gap-2 md:gap-4 items-center px-5 py-3.5 hover:bg-surface-2/40 transition-colors">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-[11px] font-black flex-shrink-0 ${avatarColor}`}>{initials}</div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-text-primary truncate">{p.name}</p>
+                            <p className="text-xs text-text-muted truncate">{p.email}</p>
                           </div>
                         </div>
-                      ) : (
-                        <div className="flex gap-2">
-                          <button onClick={() => handleApprove(r._id, r.name)} disabled={actionLoad === r._id}
-                            className="flex-1 py-2 bg-green-500 hover:bg-green-600 text-white text-xs font-bold rounded-lg transition-all disabled:opacity-50 flex items-center justify-center gap-1.5">
-                            <CheckCircle className="w-3.5 h-3.5" />
-                            {actionLoad === r._id ? 'Approving…' : 'Approve'}
-                          </button>
-                          <button onClick={() => setRejectId(r._id)}
-                            className="flex-1 py-2 border border-red-400/30 text-red-500 hover:bg-red-500/5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5">
-                            <XCircle className="w-3.5 h-3.5" /> Reject
-                          </button>
+                        <div>
+                          {p.username
+                            ? <span className="px-2.5 py-1 bg-surface-2 border border-border rounded-lg text-[11px] font-mono text-text-muted">@{p.username}</span>
+                            : <span className="text-[10px] text-text-muted italic opacity-60">Not activated</span>}
                         </div>
-                      )
+                        <span className={`w-fit px-2.5 py-1 rounded-lg text-[10px] font-bold border ${ROLE_STYLE[p.role] || 'bg-surface-2 text-text-muted border-border'}`}>
+                          {ROLE_LABEL[p.role] || p.role || '--'}
+                        </span>
+                        <p className="text-xs text-text-muted hidden md:block">{joinDate}</p>
+                        <div>
+                          {p.kind === 'user' && p.isActive    && <p className="text-xs font-semibold text-green-500 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />Active</p>}
+                          {p.kind === 'user' && !p.isActive   && <p className="text-xs font-semibold text-red-400 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-red-400 inline-block" />Inactive</p>}
+                          {p.kind === 'invite'                 && <p className="text-xs font-semibold text-blue-500 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block" />Invite Sent</p>}
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          {p.kind === 'user' && (
+                            <button onClick={() => handleToggle(p._user._id)} disabled={togglingId === p._user._id}
+                              className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all disabled:opacity-50 ${
+                                p.isActive ? 'border-red-400/30 text-red-500 hover:bg-red-500/5' : 'border-green-400/30 text-green-500 hover:bg-green-500/5'
+                              }`}>
+                              {togglingId === p._user._id ? '...' : p.isActive ? 'Disable' : 'Enable'}
+                            </button>
+                          )}
+                          {p.kind === 'invite' && (
+                            removeId === p._id ? (
+                              <div className="flex items-center gap-1">
+                                <button onClick={() => handleRemove(p._id, p.name)} disabled={removeLoad === p._id}
+                                  className="px-2.5 py-1.5 bg-red-500 text-white text-xs font-bold rounded-lg disabled:opacity-50">
+                                  {removeLoad === p._id ? '...' : 'Confirm'}
+                                </button>
+                                <button onClick={() => setRemoveId(null)} className="px-2 py-1.5 border border-border text-text-muted text-xs rounded-lg">x</button>
+                              </div>
+                            ) : (
+                              <>
+                                <button onClick={() => setInviteLink({ id: p._id, link: `${window.location.origin}/invite?token=`, name: p.name, emailSent: false })}
+                                  className="px-2.5 py-1.5 border border-brand/30 text-brand hover:bg-brand/5 text-xs font-bold rounded-lg flex items-center gap-1">
+                                  <RefreshCw className="w-3 h-3" /> Resend
+                                </button>
+                                <button onClick={() => setRemoveId(p._id)}
+                                  className="p-1.5 border border-red-400/20 text-red-400 hover:bg-red-500/5 rounded-lg" title="Remove">
+                                  <Archive className="w-3 h-3" />
+                                </button>
+                              </>
+                            )
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="px-5 py-3 border-t border-border bg-surface-2/60">
+                  <p className="text-xs text-text-muted">
+                    Showing <span className="font-semibold text-text-primary">{filteredRoster.length}</span> of{' '}
+                    <span className="font-semibold text-text-primary">{rosterRows.length}</span> users
+                    {peopleFromRequests.filter(p => p.reqStatus === 'approved').length > 0 && (
+                      <span className="ml-3 text-blue-500 font-semibold">
+                        {peopleFromRequests.filter(p => p.reqStatus === 'approved').length} invite sent
+                      </span>
                     )}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Footer */}
-            {!loadingR && visibleRequests.length > 0 && (
-              <div className="mt-4 pt-3 border-t border-border">
-                <p className="text-xs text-text-muted">
-                  {visibleRequests.length} {reqFilter === 'all' ? 'total' : reqFilter} request{visibleRequests.length !== 1 ? 's' : ''}
-                </p>
-              </div>
+                  </p>
+                </div>
+              </>
             )}
           </div>
-        </div>
-      )}
+        );
+      })()}
+
+      {/* ══ VIEW: Access Requests ══ */}
+      {activeView === 'requests' && (() => {
+        const visibleRequests = requests.filter(r =>
+          reqFilter === 'all' ? true : r.status === reqFilter
+        );
+        const reqTabs = [
+          { id: 'pending',  label: 'Pending',  count: pending.length,  pulse: pending.length > 0 },
+          { id: 'approved', label: 'Approved', count: approved.length },
+          { id: 'rejected', label: 'Rejected', count: rejected.length },
+          { id: 'all',      label: 'All',      count: requests.length },
+        ];
+        return (
+          <div className="bg-surface border border-border rounded-2xl overflow-hidden">
+            {/* Filter tabs */}
+            <div className="flex gap-0 px-4 border-b border-border overflow-x-auto">
+              {reqTabs.map(t => (
+                <button key={t.id} onClick={() => setReqFilter(t.id)}
+                  className={`relative flex items-center gap-1.5 px-4 py-3.5 text-sm font-semibold border-b-2 whitespace-nowrap transition-all ${
+                    reqFilter === t.id ? 'border-brand text-brand' : 'border-transparent text-text-muted hover:text-text-primary'
+                  }`}>
+                  {t.pulse && <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse" />}
+                  {t.label}
+                  <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${
+                    reqFilter === t.id ? 'bg-brand/10 text-brand' : 'bg-surface-2 text-text-muted'
+                  }`}>{t.count}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Cards */}
+            <div className="p-4">
+              {loadingR ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {[...Array(2)].map((_, i) => <div key={i} className="h-32 bg-surface-2 rounded-xl animate-pulse" />)}
+                </div>
+              ) : visibleRequests.length === 0 ? (
+                <div className="text-center py-12">
+                  <ShieldCheck className="w-10 h-10 text-text-muted/30 mx-auto mb-3" />
+                  <p className="text-text-muted text-sm">No {reqFilter === 'all' ? '' : reqFilter} requests</p>
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {visibleRequests.map(r => (
+                      <div key={r._id}
+                        className={`bg-surface border rounded-xl p-4 transition-all ${
+                          r.status === 'pending'  ? 'border-l-4 border-l-amber-500 border-border'
+                          : r.status === 'approved' ? 'border-l-4 border-l-green-500 border-border'
+                          :                           'border-l-4 border-l-red-400 border-border'
+                        }`}>
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <div className="min-w-0">
+                            <p className="font-semibold text-text-primary text-sm truncate">{r.name}</p>
+                            <p className="text-xs text-text-muted truncate">{r.email}</p>
+                          </div>
+                          <span className={`flex-shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-wide ${
+                            STATUS_BADGE[r.status] || 'bg-surface-2 text-text-muted border-border'
+                          }`}>{r.status}</span>
+                        </div>
+                        <div className="flex items-center gap-2 mb-3">
+                          <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border ${ROLE_STYLE[r.role] || 'bg-surface-2 text-text-muted border-border'}`}>
+                            {ROLE_LABEL[r.role] || r.role}
+                          </span>
+                          <span className="text-[10px] text-text-muted">
+                            {new Date(r.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          </span>
+                        </div>
+                        {r.approvedBy && (
+                          <p className="text-[10px] text-text-muted mb-2">By: {r.approvedBy}</p>
+                        )}
+
+                        {r.status === 'pending' && (
+                          rejectId === r._id ? (
+                            <div className="space-y-1.5">
+                              <textarea value={rejectNote} onChange={e => setRejectNote(e.target.value)}
+                                placeholder="Rejection reason (optional)" rows={2}
+                                className="w-full px-3 py-2 text-xs bg-surface-2 border border-border rounded-lg text-text-primary placeholder:text-text-muted resize-none focus:outline-none focus:ring-2 focus:ring-red-400/30" />
+                              <div className="flex gap-2">
+                                <button onClick={() => handleReject(r._id)} disabled={actionLoad === r._id}
+                                  className="flex-1 py-2 bg-red-500 hover:bg-red-600 text-white text-xs font-bold rounded-lg transition-all disabled:opacity-50">
+                                  {actionLoad === r._id ? '...' : 'Confirm Reject'}
+                                </button>
+                                <button onClick={() => { setRejectId(null); setRejectNote(''); }}
+                                  className="px-3 py-2 border border-border text-text-muted text-xs rounded-lg hover:bg-surface-2">Cancel</button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex gap-2">
+                              <button onClick={() => handleApprove(r._id, r.name)} disabled={actionLoad === r._id}
+                                className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-green-500 hover:bg-green-600 text-white text-xs font-bold rounded-lg transition-all disabled:opacity-50">
+                                <CheckCircle className="w-3.5 h-3.5" />
+                                {actionLoad === r._id ? '...' : 'Approve'}
+                              </button>
+                              <button onClick={() => setRejectId(r._id)}
+                                className="flex-1 flex items-center justify-center gap-1.5 py-2 border border-red-400/30 text-red-500 hover:bg-red-500/5 text-xs font-bold rounded-lg transition-all">
+                                <XCircle className="w-3.5 h-3.5" /> Reject
+                              </button>
+                            </div>
+                          )
+                        )}
+
+                        {(r.status === 'approved' || r.status === 'rejected') && (
+                          <div className="flex items-center justify-between mt-1">
+                            {r.status === 'approved' && (
+                              <button
+                                onClick={() => setInviteLink({ id: r._id, link: `${window.location.origin}/invite?token=`, name: r.name, emailSent: false })}
+                                className="text-[10px] text-brand hover:text-brand-hover font-semibold transition-colors">
+                                Resend Invite
+                              </button>
+                            )}
+                            {r.status !== 'approved' && <span />}
+                            {removeId === r._id ? (
+                              <div className="flex items-center gap-1.5">
+                                <button onClick={() => handleRemove(r._id, r.name)} disabled={removeLoad === r._id}
+                                  className="px-2.5 py-1 bg-red-500 text-white text-[10px] font-bold rounded-lg disabled:opacity-50">
+                                  {removeLoad === r._id ? '...' : 'Confirm'}
+                                </button>
+                                <button onClick={() => setRemoveId(null)} className="px-2 py-1 border border-border text-text-muted text-[10px] rounded-lg">x</button>
+                              </div>
+                            ) : (
+                              <button onClick={() => setRemoveId(r._id)}
+                                className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold text-red-400 hover:text-red-500 hover:bg-red-500/5 border border-red-400/20 hover:border-red-400/40 rounded-lg transition-all">
+                                <Archive className="w-3 h-3" /> Remove
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-border">
+                    <p className="text-xs text-text-muted">
+                      {visibleRequests.length} {reqFilter === 'all' ? 'total' : reqFilter} request{visibleRequests.length !== 1 ? 's' : ''}
+                    </p>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

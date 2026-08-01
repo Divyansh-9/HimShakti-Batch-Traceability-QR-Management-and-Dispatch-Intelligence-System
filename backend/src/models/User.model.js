@@ -19,6 +19,11 @@ const userSchema = new mongoose.Schema({
   emailVerified:  { type: Boolean, default: false },
   otpCode:        { type: String,  default: null },   // 6-digit hashed OTP
   otpExpiry:      { type: Date,    default: null },   // OTP valid for 10 minutes
+  otpAttempts:    { type: Number,  default: 0 },      // lock after 5 wrong guesses
+
+  // Password-reset token (short-lived JWT id stored here for single-use invalidation)
+  resetToken:       { type: String, default: null },
+  resetTokenExpiry: { type: Date,   default: null },
 }, { timestamps: true });
 
 // Compare plain password against stored hash

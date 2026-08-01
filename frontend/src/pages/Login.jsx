@@ -1,10 +1,10 @@
-import { useState } from 'react';
+﻿import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useGoogleLogin } from '@react-oauth/google';
 import toast from 'react-hot-toast';
 import client from '../api/client';
-import { Eye, EyeOff, LogIn, Leaf, ArrowLeft, ArrowRight, X, AlertTriangle, Mail } from 'lucide-react';
+import { Eye, EyeOff, LogIn, Leaf, ArrowLeft, ArrowRight, X, AlertTriangle, Mail, KeyRound, ShieldCheck, RotateCcw } from 'lucide-react';
 
 
 // ── Google Brand-Compliant Button ─────────────────────────────
@@ -241,11 +241,460 @@ function RequestAccessForm({ prefillName = '', prefillEmail = '' }) {
   );
 }
 
+// ── Forgot Password Panel ──────────────────────────────────────
+// 3-step inline panel: identify → OTP → new password
+function ForgotPasswordPanel({ onClose }) {
+  const [step,          setStep]          = useState(1);
+  const [identifier,    setIdentifier]    = useState('');
+  const [maskedEmail,   setMaskedEmail]   = useState('');
+  const [otp,           setOtp]           = useState(['', '', '', '', '', '']);
+  const [resetToken,    setResetToken]    = useState('');
+  const [newPass,       setNewPass]       = useState('');
+  const [confirmPass,   setConfirmPass]   = useState('');
+  const [showPass,      setShowPass]      = useState(false);
+  const [loading,       setLoading]       = useState(false);
+  const [error,         setError]         = useState('');
+  const [resendTimer,   setResendTimer]   = useState(0);
+  const otpRefs = [useRef(), useRef(), useRef(), useRef(), useRef(), useRef()];
+
+  // Resend countdown
+  useEffect(() => {
+    if (resendTimer <= 0) return;
+    const t = setTimeout(() => setResendTimer(v => v - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resendTimer]);
+
+  // Password strength
+  function getStrength(p) {
+    if (!p) return 0;
+    let s = 0;
+    if (p.length >= 8)  s++;
+    if (/[A-Z]/.test(p)) s++;
+    if (/[0-9]/.test(p)) s++;
+    if (/[^A-Za-z0-9]/.test(p)) s++;
+    return s;
+  }
+  const strength = getStrength(newPass);
+  const strengthLabel = ['', 'Weak', 'Fair', 'Good', 'Strong'][strength];
+  const strengthColor = ['', 'bg-red-500', 'bg-amber-400', 'bg-blue-400', 'bg-green-500'][strength];
+
+  // Step 1 — send OTP
+  async function handleSendOtp(e) {
+    e.preventDefault();
+    if (!identifier.trim()) { setError('Please enter your username or email.'); return; }
+    setLoading(true); setError('');
+    try {
+      const data = await client('/auth/forgot-password', {
+        method: 'POST',
+        body: JSON.stringify({ identifier: identifier.trim() }),
+      });
+      setMaskedEmail(data.maskedEmail || '');
+      setStep(2);
+      setResendTimer(60);
+      setTimeout(() => otpRefs[0].current?.focus(), 100);
+    } catch (err) {
+      if (err.code === 'NO_EMAIL' || err.status === 422) {
+        setError('This account has no email linked. Contact your administrator to reset your password.');
+      } else {
+        // Generic — do not reveal whether account exists
+        setMaskedEmail('your registered email');
+        setStep(2);
+        setResendTimer(60);
+      }
+    } finally { setLoading(false); }
+  }
+
+  // Step 1 — resend (called from step 2 too)
+  async function handleResend() {
+    if (resendTimer > 0) return;
+    setLoading(true); setError('');
+    try {
+      await client('/auth/forgot-password', {
+        method: 'POST',
+        body: JSON.stringify({ identifier: identifier.trim() }),
+      });
+      setResendTimer(60);
+      setOtp(['', '', '', '', '', '']);
+      setTimeout(() => otpRefs[0].current?.focus(), 100);
+      toast.success('New OTP sent!');
+    } catch { toast.error('Failed to resend. Try again.'); }
+    finally { setLoading(false); }
+  }
+
+  // Step 2 — verify OTP
+  async function handleVerifyOtp(e) {
+    e.preventDefault();
+    const code = otp.join('');
+    if (code.length < 6) { setError('Please enter all 6 digits.'); return; }
+    setLoading(true); setError('');
+    try {
+      const data = await client('/auth/verify-reset-otp', {
+        method: 'POST',
+        body: JSON.stringify({ identifier: identifier.trim(), otp: code }),
+      });
+      setResetToken(data.resetToken);
+      setStep(3);
+    } catch (err) { setError(err.message || 'Incorrect OTP. Please try again.'); }
+    finally { setLoading(false); }
+  }
+
+  // Step 3 — reset password
+  async function handleResetPassword(e) {
+    e.preventDefault();
+    if (newPass.length < 8) { setError('Password must be at least 8 characters.'); return; }
+    if (newPass !== confirmPass) { setError('Passwords do not match.'); return; }
+    setLoading(true); setError('');
+    try {
+      await client('/auth/reset-password', {
+        method: 'POST',
+        body: JSON.stringify({ resetToken, newPassword: newPass }),
+      });
+      toast.success('Password reset! Sign in with your new password.');
+      onClose();
+    } catch (err) { setError(err.message || 'Reset failed. Please start over.'); }
+    finally { setLoading(false); }
+  }
+
+  // OTP input handling
+  function handleOtpChange(idx, val) {
+    if (!/^\d?$/.test(val)) return;
+    const next = [...otp];
+    next[idx] = val;
+    setOtp(next);
+    if (val && idx < 5) otpRefs[idx + 1].current?.focus();
+  }
+  function handleOtpKey(idx, e) {
+    if (e.key === 'Backspace' && !otp[idx] && idx > 0) {
+      otpRefs[idx - 1].current?.focus();
+    }
+  }
+  function handleOtpPaste(e) {
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+    if (pasted.length === 6) {
+      setOtp(pasted.split(''));
+      otpRefs[5].current?.focus();
+    }
+  }
+
+  const stepTitles = ['', 'Reset Password', 'Enter OTP Code', 'Set New Password'];
+  const stepIcons  = [null, KeyRound, ShieldCheck, KeyRound];
+  const StepIcon   = stepIcons[step];
+
+  return (
+    <>
+      <style>{`
+        @keyframes fpFadeIn  { from { opacity:0; }              to { opacity:1; } }
+        @keyframes fpSlideUp { from { transform:translateY(24px) scale(0.97); opacity:0; }
+                               to   { transform:translateY(0)    scale(1);    opacity:1; } }
+        .fp-scrim  { animation: fpFadeIn  0.22s ease forwards; }
+        .fp-card   { animation: fpSlideUp 0.28s cubic-bezier(0.34,1.56,0.64,1) forwards; }
+      `}</style>
+
+      {/* ── Full-screen scrim ── */}
+      <div
+        className="fp-scrim fixed inset-0 z-50 flex items-center justify-center p-4"
+        style={{ background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(18px)' }}
+        onClick={onClose}
+      >
+        {/* ── Floating glass card ── */}
+        <div
+          className="fp-card relative w-full max-w-sm overflow-hidden rounded-3xl shadow-2xl"
+          style={{
+            background: 'linear-gradient(160deg, rgba(40,40,40,0.97) 0%, rgba(18,18,18,0.98) 100%)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            boxShadow: '0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04) inset',
+          }}
+          onClick={e => e.stopPropagation()}
+        >
+          {/* Subtle top glow accent */}
+          <div style={{
+            position: 'absolute', top: 0, left: '20%', right: '20%', height: '1px',
+            background: 'linear-gradient(90deg, transparent, rgba(232,99,42,0.6), transparent)',
+          }} />
+
+          {/* ── Step progress bar ── */}
+          <div className="h-0.5 bg-white/5">
+            <div
+              className="h-full transition-all duration-500 ease-out"
+              style={{
+                width: `${(step / 3) * 100}%`,
+                background: 'linear-gradient(90deg, #e8632a, #f59e0b)',
+              }}
+            />
+          </div>
+
+          {/* ── Card header ── */}
+          <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-white/[0.06]">
+            <div className="flex items-center gap-3">
+              {step > 1 && (
+                <button
+                  onClick={() => { setStep(s => s - 1); setError(''); }}
+                  className="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/50 hover:text-white transition-all"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                </button>
+              )}
+              <div
+                className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: 'rgba(232,99,42,0.15)', border: '1px solid rgba(232,99,42,0.25)' }}
+              >
+                {StepIcon && <StepIcon className="w-4 h-4 text-brand" />}
+              </div>
+              <div>
+                <p className="text-white font-bold text-sm leading-none">{stepTitles[step]}</p>
+                <p className="text-white/35 text-[10px] mt-0.5">Step {step} of 3 · HimShakti</p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/40 hover:text-white/80 transition-all"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* ── Card body ── */}
+          <div className="px-6 py-5">
+
+            {/* Step 1 — Identify */}
+            {step === 1 && (
+              <form onSubmit={handleSendOtp} className="space-y-4">
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
+                      style={{ background: 'rgba(232,99,42,0.12)', border: '1px solid rgba(232,99,42,0.2)' }}>
+                      <KeyRound className="w-5 h-5 text-brand" />
+                    </div>
+                    <div>
+                      <p className="text-white font-semibold text-sm">Forgot your password?</p>
+                      <p className="text-white/45 text-xs">We'll send a one-time code to your email</p>
+                    </div>
+                  </div>
+                  <label className="block text-xs font-semibold text-white/60 uppercase tracking-wider mb-1.5">
+                    Username or Email
+                  </label>
+                  <input
+                    type="text"
+                    value={identifier}
+                    onChange={e => { setIdentifier(e.target.value); setError(''); }}
+                    placeholder="e.g. manager or you@himshakti.com"
+                    autoFocus
+                    className="w-full px-4 py-3 min-h-[44px] rounded-xl text-white text-sm placeholder:text-white/25 focus:outline-none focus:ring-2 transition-all"
+                    style={{
+                      background: 'rgba(255,255,255,0.06)',
+                      border: '1px solid rgba(255,255,255,0.12)',
+                    }}
+                    onFocus={e => { e.target.style.borderColor = 'rgba(232,99,42,0.5)'; e.target.style.boxShadow = '0 0 0 3px rgba(232,99,42,0.12)'; }}
+                    onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.12)'; e.target.style.boxShadow = 'none'; }}
+                  />
+                </div>
+
+                {error && (
+                  <div className="flex items-start gap-2.5 rounded-xl px-3.5 py-3"
+                    style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                    <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+                    <p className="text-red-300 text-xs leading-relaxed">{error}</p>
+                  </div>
+                )}
+
+                <button type="submit" disabled={loading}
+                  className="w-full py-3 min-h-[44px] rounded-xl text-white font-bold text-sm transition-all duration-200 disabled:opacity-50 flex items-center justify-center gap-2"
+                  style={{ background: 'linear-gradient(135deg, #e8632a, #d4521f)', boxShadow: '0 4px 20px rgba(232,99,42,0.35)' }}>
+                  {loading
+                    ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /><span>Sending OTP…</span></>
+                    : <><Mail className="w-4 h-4" /><span>Send OTP</span></>}
+                </button>
+
+                <p className="text-center text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                  Remembered it?{' '}
+                  <button type="button" onClick={onClose}
+                    className="text-brand hover:text-orange-400 font-semibold transition-colors">
+                    Back to Sign In
+                  </button>
+                </p>
+              </form>
+            )}
+
+            {/* Step 2 — OTP Entry */}
+            {step === 2 && (
+              <form onSubmit={handleVerifyOtp} className="space-y-5">
+                <div className="text-center py-1">
+                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-3"
+                    style={{ background: 'rgba(232,99,42,0.12)', border: '1px solid rgba(232,99,42,0.22)' }}>
+                    <Mail className="w-7 h-7 text-brand" />
+                  </div>
+                  <p className="text-white font-bold text-sm">Check your inbox</p>
+                  <p className="text-white/45 text-xs mt-1 leading-relaxed">
+                    6-digit code sent to<br />
+                    <span className="text-white/75 font-semibold font-mono">{maskedEmail}</span>
+                  </p>
+                  <p className="text-white/25 text-[10px] mt-1">Expires in 5 minutes</p>
+                </div>
+
+                {/* 6-digit boxes */}
+                <div className="flex justify-center gap-2" onPaste={handleOtpPaste}>
+                  {otp.map((digit, idx) => (
+                    <input
+                      key={idx}
+                      ref={otpRefs[idx]}
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={1}
+                      value={digit}
+                      onChange={e => handleOtpChange(idx, e.target.value)}
+                      onKeyDown={e => handleOtpKey(idx, e)}
+                      className="w-11 h-14 text-center text-xl font-black rounded-xl text-white focus:outline-none transition-all duration-200"
+                      style={{
+                        background: digit ? 'rgba(232,99,42,0.12)' : 'rgba(255,255,255,0.06)',
+                        border: digit ? '1.5px solid rgba(232,99,42,0.5)' : '1.5px solid rgba(255,255,255,0.1)',
+                        boxShadow: digit ? '0 0 0 3px rgba(232,99,42,0.1)' : 'none',
+                        letterSpacing: '0.05em',
+                      }}
+                    />
+                  ))}
+                </div>
+
+                {error && (
+                  <div className="flex items-start gap-2.5 rounded-xl px-3.5 py-3"
+                    style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                    <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+                    <p className="text-red-300 text-xs leading-relaxed">{error}</p>
+                  </div>
+                )}
+
+                <button type="submit" disabled={loading || otp.join('').length < 6}
+                  className="w-full py-3 min-h-[44px] rounded-xl text-white font-bold text-sm transition-all duration-200 disabled:opacity-50 flex items-center justify-center gap-2"
+                  style={{ background: 'linear-gradient(135deg, #e8632a, #d4521f)', boxShadow: '0 4px 20px rgba(232,99,42,0.35)' }}>
+                  {loading
+                    ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /><span>Verifying…</span></>
+                    : <><ShieldCheck className="w-4 h-4" /><span>Verify OTP</span></>}
+                </button>
+
+                <div className="text-center">
+                  {resendTimer > 0 ? (
+                    <p className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                      Resend available in <span style={{ color: 'rgba(255,255,255,0.6)', fontWeight: 600 }}>{resendTimer}s</span>
+                    </p>
+                  ) : (
+                    <button type="button" onClick={handleResend} disabled={loading}
+                      className="text-xs text-brand hover:text-orange-400 font-semibold flex items-center gap-1.5 mx-auto transition-colors disabled:opacity-50">
+                      <RotateCcw className="w-3 h-3" /> Resend OTP
+                    </button>
+                  )}
+                </div>
+              </form>
+            )}
+
+            {/* Step 3 — New Password */}
+            {step === 3 && (
+              <form onSubmit={handleResetPassword} className="space-y-4">
+                <div className="flex items-center gap-3 p-3.5 rounded-2xl mb-1"
+                  style={{ background: 'rgba(34,197,94,0.07)', border: '1px solid rgba(34,197,94,0.15)' }}>
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                    style={{ background: 'rgba(34,197,94,0.12)' }}>
+                    <ShieldCheck className="w-5 h-5 text-green-400" />
+                  </div>
+                  <div>
+                    <p className="text-green-400 font-bold text-xs">Identity Verified</p>
+                    <p className="text-white/40 text-[10px]">Set your new password below</p>
+                  </div>
+                </div>
+
+                {/* New password */}
+                <div>
+                  <label className="block text-xs font-semibold text-white/60 uppercase tracking-wider mb-1.5">New Password</label>
+                  <div className="relative">
+                    <input
+                      type={showPass ? 'text' : 'password'}
+                      value={newPass}
+                      onChange={e => { setNewPass(e.target.value); setError(''); }}
+                      placeholder="Min. 8 characters"
+                      autoFocus
+                      className="w-full px-4 py-3 pr-10 min-h-[44px] rounded-xl text-white text-sm placeholder:text-white/25 focus:outline-none transition-all"
+                      style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }}
+                      onFocus={e => { e.target.style.borderColor = 'rgba(232,99,42,0.5)'; e.target.style.boxShadow = '0 0 0 3px rgba(232,99,42,0.12)'; }}
+                      onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.12)'; e.target.style.boxShadow = 'none'; }}
+                    />
+                    <button type="button" onClick={() => setShowPass(v => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors">
+                      {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  {/* Strength bar */}
+                  {newPass && (
+                    <div className="mt-2 space-y-1">
+                      <div className="flex gap-1">
+                        {[1,2,3,4].map(i => (
+                          <div key={i} className={`h-1 flex-1 rounded-full transition-all duration-300 ${i <= strength ? strengthColor : 'bg-white/8'}`} />
+                        ))}
+                      </div>
+                      <p className="text-[10px]" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                        Strength: <span style={{ color: 'rgba(255,255,255,0.6)', fontWeight:600 }}>{strengthLabel}</span>
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Confirm password */}
+                <div>
+                  <label className="block text-xs font-semibold text-white/60 uppercase tracking-wider mb-1.5">Confirm Password</label>
+                  <input
+                    type={showPass ? 'text' : 'password'}
+                    value={confirmPass}
+                    onChange={e => { setConfirmPass(e.target.value); setError(''); }}
+                    placeholder="Re-enter new password"
+                    className="w-full px-4 py-3 min-h-[44px] rounded-xl text-white text-sm placeholder:text-white/25 focus:outline-none transition-all"
+                    style={{
+                      background: confirmPass && confirmPass !== newPass ? 'rgba(239,68,68,0.06)' : 'rgba(255,255,255,0.06)',
+                      border: confirmPass && confirmPass !== newPass ? '1px solid rgba(239,68,68,0.35)' : '1px solid rgba(255,255,255,0.12)',
+                    }}
+                    onFocus={e => { if (!e.target.value || confirmPass === newPass) { e.target.style.borderColor = 'rgba(232,99,42,0.5)'; e.target.style.boxShadow = '0 0 0 3px rgba(232,99,42,0.12)'; } }}
+                    onBlur={e => { if (!e.target.value || confirmPass === newPass) { e.target.style.borderColor = 'rgba(255,255,255,0.12)'; e.target.style.boxShadow = 'none'; } }}
+                  />
+                  {confirmPass && confirmPass !== newPass && (
+                    <p className="text-red-400 text-[10px] mt-1">Passwords do not match</p>
+                  )}
+                </div>
+
+                {error && (
+                  <div className="flex items-start gap-2.5 rounded-xl px-3.5 py-3"
+                    style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                    <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+                    <p className="text-red-300 text-xs leading-relaxed">{error}</p>
+                  </div>
+                )}
+
+                <button type="submit" disabled={loading || !newPass || !confirmPass || newPass !== confirmPass}
+                  className="w-full py-3 min-h-[44px] rounded-xl text-white font-bold text-sm transition-all duration-200 disabled:opacity-50 flex items-center justify-center gap-2"
+                  style={{ background: 'linear-gradient(135deg, #e8632a, #d4521f)', boxShadow: '0 4px 20px rgba(232,99,42,0.35)' }}>
+                  {loading
+                    ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /><span>Resetting…</span></>
+                    : <><KeyRound className="w-4 h-4" /><span>Reset Password</span></>}
+                </button>
+              </form>
+            )}
+
+          </div>
+
+          {/* Bottom brand strip */}
+          <div className="px-6 py-3 border-t" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
+            <p className="text-center text-[10px]" style={{ color: 'rgba(255,255,255,0.2)' }}>
+              🔒 Secured by HimShakti Traceability Platform
+            </p>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+
 // ── Main Login Page ────────────────────────────────────────────
 export default function Login() {
-  const [tab,         setTab]         = useState('signin');
-  const [username,    setUsername]    = useState('');
-  const [password,    setPassword]    = useState('');
+  const [tab,           setTab]           = useState('signin');
+  const [username,      setUsername]      = useState('');
+  const [password,      setPassword]      = useState('');
+  const [showForgot,    setShowForgot]    = useState(false);
   // null = idle | 'loading' = verifying with backend | { code, message } = error state
   const [googleState, setGoogleState] = useState(null);
   const { login, loading, error } = useAuth();
@@ -304,7 +753,9 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen relative flex items-center justify-center overflow-hidden">
+    <>
+      {showForgot && <ForgotPasswordPanel onClose={() => setShowForgot(false)} />}
+      <div className="min-h-screen relative flex items-center justify-center overflow-hidden">
 
       {/* ── Full-bleed background ── */}
       <div className="absolute inset-0">
@@ -378,6 +829,7 @@ export default function Login() {
               <form className="space-y-4" onSubmit={handleLogin}>
 
                 {/* ── Google Sign-In — REAL OAuth via @react-oauth/google ── */}
+
                 <div>
                   {/* Loading state replaces the button while waiting for backend */}
                   {googleState === 'loading' ? (
@@ -504,7 +956,7 @@ export default function Login() {
                     <input type="checkbox" className="h-4 w-4 rounded border-white/30 bg-white/10 text-brand focus:ring-brand/50 focus:ring-offset-0" />
                     <span className="text-sm text-white/60">Remember me</span>
                   </label>
-                  <button type="button" onClick={() => setTab('request')} className="text-sm text-white/60 hover:text-white transition-colors min-h-[44px] px-1">
+                  <button type="button" onClick={() => setShowForgot(true)} className="text-sm text-white/60 hover:text-white transition-colors min-h-[44px] px-1">
                     Forgot password?
                   </button>
                 </div>
@@ -568,5 +1020,7 @@ export default function Login() {
         </div>
       </div>
     </div>
+    </>
   );
+
 }
