@@ -6,6 +6,14 @@ const { generateToken } = require('../middleware/auth');
 const jwt = require('jsonwebtoken');
 const { sendApprovalEmail, sendRejectionEmail, sendOtpEmail, sendPasswordResetOtpEmail } = require('../services/emailService');
 
+function getFrontendUrl() {
+  const envUrl = process.env.FRONTEND_URL;
+  if (!envUrl || envUrl.includes('localhost') || envUrl.includes('127.0.0.1')) {
+    return 'https://himshakti2026-bb904.web.app';
+  }
+  return envUrl;
+}
+
 // ─────────────────────────────────────────────────────────────────
 // POST /auth/login
 // Now checks MongoDB users collection — hardcoded block is gone.
@@ -102,7 +110,7 @@ async function approve(req, res, next) {
     request.approvedBy   = req.user.username;
     await request.save();
 
-    const frontendUrl = process.env.FRONTEND_URL || 'https://himshakti2026-bb904.web.app';
+    const frontendUrl = getFrontendUrl();
     const inviteLink  = `${frontendUrl}/invite?token=${rawToken}`;
 
     // ── Auto-send approval email ──────────────────────────────────────────
@@ -486,7 +494,7 @@ async function resendInvite(req, res, next) {
     request.inviteUsed   = false;
     await request.save();
 
-    const frontendUrl = process.env.FRONTEND_URL || 'https://himshakti2026-bb904.web.app';
+    const frontendUrl = getFrontendUrl();
     const inviteLink  = `${frontendUrl}/invite?token=${rawToken}`;
 
     let emailResult = { sent: false, reason: 'no email on record' };
