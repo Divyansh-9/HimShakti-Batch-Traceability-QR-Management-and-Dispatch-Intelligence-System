@@ -24,7 +24,11 @@ const PORT   = process.env.PORT || 5001;
 const CORS_ORIGINS = [
   process.env.FRONTEND_URL || 'http://localhost:5173',
   'http://localhost:3000',
+  'http://localhost:5173',
   'http://localhost:5174',
+  'https://himshakti2026-bb904.web.app',
+  'https://himshakti2026-bb904.firebaseapp.com',
+  'https://him-shakti-batch-traceability-qr-ma.vercel.app',
 ];
 
 // ── Socket.io — real-time batch updates ────────────────────────────
@@ -44,7 +48,11 @@ app.set('io', io);
 
 // ── Express middleware ─────────────────────────────────────────────
 app.use(helmet());
-app.use(cors({ origin: CORS_ORIGINS, methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE'], credentials: true }));
+app.use(cors({
+  origin: (origin, callback) => callback(null, true),
+  methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
+  credentials: true,
+}));
 app.use(express.json({ limit: '1mb' }));
 app.use(apiLimiter);
 
