@@ -48,6 +48,16 @@ app.use(cors({ origin: CORS_ORIGINS, methods: ['GET', 'POST', 'PATCH', 'PUT', 'D
 app.use(express.json({ limit: '1mb' }));
 app.use(apiLimiter);
 
+// Ensure MongoDB connection is active for serverless Cloud Functions
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Health
 app.get('/health', (_req, res) => {
   res.json({
@@ -74,11 +84,15 @@ app.use('/api/ai',       aiRoutes);
 
 app.use(errorHandler);
 
-connectDB().then(async () => {
-  await seedUsers();
-  server.listen(PORT, () => {
-    console.log(`🚀 [HimShakti] Backend running at http://localhost:${PORT}`);
-    console.log(`🔌 [HimShakti] Socket.io real-time enabled`);
-    console.log(`📡 [HimShakti] Health: http://localhost:${PORT}/health`);
+if (require.main === module) {
+  connectDB().then(async () => {
+    await seedUsers();
+    server.listen(PORT, () => {
+      console.log(`🚀 [HimShakti] Backend running at http://localhost:${PORT}`);
+      console.log(`🔌 [HimShakti] Socket.io real-time enabled`);
+      console.log(`📡 [HimShakti] Health: http://localhost:${PORT}/health`);
+    });
   });
-});
+}
+
+module.exports = app;
