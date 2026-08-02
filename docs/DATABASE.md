@@ -297,6 +297,7 @@ Manages the onboarding workflow: new users submit a request â†’ admin reviews â†
     'factory-manager',
     'quality-inspector',
     'dispatch-coordinator',
+    'manager',
     'admin'
   ],
 

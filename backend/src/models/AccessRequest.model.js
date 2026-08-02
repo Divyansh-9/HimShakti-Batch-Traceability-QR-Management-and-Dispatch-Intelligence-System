@@ -6,7 +6,7 @@ const accessRequestSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
   role: {
     type:     String,
-    enum:     ['factory-manager', 'quality-inspector', 'dispatch-coordinator', 'admin'],
+    enum:     ['factory-manager', 'quality-inspector', 'dispatch-coordinator', 'manager', 'admin'],
     required: true,
   },
   status: {

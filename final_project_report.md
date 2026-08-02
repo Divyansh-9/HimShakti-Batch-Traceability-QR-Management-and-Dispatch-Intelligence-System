@@ -183,7 +183,7 @@ const ScanEventSchema = new mongoose.Schema({
 const AccessRequestSchema = new mongoose.Schema({
   name:         { type: String },
   email:        { type: String, unique: true },
-  role:         { type: String, enum: ['factory-manager', 'quality-inspector', 'dispatch-coordinator', 'admin'] },
+  role:         { type: String, enum: ['factory-manager', 'quality-inspector', 'dispatch-coordinator', 'manager', 'admin'] },
   status:       { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
   note:         { type: String },          // Rejection reason
   inviteToken:  { type: String },          // SHA-256 hashed raw token
