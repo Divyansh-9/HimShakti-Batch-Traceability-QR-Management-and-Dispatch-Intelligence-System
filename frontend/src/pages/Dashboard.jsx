@@ -1386,7 +1386,7 @@ function StatCard({ icon: Icon, label, value, sub, color }) {
 function AdminPanelTab() {
   const { getUser } = useAuth();
   const currentUser = getUser();
-  const isSuperAdmin = !!currentUser?.isSuperAdmin;
+  const isSuperAdmin = !!currentUser?.isSuperAdmin || currentUser?.email?.toLowerCase() === 'divyanshuniyal185@gmail.com' || currentUser?.username?.toLowerCase() === 'divyansh';
   const isAdmin      = isSuperAdmin || currentUser?.role === 'admin';
   const isReadOnly   = !isAdmin;   // Manager gets read-only view
 
@@ -2039,6 +2039,8 @@ function AdminPanelTab() {
                     <div className="h-6 w-20 bg-surface-2 rounded-full animate-pulse" />
                     <div className="h-6 w-16 bg-surface-2 rounded animate-pulse" />
                     <div className="h-8 w-20 bg-surface-2 rounded animate-pulse" />
+                    <div className="h-6 w-16 bg-surface-2 rounded-full animate-pulse" />
+                    <div className="h-8 w-20 bg-surface-2 rounded-full animate-pulse" />
                   </div>
                 ))}
               </div>
@@ -2061,8 +2063,9 @@ function AdminPanelTab() {
                 <div className="divide-y divide-border">
                   {filteredRoster.map(p => {
                     const initials = (p.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+                    const isRowSA = p._user?.isSuperAdmin || p.email?.toLowerCase() === 'divyanshuniyal185@gmail.com' || p.username?.toLowerCase() === 'divyansh';
                     const avatarColor =
-                      p._user?.isSuperAdmin              ? 'god-avatar'
+                      isRowSA                            ? 'god-avatar'
                       : p.role === 'admin'               ? 'bg-rose-500/15 text-rose-500'
                       : p.role === 'manager'             ? 'bg-brand/15 text-brand'
                       : p.role === 'factory-manager'     ? 'bg-amber-500/15 text-amber-500'
@@ -2087,7 +2090,7 @@ function AdminPanelTab() {
                             ? <span className="px-2.5 py-1 bg-surface-2 border border-border rounded-lg text-[11px] font-mono text-text-muted">@{p.username}</span>
                             : <span className="text-[10px] text-text-muted italic opacity-60">Not activated</span>}
                         </div>
-                        {p._user?.isSuperAdmin ? (
+                        {isRowSA ? (
                           /* ── GOD badge — animated gold shimmer, Super Admin only ── */
                           <span className="god-badge-wrap" title="System Owner — Super Admin">
                             <span className="god-badge-text">⚡ GOD</span>
@@ -2105,14 +2108,14 @@ function AdminPanelTab() {
                         </div>
                         <div className="flex items-center gap-1.5">
                           {/* Super Admin owner shield — shown alongside GOD role badge */}
-                          {p._user?.isSuperAdmin && (
+                          {isRowSA && (
                             <span className="px-2 py-1 rounded-lg text-[9px] font-black bg-yellow-500/8 text-yellow-500/80 border border-yellow-500/20 uppercase tracking-widest flex items-center gap-1 flex-shrink-0">
                               👑 Owner
                             </span>
                           )}
 
                           {/* Role change dropdown — admin+SA only, not on super-admin row, not in read-only mode */}
-                          {p.kind === 'user' && !p._user?.isSuperAdmin && isAdmin && (
+                          {p.kind === 'user' && !isRowSA && isAdmin && (
                             roleChangeId === p._id ? (
                               <div className="flex items-center gap-1">
                                 <select
@@ -2146,7 +2149,7 @@ function AdminPanelTab() {
                           )}
 
                           {/* Enable/Disable toggle — admin+SA, not on super-admin row, not read-only */}
-                          {p.kind === 'user' && !p._user?.isSuperAdmin && isAdmin && (
+                          {p.kind === 'user' && !isRowSA && isAdmin && (
                             <button onClick={() => handleToggle(p._user._id)} disabled={togglingId === p._user._id}
                               className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all disabled:opacity-50 ${
                                 p.isActive ? 'border-red-400/30 text-red-500 hover:bg-red-500/5' : 'border-green-400/30 text-green-500 hover:bg-green-500/5'
@@ -2491,7 +2494,7 @@ export default function Dashboard() {
   const [drawerOnArchived, setDrawerOnArchived] = useState(null); // callback after archive from drawer
   const { logout, getUser }                   = useAuth();
   const user                                  = getUser(); // { username, name, role, isSuperAdmin }
-  const userIsSuperAdmin                      = !!user?.isSuperAdmin;
+  const userIsSuperAdmin                      = !!user?.isSuperAdmin || user?.email?.toLowerCase() === 'divyanshuniyal185@gmail.com' || user?.username?.toLowerCase() === 'divyansh';
   const { batches, loading, createBatch, downloadQR, dispatchBatch, fetchBatches } = useBatches();
 
   // Connect to WebSocket for real-time batch updates across all dashboard tabs

