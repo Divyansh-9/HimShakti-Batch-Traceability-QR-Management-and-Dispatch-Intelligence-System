@@ -3,17 +3,25 @@
 # 🌿 HimShakti — Batch Traceability & Dispatch Intelligence System
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Status-Live%20%26%20Active-22c55e?style=for-the-badge&logo=checkmarx&logoColor=white" />
+  <img src="https://img.shields.io/badge/Status-Live%20%26%20Deployed-22c55e?style=for-the-badge&logo=checkmarx&logoColor=white" />
   <img src="https://img.shields.io/badge/React-18%20%2B%20Vite-61DAFB?style=for-the-badge&logo=react&logoColor=black" />
   <img src="https://img.shields.io/badge/Node.js-Express%205-339933?style=for-the-badge&logo=node.js&logoColor=white" />
   <img src="https://img.shields.io/badge/MongoDB-Atlas-47A248?style=for-the-badge&logo=mongodb&logoColor=white" />
   <img src="https://img.shields.io/badge/AI-Gemini%202.5%20Flash-FF6F00?style=for-the-badge&logo=google&logoColor=white" />
   <img src="https://img.shields.io/badge/Auth-JWT%20%2B%20RBAC-8B5CF6?style=for-the-badge&logo=jsonwebtokens&logoColor=white" />
+  <img src="https://img.shields.io/badge/Frontend-Firebase%20Hosting-FF6000?style=for-the-badge&logo=firebase&logoColor=white" />
+  <img src="https://img.shields.io/badge/Backend-Vercel%20Serverless-000000?style=for-the-badge&logo=vercel&logoColor=white" />
 </p>
 
 <p align="center">
   <strong>Farm-to-shelf batch traceability for HimShakti Food Processing, Uttarakhand</strong><br/>
   Wild berries · Natural Himalayan salts · Fruit preserves
+</p>
+
+<p align="center">
+  🌐 <strong>Live App:</strong> <a href="https://himshakti2026-bb904.web.app">himshakti2026-bb904.web.app</a>
+  &nbsp;·&nbsp;
+  🔌 <strong>API:</strong> <a href="https://him-shakti-batch-traceability-qr-ma.vercel.app">Vercel Backend</a>
 </p>
 
 <p align="center">
@@ -491,7 +499,7 @@ POST /api/batches  ─────► MongoDB insert
   status:           "URGENT",         // Enum: READY | WARNING | URGENT | DISPATCHED | EXPIRED
   priorityScore:    542,              // FEFO sort key — higher = dispatch sooner
   qrCodeDataUrl:    "data:image/png;base64,...",  // 300x300 PNG
-  qrAbsoluteUrl:    "http://localhost:5001/trace/HS-2026-06-001",
+  qrAbsoluteUrl:    "https://him-shakti-batch-traceability-qr-ma.vercel.app/trace/HS-2026-06-001",
   dispatchDate:     null,             // Set when dispatched
   buyerName:        null,             // Set when dispatched
   traceabilityNote: "Batch of Wild Berry Mix sourced from Ramesh Thakur...",
@@ -746,6 +754,12 @@ Output:
 
 ## 📋 Changelog
 
+### v2.2.0 — Production Deployment
+- 🚀 Frontend deployed to **Firebase Hosting**: [himshakti2026-bb904.web.app](https://himshakti2026-bb904.web.app)
+- 🚀 Backend deployed to **Vercel Serverless**: [him-shakti-batch-traceability-qr-ma.vercel.app](https://him-shakti-batch-traceability-qr-ma.vercel.app)
+- ⚙️ All production env vars configured (MongoDB, Gemini, JWT, Google OAuth, Gmail SMTP)
+- 📄 All documentation updated to reflect deployed system
+
 ### v1.5.0 — Admin Panel Intelligence Upgrade
 - 🆕 Role Distribution stacked bar with clickable legend
 - 🆕 Users Roster: search + Active/Inactive toggle + role filter tabs + row count footer
@@ -848,18 +862,18 @@ This was caused by a `u.name.split()` crash when any user in MongoDB had a null/
 
 | Document | Purpose | Status |
 |---|---|---|
-| [`README.md`](./README.md) | System overview, setup, API reference | ✅ v2.1.0 |
-| [`CHANGELOG.md`](./CHANGELOG.md) | Full version history | ✅ v2.1.0 |
+| [`README.md`](./README.md) | System overview, setup, API reference | ✅ v2.2.0 |
+| [`CHANGELOG.md`](./CHANGELOG.md) | Full version history | ✅ v2.2.0 |
 | [`docs/BATCH_MANAGEMENT.md`](./docs/BATCH_MANAGEMENT.md) | Batch management workflow, drawer UI, RBAC, soft delete, API | ✅ v2.0.0 |
-| [`docs/DATABASE.md`](./docs/DATABASE.md) | Full database design, schema reference & Atlas setup | ✅ Current |
-| [`docs/schema-diagram.png`](./docs/schema-diagram.png) | Visual ER diagram — all 4 collections & relationships | ✅ Current |
-| [`frontend/README.md`](./frontend/README.md) | Frontend architecture & component guide | ✅ Current |
-| [`intern-2/srs.md`](./intern-2/srs.md) | Software Requirements Specification | ✅ Phase 4 |
-| [`intern-2/planning_report.md`](./intern-2/planning_report.md) | Planning & design report | ✅ Phase 2 |
-| [`final_project_report.md`](./final_project_report.md) | Final project report & schema design | ✅ Phase 3 |
-| [`shared/README.md`](./shared/README.md) | Inter-intern DB schema contract | ✅ Active |
-| [`docs/W3_Wireframes.md`](./docs/W3_Wireframes.md) | UI wireframes | ✅ Phase 3 |
-| [`docs/PROMPTS.md`](./docs/PROMPTS.md) | AI prompt engineering log — 3 variations, inputs/outputs, dual-provider architecture | ✅ New |
+| [`docs/DATABASE.md`](./docs/DATABASE.md) | Full database design, schema reference & Atlas setup | ✅ v2.1.0 |
+| [`docs/schema-diagram.png`](./docs/schema-diagram.png) | Visual ER diagram — all collections & relationships | ✅ Current |
+| [`frontend/README.md`](./frontend/README.md) | Frontend architecture & component guide | ✅ v2.2.0 |
+| [`intern-2/srs.md`](./intern-2/srs.md) | Software Requirements Specification | ✅ v2.1.0 Final |
+| [`intern-2/planning_report.md`](./intern-2/planning_report.md) | Planning & design report (pre-implementation reference) | 📌 Phase 2 |
+| [`intern-2/implementation_plan_Initial.md`](./intern-2/implementation_plan_Initial.md) | Initial implementation plan (historical reference) | 📌 Phase 5 |
+| [`final_project_report.md`](./final_project_report.md) | Final project report — deployed system architecture & design | ✅ v2.1.0 |
+| [`docs/W3_Wireframes.md`](./docs/W3_Wireframes.md) | UI wireframes (design reference) | 📌 Phase 3 |
+| [`docs/PROMPTS.md`](./docs/PROMPTS.md) | AI prompt engineering log — variations, inputs/outputs, dual-provider | ✅ Current |
 
 ---
 
@@ -868,6 +882,8 @@ This was caused by a `u.name.split()` crash when any user in MongoDB had a null/
 **HimShakti Food Processing — Batch Traceability & Dispatch Intelligence**
 
 *Built with ❤️ for the Himalayan food ecosystem — By Divyansh · 2026*
+
+🌐 **Live**: [himshakti2026-bb904.web.app](https://himshakti2026-bb904.web.app)
 
 [![GitHub](https://img.shields.io/badge/GitHub-Repository-181717?style=flat-square&logo=github)](https://github.com/Divyansh-9/HimShakti-Batch-Traceability-QR-Management-and-Dispatch-Intelligence-System)
 

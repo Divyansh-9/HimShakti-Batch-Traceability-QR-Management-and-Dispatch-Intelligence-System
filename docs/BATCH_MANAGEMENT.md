@@ -1,8 +1,8 @@
 # Batch Management — Detail-Led Workflow
 
-> **Version:** 2.0.0 · **Added:** 2026-07-04 · **Author:** Intern 2
+> **Version:** 2.1.0 · **Updated:** 2026-08-02 · **Author:** Intern 2
 
-This document describes the Batch Management system introduced in v2.0.0 — a professional, audit-safe workflow built around a detail-led drawer pattern, soft-delete archiving, and React Query optimistic updates.
+This document describes the Batch Management system. The detail-led drawer workflow was introduced in v2.0.0 and extended with raw material correction in v2.1.0. The system is live at [himshakti2026-bb904.web.app](https://himshakti2026-bb904.web.app).
 
 ---
 
@@ -232,6 +232,34 @@ Updates the traceability note on a batch. Appends the old note to history.
 
 ---
 
+### `PATCH /api/batches/:id/raw-material`
+
+Corrects raw material sourcing fields on a batch. Appends a change summary to `noteHistory[]`.
+
+**Auth:** Required (Bearer token)  
+**Roles:** `admin`, `manager`, `factory-manager`  
+**Added:** v2.1.0
+
+**Request body:**
+```json
+{
+  "farmerName": "Corrected Farmer Name",
+  "village": "Corrected Village",
+  "sourceLotCode": "LOT-WB-2026-045-REVISED"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Raw material data updated",
+  "data": { /* updated batch */ }
+}
+```
+
+---
+
 ### `DELETE /api/batches/:id`
 
 Soft-deletes (archives) a batch. Record is preserved.
@@ -345,11 +373,12 @@ On settled: invalidates ['batches'] query → batch reappears
 | `frontend/src/components/BatchDetailDrawer.jsx` | The main drawer UI component |
 | `frontend/src/hooks/useBatches.js` | React Query hook with all mutations |
 | `frontend/src/pages/Dashboard.jsx` | Wires drawer state + passes props |
-| `backend/src/controllers/batches.controller.js` | `updateBatchNote`, `softDeleteBatch`, `restoreBatch` |
-| `backend/src/routes/batches.routes.js` | `PATCH /:id/note`, `DELETE /:id`, `PATCH /:id/restore` |
+| `backend/src/controllers/batches.controller.js` | `updateBatchNote`, `updateRawMaterial`, `softDeleteBatch`, `restoreBatch` |
+| `backend/src/routes/batches.routes.js` | `PATCH /:id/note`, `PATCH /:id/raw-material`, `DELETE /:id`, `PATCH /:id/restore` |
 | `backend/src/models/Batch.model.js` | Schema with `noteHistory` + soft-delete fields |
 | `docs/BATCH_MANAGEMENT.md` | This document |
 
 ---
 
-*Document maintained by Intern 2 — HimShakti Batch Traceability & Dispatch Intelligence System*
+*Document maintained by Intern 2 — HimShakti Batch Traceability & Dispatch Intelligence System*  
+*Schema v2.1.0 · Live: https://himshakti2026-bb904.web.app*

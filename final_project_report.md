@@ -1,106 +1,196 @@
-# Final Project Report & System Design: Batch Traceability, QR Management, and Dispatch Intelligence System
+# Final Project Report — HimShakti Batch Traceability, QR Management & Dispatch Intelligence System
 
-## 1. System Architecture and Design Overview
-The system utilizes a 3-tier MVC architecture tailored for deployment in cloud environments. It provides separation between:
-* **The Shared Persistence Layer (MongoDB Atlas)**: Used by both Intern 1 and Intern 2.
-* **The Application Layer (Node.js/Express API)**: Resolves business rules, enforces safety gates, and manages external integrations.
-* **The Presentation Layer (React client)**: Serving both the manager dashboard and public QR scan landing pages.
-
-```
-                  ┌─────────────────────────────┐
-                  │   B2B Buyer/Consumer Phone  │
-                  └──────────────┬──────────────┘
-                                 │
-                            [QR Scan Url]
-                                 │
-  ┌──────────────────────┐       ▼       ┌──────────────────────┐
-  │   Factory Manager    │  ┌─────────┐  │   Public Trace Page  │
-  │    (React Client)    │  │ QR Code │  │    (React Client)    │
-  └──────────┬───────────┘  └─────────┘  └──────────┬───────────┘
-             │                                      │
-        [API Requests]                         [API Requests]
-             │                                      │
-             ▼                                      ▼
-  ┌─────────────────────────────────────────────────────────────┐
-  │                 Node.js / Express REST API                  │
-  ├─────────────────────────────────────────────────────────────┤
-  │  [Auth Mid]  [QR Generator]  [Gemini Agent]  [Cache Mgr]   │
-  └──────────────────────────────┬──────────────────────────────┘
-                                 │
-                         [Mongoose Queries]
-                                 │
-                                 ▼
-  ┌─────────────────────────────────────────────────────────────┐
-  │                 MongoDB Atlas Database (Shared)              │
-  ├─────────────────────────────────────────────────────────────┤
-  │  collections: [products] , [batches] , [scanEvents]         │
-  └─────────────────────────────────────────────────────────────┘
-```
+> **Version**: 2.1.0 — Production  
+> **Date**: 2026-08-02  
+> **Author**: Divyansh Uniyal — Intern 2, TBI-GEU Summer Internship 2026  
+> **Status**: ✅ LIVE & DEPLOYED  
+> **Frontend**: https://himshakti2026-bb904.web.app  
+> **Backend API**: https://him-shakti-batch-traceability-qr-ma.vercel.app
 
 ---
 
-## 2. Refined MongoDB Schema Design (Mongoose Modeling)
+## 1. System Architecture and Design Overview
 
-### 2.1. `products` Collection (Shared Schema)
-Managed primarily by Intern 1 (ml-predictions), read by Intern 2 (traceability).
+The system is a full-stack MERN application using a 3-tier architecture deployed across cloud platforms:
+
+- **Frontend**: React 18 + Vite 5, hosted on Firebase Hosting
+- **Backend**: Node.js + Express 5, deployed on Vercel Serverless
+- **Database**: MongoDB Atlas (shared with Intern 1)
+
+```
+                  ┌─────────────────────────────────────────────┐
+                  │   B2B Buyer / Consumer (Phone Camera Scan)  │
+                  └───────────────────┬─────────────────────────┘
+                                      │
+                               [QR Scan URL]
+                                      │
+  ┌───────────────────────┐           ▼           ┌────────────────────────────┐
+  │   Factory Manager     │  ┌─────────────────┐  │   Public Trace Page        │
+  │   Dashboard           │  │   QR Code PNG   │  │  /trace/:batchCode         │
+  │   (React 18 + Vite)   │  └─────────────────┘  │   (Mobile Optimized)       │
+  └──────────┬────────────┘                        └────────────┬───────────────┘
+             │  REST + Socket.IO                                │  REST
+             ▼                                                  ▼
+  ┌────────────────────────────────────────────────────────────────────────────┐
+  │              Node.js / Express REST API (Vercel Serverless)                │
+  ├────────────────────────────────────────────────────────────────────────────┤
+  │  [JWT Auth + RBAC]  [Socket.IO]  [Gemini 2.5 Flash]  [Nodemailer SMTP]    │
+  │  [QR Generator]     [Rate Limiter]  [Helmet]          [CORS Allowlist]     │
+  └──────────────────────────────────┬─────────────────────────────────────────┘
+                                     │ Mongoose ODM
+                                     ▼
+  ┌────────────────────────────────────────────────────────────────────────────┐
+  │                       MongoDB Atlas (Shared DB)                            │
+  ├────────────────────────────────────────────────────────────────────────────┤
+  │  [users]  [accessRequests]  [batches]  [scanEvents]  [products (Intern 1)] │
+  └────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Deployment Architecture
+
+| Component | Platform | URL |
+|---|---|---|
+| Frontend | Firebase Hosting | https://himshakti2026-bb904.web.app |
+| Backend API | Vercel Serverless | https://him-shakti-batch-traceability-qr-ma.vercel.app |
+| Database | MongoDB Atlas M0 | `himshakti` database |
+| AI | Google Gemini 2.5 Flash | via `@google/generative-ai` SDK |
+| Email | Gmail SMTP (Nodemailer) | App Password auth |
+
+---
+
+## 2. MongoDB Schema Design (v2.1.0 — Final)
+
+### 2.1. `products` Collection (Shared — Read-Only for Intern 2)
+Managed by Intern 1. Intern 2 reads `predictedShelfLifeDays`, `baseShelfLifeDays`, and `riskLevel` at batch creation time.
 
 ```javascript
 const ProductSchema = new mongoose.Schema({
-  productName: { type: String, required: true, unique: true, trim: true },
-  sku: { type: String, required: true, unique: true, uppercase: true, trim: true },
-  category: { type: String, required: true, enum: ['snack', 'juice', 'pickle'] },
-  unitSize: { type: String, required: true, trim: true }, // e.g., "200g Pouch", "500ml Bottle"
-  baseShelfLifeDays: { type: Number, required: true, min: 1 },
-  predictedShelfLifeDays: { type: Number, default: null }, // Written by Intern 1
-  predictedExpiryTemplate: { type: String, default: "Best Before {days} Days from Packing" },
-  riskLevel: { type: String, default: null, enum: ['LOW', 'MEDIUM', 'HIGH', null] }, // From Intern 1 AI
-  isActive: { type: Boolean, default: true }
+  productName:              { type: String, required: true, unique: true },
+  sku:                      { type: String, required: true, unique: true },
+  category:                 { type: String, enum: ['snack', 'juice', 'pickle'] },
+  unitSize:                 { type: String },
+  baseShelfLifeDays:        { type: Number, required: true },
+  predictedShelfLifeDays:   { type: Number, default: null },
+  predictedExpiryTemplate:  { type: String },
+  riskLevel:                { type: String, enum: ['LOW', 'MEDIUM', 'HIGH', null] },
+  isActive:                 { type: Boolean, default: true }
 }, { timestamps: true });
 ```
-* **Why `sku` is added**: Standardizes product codes for retail integration (e.g., `HS-MIL-SNK-01`).
-* **Why `shelfLifeSource` is not in Products**: Shelf life source is batch-specific since one batch might use predicted and another fallback.
 
-### 2.2. `batches` Collection (Owned by Intern 2)
-Tracks physical batches produced at the HimShakti factory.
+### 2.2. `batches` Collection (Owned by Intern 2 — v2.1.0 Final Schema)
 
 ```javascript
 const BatchSchema = new mongoose.Schema({
-  batchCode: { type: String, required: true, unique: true, uppercase: true, trim: true }, // e.g., HS-2026-06-001
-  productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
-  productName: { type: String, required: true }, // Denormalized snapshot
-  sku: { type: String, required: true }, // Denormalized snapshot
-  sourceLotCode: { type: String, required: true, uppercase: true, trim: true }, // Supplier farm code
-  farmerName: { type: String, required: true, trim: true },
-  village: { type: String, required: true, trim: true },
-  packDate: { type: Date, required: true },
-  expiryDate: { type: Date, required: true },
-  dataSource: { type: String, required: true, enum: ['predicted', 'fallback'] },
-  shelfLifeSource: { type: String, required: true, enum: ['predicted', 'base', 'manual'] },
+  // ── Identity ──────────────────────────────────────────────────────
+  batchCode:       { type: String, required: true, unique: true },  // HS-YYYY-MM-NNN
+
+  // ── Product Reference (Denormalized Snapshot) ─────────────────────
+  productId:       { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
+  productName:     { type: String, required: true },  // Immutable after creation
+  sku:             { type: String, required: true },   // Immutable after creation
+
+  // ── Raw Material Traceability ─────────────────────────────────────
+  sourceLotCode:   { type: String, required: true },
+  farmerName:      { type: String, required: true },
+  village:         { type: String, required: true },
+
+  // ── Production Metrics ────────────────────────────────────────────
   quantityProduced: { type: Number, required: true, min: 1 },
-  unit: { type: String, required: true, enum: ['Kg', 'Units', 'Liters'] },
-  yieldPercent: { type: Number, required: true, min: 0, max: 100 },
-  status: { type: String, required: true, enum: ['READY', 'WARNING', 'URGENT', 'DISPATCHED', 'EXPIRED'], default: 'READY' },
-  priorityScore: { type: Number, default: 0 },
-  qrCodeDataUrl: { type: String, required: true }, // Base64 data URL of the generated QR
-  qrAbsoluteUrl: { type: String, required: true }, // Absolute target URL encoded in QR
-  dispatchDate: { type: Date, default: null },
-  buyerName: { type: String, default: null, trim: true },
-  traceabilityNote: { type: String, default: "" },
-  createdBy: { type: String, required: true } // Email or name of Manager who logged it
+  unit:             { type: String, enum: ['Kg', 'Units', 'Liters'] },
+  yieldPercent:     { type: Number, min: 0, max: 100 },
+
+  // ── Shelf Life & Dates ────────────────────────────────────────────
+  packDate:        { type: Date, required: true },
+  expiryDate:      { type: Date, required: true },   // Computed by expiryCalculator.js
+  dataSource:      { type: String, enum: ['predicted', 'fallback'] },
+  shelfLifeSource: { type: String, enum: ['predicted', 'base', 'manual'] },
+
+  // ── FEFO Status ───────────────────────────────────────────────────
+  status:          { type: String, enum: ['READY','WARNING','URGENT','DISPATCHED','EXPIRED'] },
+  priorityScore:   { type: Number, default: 0 },
+
+  // ── QR Code ──────────────────────────────────────────────────────
+  qrCodeDataUrl:   { type: String },  // base64 PNG (300×300)
+  qrAbsoluteUrl:   { type: String },  // Public trace URL
+
+  // ── Dispatch ─────────────────────────────────────────────────────
+  dispatchDate:    { type: Date, default: null },
+  buyerName:       { type: String, default: null },
+
+  // ── Audit Trail ──────────────────────────────────────────────────
+  traceabilityNote: { type: String, default: '' },
+  noteHistory: [{                     // Append-only — never truncated
+    note:     { type: String },
+    editedBy: { type: String },
+    editedAt: { type: Date, default: Date.now }
+  }],
+  createdBy: { type: String },
+
+  // ── Soft Delete (v2.0.0) ─────────────────────────────────────────
+  isDeleted:  { type: Boolean, default: false },  // Soft archive flag
+  deletedAt:  { type: Date, default: null },
+  deletedBy:  { type: String, default: null },
+  deleteNote: { type: String, default: null },
+
+}, { timestamps: true });
+
+// Indexes
+BatchSchema.index({ status: 1, expiryDate: 1 });              // FEFO queries
+BatchSchema.index({ isDeleted: 1, status: 1, expiryDate: 1 }); // Archive queries
+BatchSchema.index({ sku: 1 });
+BatchSchema.index({ productId: 1 });
+```
+
+**Key design decisions:**
+- `productName` and `sku` are **denormalized snapshots** — the name at time of production is preserved even if the product catalog changes later (FDA/FSSAI audit trail requirement).
+- `noteHistory[]` is append-only — every traceability note edit is permanently audited.
+- `isDeleted` enables **soft delete** — batches are never hard-deleted. All QR scan history, note history, and metadata are preserved for regulatory compliance.
+
+### 2.3. `users` Collection
+
+```javascript
+const UserSchema = new mongoose.Schema({
+  username:       { type: String, required: true, unique: true, lowercase: true },
+  passwordHash:   { type: String },                 // bcrypt 10 rounds
+  name:           { type: String },
+  email:          { type: String },
+  googleEmail:    { type: String, sparse: true },   // SPARSE UNIQUE — Google SSO
+  googleLinkedAt: { type: Date },
+  role: {
+    type: String,
+    enum: ['admin', 'manager', 'factory-manager', 'quality-inspector', 'dispatch-coordinator']
+  },
+  isActive:       { type: Boolean, default: true }
 }, { timestamps: true });
 ```
 
-### 2.3. `scanEvents` Collection (Owned by Intern 2)
-Logs read-only analytical logs when public QR URLs are accessed.
+### 2.4. `scanEvents` Collection (Append-Only)
 
 ```javascript
 const ScanEventSchema = new mongoose.Schema({
-  batchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Batch', required: true },
-  scannedAt: { type: Date, default: Date.now, required: true },
-  source: { type: String, required: true, enum: ['factory', 'buyer', 'QA'], default: 'buyer' },
-  deviceType: { type: String, required: true, enum: ['Mobile', 'Tablet', 'Desktop', 'Unknown'] },
-  ipHash: { type: String, required: true } // MD5/SHA256 hash of IP to prevent tracking personal data
-});
+  batchId:    { type: mongoose.Schema.Types.ObjectId, ref: 'Batch', required: true },
+  batchCode:  { type: String },           // Denormalized for fast reads
+  scannedAt:  { type: Date, default: Date.now },
+  source:     { type: String, enum: ['factory', 'buyer', 'QA'] },
+  deviceType: { type: String, enum: ['Mobile', 'Tablet', 'Desktop', 'Unknown'] },
+  ipHash:     { type: String }            // SHA-256 hash — never plain text
+}, { timestamps: true });
+```
+
+### 2.5. `accessRequests` Collection
+
+```javascript
+const AccessRequestSchema = new mongoose.Schema({
+  name:         { type: String },
+  email:        { type: String, unique: true },
+  role:         { type: String, enum: ['factory-manager', 'quality-inspector', 'dispatch-coordinator', 'admin'] },
+  status:       { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
+  note:         { type: String },          // Rejection reason
+  inviteToken:  { type: String },          // SHA-256 hashed raw token
+  inviteExpiry: { type: Date },            // 72 hours from approval
+  inviteUsed:   { type: Boolean, default: false },
+  approvedBy:   { type: String }           // username of approving admin
+}, { timestamps: true });
 ```
 
 ---
@@ -108,151 +198,336 @@ const ScanEventSchema = new mongoose.Schema({
 ## 3. Database Optimizations: Indexes & Denormalization
 
 ### 3.1. Indexing Strategy
-To ensure dashboard scaling, we define the following indexes:
-1. **`batches.batchCode` (Unique Index)**: Fast index lookup for single batch fetches and validations.
-2. **`batches.productId` (Standard Index)**: Accelerates aggregations (e.g., retrieving all batches for a specific product type).
-3. **`batches.expiryDate` + `batches.status` (Compound Index)**: Used by the FEFO algorithm. The query filters for active statuses (`READY`, `WARNING`, `URGENT`) and sorts ascending by `expiryDate`.
-4. **`scanEvents.batchId` (Standard Index)**: Speeds up calculation of scan counts for dashboard analytics.
+
+| Index | Collection | Purpose |
+|---|---|---|
+| `batchCode` (Unique) | `batches` | Fast single batch lookup, deduplication |
+| `status + expiryDate` (Compound) | `batches` | FEFO queue query — filter by status, sort by expiry |
+| `isDeleted + status + expiryDate` (Compound) | `batches` | Archive view queries |
+| `sku` | `batches` | Product-type filtering |
+| `productId` | `batches` | All batches for a given product |
+| `batchId` | `scanEvents` | All scans for a batch |
+| `batchId + scannedAt` (Compound) | `scanEvents` | Paginated scan history |
+| `username` (Unique) | `users` | Login lookup |
+| `googleEmail` (Sparse Unique) | `users` | Google SSO lookup |
+| `email` (Unique) | `accessRequests` | Duplicate submission prevention |
 
 ### 3.2. Denormalization Strategy
-* **What is denormalized?**: `productName` and `sku` are copied from the `products` collection directly into the `batches` collection at the moment of creation.
-* **Trade-off Analysis**:
-  * *Pros*: Avoids expensive `$lookup` (JOIN) operations in MongoDB when listing 100+ batches. Dashboard lists load instantly with a single query.
-  * *Cons*: If a product name is modified in `products`, the historical batch records will still show the old name.
-  * *Justification*: In food safety auditing, historical batch records must represent the exact labeling printed on the package at the time of manufacturing. If a product's marketing name changes, the historical batch must not automatically update, as it would cause audit discrepancy.
+
+`productName` and `sku` are copied from `products` into each `batches` document at creation time. This:
+- Eliminates expensive `$lookup` (JOIN) operations when listing 100+ batches
+- Guarantees historical accuracy — if a product name changes 6 months later, the batch label remains as-printed
+- Matches real food safety audit requirements (FDA 21 CFR Part 11, FSSAI traceability mandates)
 
 ---
 
-## 4. API Endpoints Design
+## 4. API Endpoints — Final (v2.1.0)
 
 ### 4.1. Authentication
-* `POST /api/v1/auth/login` (Light validation returning a JWT).
+| Method | Endpoint | Auth | Description |
+|---|---|:---:|---|
+| `POST` | `/auth/login` | — | Login with username + password → JWT |
+| `POST` | `/auth/google/token` | — | Google OAuth token exchange → JWT |
+| `POST` | `/auth/request-access` | — | Submit onboarding access request |
+| `GET` | `/auth/users` | Admin | List all users |
+| `PATCH` | `/auth/users/:id/toggle` | Admin | Enable/disable user |
+| `GET` | `/auth/requests` | Admin | List access requests |
+| `POST` | `/auth/requests/:id/approve` | Admin | Approve + generate invite link + send email |
+| `POST` | `/auth/requests/:id/reject` | Admin | Reject with optional note |
 
-### 4.2. Product Catalog (Read-Only access for Intern 2)
-* `GET /api/v1/products` (Populates selection dropdowns).
+### 4.2. Products (Read-Only)
+| Method | Endpoint | Auth | Description |
+|---|---|:---:|---|
+| `GET` | `/api/products` | — | List all products |
+| `GET` | `/api/products/:id` | — | Single product detail |
 
-### 4.3. Batch Management (Factory Manager Portal)
-* `GET /api/v1/batches` (Paginated list: `?page=1&limit=20&status=READY&search=HS-2026`).
-* `POST /api/v1/batches` (Creates batch, computes dates, generates QR, returns batch object).
-* `GET /api/v1/batches/:id` (Fetches detail record).
-* `PATCH /api/v1/batches/:id/dispatch` (Transition to `DISPATCHED`).
-  * Request Body: `{ buyerName: "Himalayan Co-op Dehradun", dispatchDate: "2026-06-11" }`.
+### 4.3. Batch Management
+| Method | Endpoint | Auth | Description |
+|---|---|:---:|---|
+| `POST` | `/api/batches` | ✅ | Create batch (auto QR + expiry) |
+| `GET` | `/api/batches` | — | List active batches (paginated) |
+| `GET` | `/api/batches/archived` | ✅ Admin | List archived batches |
+| `GET` | `/api/batches/:id` | — | Single batch with live daysToExpiry |
+| `GET` | `/api/batches/:id/qr` | — | QR PNG only (lightweight endpoint) |
+| `PATCH` | `/api/batches/:id/note` | ✅ | Update traceability note (appends to history) |
+| `PATCH` | `/api/batches/:id/raw-material` | ✅ | Correct raw material data |
+| `PATCH` | `/api/batches/:id/dispatch` | ✅ | Record dispatch |
+| `DELETE` | `/api/batches/:id` | ✅ Admin | Soft-delete (archive) |
+| `PATCH` | `/api/batches/:id/restore` | ✅ Admin | Restore archived batch |
 
-### 4.4. Public Traceability (No Auth)
-* `GET /api/v1/public/batch/:id` (Returns batch information + logs a record to `scanEvents` asynchronously).
+### 4.4. FEFO & QR
+| Method | Endpoint | Auth | Description |
+|---|---|:---:|---|
+| `GET` | `/api/dispatch/fefo` | — | FEFO priority queue |
+| `GET` | `/api/qr/:batchCode/image` | — | QR PNG by batch code |
+| `GET` | `/trace/:batchCode` | — | Public consumer trace page |
 
-### 4.5. AI Dispatch Intelligence
-* `POST /api/v1/ai/audit` (Triggers Gemini analysis, updates the AI cache).
-* `GET /api/v1/ai/summary` (Reads current cached advisory reports).
+### 4.5. AI
+| Method | Endpoint | Auth | Description |
+|---|---|:---:|---|
+| `POST` | `/api/ai/dispatch-audit` | ✅ | Gemini 2.5 Flash advisory (4hr cache) |
+
+### 4.6. Utilities
+| Method | Endpoint | Auth | Description |
+|---|---|:---:|---|
+| `GET` | `/health` | — | Server health check |
 
 ---
 
-## 5. UI/UX Flow & Screen List
+## 5. RBAC — Role-Based Access Control
 
-The frontend React application is organized into two separate router boundaries:
+| Action | admin | manager | factory-manager | quality-inspector | dispatch-coordinator |
+|---|:---:|:---:|:---:|:---:|:---:|
+| View all tabs | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Create batch | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Edit traceability note | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Dispatch batch | ✅ | ✅ | ❌ | ❌ | ✅ |
+| Archive batch | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Restore batch | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Admin Panel | ✅ | ❌ | ❌ | ❌ | ❌ |
+| AI Audit | ✅ | ✅ | ❌ | ❌ | ❌ |
 
-### 5.1. Manager Portal (Authenticated)
-1. **Dashboard Overview Screen**:
-   * Metrics panel (Total Active, Urgent, Dispatched, Expired).
-   * **Advisory Briefing Panel**: Displays the cached Gemini AI analysis, showing urgent dispatches and quality flags.
-   * "Run AI Audit" button with progress loader.
-   * Batch table with searching, filtering, and pagination.
-2. **Add New Batch Screen**:
-   * Interactive wizard form.
-   * Displays warning indicators if a product is selected that relies on the "base shelf life fallback" or has a missing risk profile.
-3. **Scan Analytics Screen**:
-   * Graph of scans over time.
-   * Top-scanned batches list to track market interest.
-
-### 5.2. Public Traceability Page (No Auth)
-* A high-end, clean consumer web page.
-* Features a dynamic timeline showing: **Harvest & Source** (Farmer, Village) → **Packaged at HimShakti** (Pack Date) → **Safe Consumption Window** (Expiry Date) → **Current Status**.
-* Includes a "Himalayan Promise" trust badge explaining the preservative-free processing of the product.
+RBAC is enforced at **both layers**:
+- **Backend**: `requireRole(...roles)` middleware on every protected route — returns `403` on violation
+- **Frontend**: Buttons and tabs conditionally rendered based on `user.role` from JWT payload
 
 ---
 
-## 6. Batch Lifecycle, FEFO Logic, and Expiry calculations
+## 6. Batch Lifecycle & FEFO Logic
 
-### 6.1. Expiry Calculation Flow
-During batch creation, the backend API enforces this logical block:
+### 6.1. Expiry Calculation Flow (expiryCalculator.js)
+
 ```
-                    [Create Batch Requested]
-                               │
-                [Query Product from Database]
-                               │
-            ┌──────────────────┴──────────────────┐
-     (ML Data Exists?)                    (ML Data Missing?)
-            │                                     │
-┌───────────▼───────────┐             ┌───────────▼───────────┐
-│ expiry = packDate +   │             │ baseDays Exists?      │
-│ predictedDays         │             └───────────┬───────────┘
-│ dataSource=predicted  │                         │
-│ shelfLifeSource=pred  │             ┌───────────┴───────────┐
-└───────────────────────┘             │                       │
-                                   [YES]                    [NO]
-                                      │                       │
-                          ┌───────────▼───────────┐   ┌───────▼──────┐
-                          │ expiry = packDate +   │   │ Return 400   │
-                          │ baseDays              │   │ Error:       │
-                          │ dataSource=fallback   │   │ Validation   │
-                          │ shelfLifeSource=base  │   │ Blocked      │
-                          └───────────────────────┘   └──────────────┘
+             [Create Batch Requested]
+                        │
+            [Query Product from Database]
+                        │
+        ┌───────────────┴───────────────┐
+ (predictedShelfLifeDays?)          (Missing?)
+        │                               │
+ expiryDate = packDate               (baseShelfLifeDays?)
+ + predictedShelfLifeDays                 │
+ dataSource = "predicted"        ┌───────┴────────┐
+                               [YES]             [NO]
+                                 │               │
+                    expiryDate = packDate    Return 400
+                    + baseShelfLifeDays      (Creation Blocked)
+                    dataSource = "fallback"
 ```
 
-### 6.2. Status Lifecycle States
-The system computes batch statuses based on the current date, using the following rules:
-* **READY**: `currentDate < expiryDate` AND remaining days > 15 AND `status !== 'DISPATCHED'`.
-* **WARNING**: Remaining days between 8 and 15 days.
-* **URGENT**: Remaining days between 1 and 7 days.
-* **EXPIRED**: `currentDate >= expiryDate` AND `status !== 'DISPATCHED'`.
-* **DISPATCHED**: Manually marked by the Factory Manager. Once a batch is dispatched, its status is permanently frozen as `DISPATCHED` to preserve historical logs.
+### 6.2. Status Tiers
 
-### 6.3. FEFO & Priority Logic
-The backend determines the `priorityScore` using a normalized score (0 to 100):
-$$\text{Days Remaining} = \frac{\text{ExpiryDate} - \text{CurrentDate}}{86400000}$$
-If a batch is `EXPIRED` or `DISPATCHED`, its priority is set to 0. Otherwise, the formula is:
-$$\text{Priority Score} = 100 - \min\left(100, \text{Days Remaining} \times 2\right) + \text{Risk Penalty}$$
-*Where Risk Penalty = 20 if Product Risk is `HIGH`, 10 if `MEDIUM`, and 0 if `LOW`.*
-This score ensures high-risk, near-expiry products surface at the top of the dashboard.
+| Status | Days to Expiry | FEFO Priority Range | Dashboard Treatment |
+|---|---|---|---|
+| `URGENT` | ≤ 7 days | 500–570 | 🔴 Red row tint, top of queue |
+| `WARNING` | 8–30 days | 200–310 | 🟡 Amber, mid-queue |
+| `READY` | > 30 days | 0–70 | 🟢 Green, bottom of queue |
+| `DISPATCHED` | — | 0 (frozen) | ✅ Removed from FEFO queue |
+| `EXPIRED` | < 0 days | 1000 | 🚨 Emergency |
+
+### 6.3. FEFO Priority Score Algorithm
+
+```javascript
+// backend/src/services/expiryCalculator.js
+function computePriorityScore(daysToExpiry) {
+  if (daysToExpiry <= 0)  return 1000;              // EXPIRED — maximum urgency
+  if (daysToExpiry <= 7)  return 500 + (7 - daysToExpiry) * 10;  // URGENT
+  if (daysToExpiry <= 30) return 200 + (30 - daysToExpiry) * 5;  // WARNING
+  return Math.max(0, 100 - daysToExpiry);           // READY
+}
+```
+
+Higher `priorityScore` → dispatched first. Score computed once at batch creation; FEFO queue sorts descending by this value.
 
 ---
 
-## 7. Barcode / QR Code Generation Flow
-1. **Database Save**: When the batch is saved, MongoDB assigns it a unique ObjectId (e.g. `60d5ec40f19e`).
-2. **Absolute Link Formulation**: The backend reads `process.env.PUBLIC_BASE_URL` (e.g., `https://trace.himshakti.com`) and constructs the URL: `https://trace.himshakti.com/trace/60d5ec40f19e`.
-3. **Image Generation**: The backend passes the URL to `qrcode.toDataURL()` to generate a base64 encoded PNG image block.
-4. **Storage**: The base64 block is stored in `qrCodeDataUrl` in the batch document, allowing the React app to display the image inline without making additional file requests.
+## 7. QR Code Generation Flow
+
+1. **Batch creation**: MongoDB assigns ObjectId; `batchCodeGenerator.js` creates sequential `HS-YYYY-MM-NNN` code.
+2. **URL formulation**: `process.env.PUBLIC_BASE_URL + "/trace/" + batchCode` → e.g. `https://him-shakti-batch-traceability-qr-ma.vercel.app/trace/HS-2026-06-001`
+3. **QR generation**: `qrcode.toDataURL(url, { width: 300, color: { dark: '#1a4731' } })` → base64 PNG
+4. **Storage**: `qrCodeDataUrl` (full base64 PNG) + `qrAbsoluteUrl` (URL string) stored in batch document
+5. **Consumer scan**: Phone camera reads QR → opens `TracePage.jsx` → batch info displayed + `scanEvent` logged asynchronously
+
+**Lightweight QR endpoint** (`GET /api/batches/:id/qr`): Returns only the base64 PNG, not the full batch document — used by QR Centre tab for lazy-loaded card images to prevent base64 bottleneck on list views.
 
 ---
 
-## 8. AI Dispatch Intelligence and Caching
+## 8. AI Dispatch Intelligence
 
-### 8.1. AI Prompt Payload Design
-When the Factory Manager clicks "Run AI Audit", the backend compiles active batches into a structured JSON payload:
+### 8.1. Prompt Design (Gemini 2.5 Flash)
+
+At audit trigger, the backend compiles all active non-dispatched batches into a structured JSON payload:
+
 ```json
 {
-  "auditDate": "2026-06-11",
+  "auditDate": "2026-08-02",
+  "totalActiveBatches": 12,
   "activeBatches": [
     {
       "batchCode": "HS-2026-06-001",
-      "productName": "Traditional Mango Pickle",
-      "daysToExpiry": 5,
-      "riskLevel": "HIGH",
-      "yieldPercent": 68.5
+      "productName": "Wild Berry Mix",
+      "daysToExpiry": 3,
+      "status": "URGENT",
+      "yieldPercent": 82.5,
+      "priorityScore": 540
     }
   ]
 }
 ```
-The prompt strictly enforces a JSON output structure:
+
+System instruction enforces structured output with sections: `dispatchQueue`, `criticalAlerts`, `summaryAdvisory`, `qualityFlags`.
+
+### 8.2. Dual-Provider Architecture (Gemini + NVIDIA Fallback)
+
 ```
-You are an AI Supply Chain advisor for HimShakti. Analyze the input JSON active batches and return a JSON object containing:
-1. "dispatchQueue": An array of batchCodes ordered by dispatch urgency.
-2. "criticalAlerts": An array of warnings for batches with < 10 days remaining or yield < 70%.
-3. "summaryAdvisory": A human-readable text recommendation for the weekly schedule.
-Respond ONLY with this JSON block.
+Request → [Gemini 2.5 Flash]
+               │ (if 429/error)
+               ▼
+         [NVIDIA NIM Fallback]
+         (meta/llama-3.1-8b-instruct)
+               │
+               ▼
+         [4hr In-Memory Cache]
 ```
 
-### 8.2. Caching Strategy
-To remain within Gemini API free-tier limitations:
-* **The Cache Collection**: We introduce a collection `ai_audits` containing the fields `lastAuditDate`, `reportData` (the JSON response), and `triggeredBy`.
-* **Execution Boundary**: When the manager visits the dashboard, the system reads the last cached document. The dashboard only allows a manual refresh if the last cache update was more than **4 hours** ago, preventing rapid clicks from overloading the API.
+- **Primary**: Google Gemini 2.5 Flash (`@google/generative-ai` SDK)
+- **Fallback**: NVIDIA NIM API (`meta/llama-3.1-8b-instruct`)
+- **Cache**: In-memory, 4-hour TTL keyed by batch fingerprint hash
+- **Frontend**: Response rendered as structured glass cards — no raw markdown displayed
+
+### 8.3. Caching Strategy
+
+The 4-hour in-memory cache (`geminiService.js`) prevents:
+- Free-tier quota exhaustion on repeated page visits
+- Latency spikes from repeated LLM calls during a shift
+- Redundant processing when batch state hasn't materially changed
+
+Admin can force a cache refresh via the "Refresh Audit" button.
+
+---
+
+## 9. Security Architecture
+
+| Layer | Mechanism | Detail |
+|---|---|---|
+| Authentication | JWT HS256 | 30-day expiry; signed with `JWT_SECRET` |
+| Authorization | RBAC middleware | `requireRole()` on every protected route |
+| Google SSO | OAuth 2.0 | Token validated against Google `/userinfo` |
+| Route protection | `ProtectedRoute` (React) | Redirects to `/login` if no JWT |
+| Rate limiting | `express-rate-limit` | 100 req/15min (API), 5 req/15min (AI) |
+| CORS | Strict allowlist | Only `FRONTEND_URL` origin accepted |
+| Security headers | Helmet | CSP, HSTS, X-Frame-Options, X-Content-Type |
+| Password storage | bcrypt 10 rounds | Never stored or logged plain |
+| IP addresses | SHA-256 hash | GDPR-compliant — no PII stored |
+| Invite tokens | SHA-256 hash | Raw token only in email link; 72hr expiry |
+
+---
+
+## 10. Frontend Application Structure
+
+### Pages
+| Page | Route | Purpose |
+|---|---|---|
+| `Home.jsx` | `/` | Parallax hero, animated stats, feature grid |
+| `About.jsx` | `/about` | Full-bleed hero, scroll-reveal mission sections |
+| `Login.jsx` | `/login` | Glassmorphic dual-flow: sign in + Google OAuth + request access |
+| `Dashboard.jsx` | `/dashboard` | 6-tab operations dashboard |
+| `TracePage.jsx` | `/trace/:batchCode` | Public consumer QR scan landing page |
+
+### Key Components
+| Component | Purpose |
+|---|---|
+| `Navbar.jsx` | Scroll-aware: transparent on hero → solid after 70px |
+| `BatchDetailDrawer.jsx` | 3-tab slide-in panel: Overview · Notes · History |
+| `CreateBatchModal.jsx` | Batch creation form modal with validation |
+| `DispatchModal.jsx` | Dispatch confirmation modal |
+| `ErrorBoundary.jsx` | React error boundary for AI Audit tab |
+
+### Custom Hooks
+| Hook | Purpose |
+|---|---|
+| `useAuth.js` | JWT context — login, Google Sign-In, logout, persistence |
+| `useBatches.js` | Batch CRUD with optimistic updates and rollback |
+| `useDispatch.js` | Dispatch mutation flow |
+| `useAIAudit.js` | Gemini audit trigger and structured response state |
+| `useSocket.js` | Socket.IO live event connection |
+
+### Design System
+| Token | Value | Purpose |
+|---|---|---|
+| `--brand` | `#ea580c` | Buttons, active states, links |
+| `--surface` | `#1e2433` | Card backgrounds |
+| `--surface-2` | `#252b3b` | Input fields, table headers |
+| `--bg` | `#141824` | Page background |
+| `--text-primary` | `#f1f5f9` | Headings, body |
+| `--text-muted` | `#64748b` | Labels, secondary |
+| `--border` | `rgba(255,255,255,0.08)` | Card/table borders |
+
+---
+
+## 11. Deployment Guide
+
+### Local Development
+```bash
+# Backend
+cd backend
+npm install
+cp .env.example .env   # Fill in your values
+npm run dev            # http://localhost:5001
+
+# Frontend
+cd frontend
+npm install
+npm run dev            # http://localhost:5173
+```
+
+### Production Deployment
+
+**Backend → Vercel:**
+```bash
+cd backend
+# Ensure vercel.json is configured
+vercel --prod
+# Set all env vars in Vercel Dashboard → Project Settings → Environment Variables
+```
+
+**Frontend → Firebase Hosting:**
+```bash
+cd frontend
+npm run build           # Builds to frontend/dist/
+cd ..                   # Return to project root
+firebase deploy --only hosting
+```
+
+**Required Production Environment Variables:**
+
+| Variable | Location | Purpose |
+|---|---|---|
+| `MONGODB_URI` | Vercel Dashboard | Atlas connection string |
+| `JWT_SECRET` | Vercel Dashboard | Token signing key |
+| `GEMINI_API_KEY` | Vercel Dashboard | Gemini 2.5 Flash |
+| `PUBLIC_BASE_URL` | Vercel Dashboard | Embedded in QR codes |
+| `FRONTEND_URL` | Vercel Dashboard | CORS allowlist |
+| `GOOGLE_CLIENT_ID` | Vercel Dashboard | OAuth credential |
+| `EMAIL_USER`, `EMAIL_PASS` | Vercel Dashboard | Gmail SMTP |
+| `VITE_API_BASE_URL` | `frontend/.env.production` | Backend API URL |
+| `VITE_GOOGLE_CLIENT_ID` | `frontend/.env.production` | OAuth client |
+
+---
+
+## 12. Known Limitations & Future Enhancements
+
+| Limitation | Impact | Suggested Future Fix |
+|---|---|---|
+| AI cache is in-memory | Resets on server cold start | Use Redis or MongoDB cache collection |
+| No email verification for access requests | Malformed emails accepted | Add email verification step |
+| QR codes embed backend URL | If backend URL changes, old QRs break | Use short-URL redirect service |
+| Gemini free-tier rate limits | AI audit may fail under heavy load | Implement request queue + retry |
+| Single MongoDB Atlas cluster | No read replica | Upgrade to paid tier for read scaling |
+
+---
+
+*HimShakti Food Processing — Batch Traceability & Dispatch Intelligence*  
+*Built by Divyansh Uniyal · TBI-GEU Summer Internship 2026*  
+*Production: https://himshakti2026-bb904.web.app*

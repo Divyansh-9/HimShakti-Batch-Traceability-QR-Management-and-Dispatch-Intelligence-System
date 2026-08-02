@@ -1,5 +1,11 @@
 # Planning Report: Batch Traceability, QR Management, and Dispatch Intelligence System
 
+> **Document Status**: 📌 Historical Pre-Implementation Reference  
+> This document was produced during the **Planning Phase (Week 2)** before development began. It reflects the intended architecture and scope. For the final deployed system, refer to [`final_project_report.md`](../final_project_report.md) and [`intern-2/srs.md`](./srs.md).  
+> **Current production URL**: https://himshakti2026-bb904.web.app
+
+---
+
 ## 1. Project Overview
 The **Batch Traceability, QR Management, and Dispatch Intelligence System** (Intern 2 System) is an enterprise-grade web application designed for **HimShakti Food Processing** in Uttarakhand, India. The system addresses a critical operational gap in the processing post-packaging phase: the absence of structured, digital batch records linked to raw material sources (farmers and villages) and dispatch workflows.
 

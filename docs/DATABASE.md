@@ -6,7 +6,8 @@
   <img src="https://img.shields.io/badge/Database-MongoDB%20Atlas-47A248?style=for-the-badge&logo=mongodb&logoColor=white" />
   <img src="https://img.shields.io/badge/ODM-Mongoose%207-880000?style=for-the-badge&logo=mongoose&logoColor=white" />
   <img src="https://img.shields.io/badge/Cluster-M0%20Free%20Tier-47A248?style=for-the-badge&logo=mongodb&logoColor=white" />
-  <img src="https://img.shields.io/badge/Collections-4-blue?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/Collections-5-blue?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/Schema-v2.1.0-22c55e?style=for-the-badge" />
 </p>
 
 *Batch Traceability · QR Management · Dispatch Intelligence*
@@ -185,8 +186,8 @@ The **core collection**. Each document represents one production batch from farm
   expiryDate: Date,     // Computed by expiryCalculator.js
 
   dataSource: Enum ['predicted', 'fallback'],
-  // 'predicted' = Gemini AI prediction used
-  // 'fallback'  = product's default shelf life used (Gemini unavailable)
+  // 'predicted' = Intern 1's AI shelf life prediction used
+  // 'fallback'  = product's base shelf life used (prediction unavailable)
 
   shelfLifeSource: Enum ['predicted', 'base', 'manual'],
   // 'predicted' = AI model predicted
@@ -205,21 +206,34 @@ The **core collection**. Each document represents one production batch from farm
   // Higher = dispatch sooner. See FEFO Priority Algorithm section.
 
   // ── QR Code ──────────────────────────────────────────────
-  qrCodeDataUrl: String,   // base64 PNG Data URL (300x300) — embedded in card
-  qrAbsoluteUrl: String,   // Public trace URL e.g. "http://localhost:5001/trace/HS-2026-06-001"
+  qrCodeDataUrl: String,   // base64 PNG Data URL (300×300)
+  qrAbsoluteUrl: String,   // Public trace URL — embedded in every QR
 
   // ── Dispatch ─────────────────────────────────────────────
   dispatchDate: Date   | null,   // Set when status -> DISPATCHED
   buyerName:    String | null,   // e.g. "Organic Valley Distributors"
 
   // ── Audit Trail ──────────────────────────────────────────
-  traceabilityNote: String,   // Auto-generated summary
-  createdBy:        String,   // username of the creating user
+  traceabilityNote: String,   // Current narrative note
+  noteHistory: [{             // Append-only — NEVER truncated (v2.0.0)
+    note:     String,         // The old note text
+    editedBy: String,         // Username of the editor
+    editedAt: Date,           // Timestamp of edit
+  }],
+  createdBy: String,          // Username of the creating user
 
-  createdAt: Date,   // Auto
-  updatedAt: Date    // Auto
+  // ── Soft Delete (v2.0.0) — Audit-Safe Archiving ──────────
+  isDeleted:  Boolean,  // default: false — soft archive flag
+  deletedAt:  Date,     // null until archived
+  deletedBy:  String,   // username of archiving admin
+  deleteNote: String,   // optional archiving reason
+
+  createdAt: Date,   // Auto (Mongoose timestamps)
+  updatedAt: Date    // Auto (Mongoose timestamps)
 }
 ```
+
+> **Soft Delete Design**: Batches are **never hard-deleted**. Setting `isDeleted: true` hides a batch from all active views while preserving its complete QR scan history, note history, dispatch record, and audit metadata. This satisfies food safety regulatory requirements for immutable audit trails. Admin can restore any archived batch at any time.
 
 **Indexes:**
 | Index | Fields | Purpose |
@@ -227,6 +241,7 @@ The **core collection**. Each document represents one production batch from farm
 | Primary | `_id` | Default |
 | Unique | `batchCode: 1` | Prevent duplicate batch codes |
 | Compound | `status: 1, expiryDate: 1` | FEFO queue queries (filter by status, sort by expiry) |
+| Compound | `isDeleted: 1, status: 1, expiryDate: 1` | Archive view queries |
 | Single | `sku: 1` | Filter by product type |
 | Single | `productId: 1` | Look up all batches for a product |
 
@@ -348,6 +363,7 @@ Without this index, MongoDB would do a collection scan on every dashboard load.
 | `users` | `googleEmail` | Sparse Unique | Very low |
 | `batches` | `batchCode` | Unique B-tree | High (1 per doc) |
 | `batches` | `status + expiryDate` | Compound B-tree | Medium |
+| `batches` | `isDeleted + status + expiryDate` | Compound B-tree | Medium |
 | `batches` | `sku` | B-tree | Low cardinality |
 | `batches` | `productId` | B-tree | Low cardinality |
 | `scanEvents` | `batchId` | B-tree | Low per batch |
@@ -552,6 +568,8 @@ Each batch includes real QR codes, diverse Uttarakhand farmers and villages, com
 
 **HimShakti Food Processing — Database Design Reference**
 
-*MongoDB Atlas · Mongoose 7 · 4 Collections · Intern 2 · 2026*
+*MongoDB Atlas · Mongoose 7 · 5 Collections · Schema v2.1.0 · Intern 2 · 2026*
+
+*Production Database: `himshakti` on MongoDB Atlas*
 
 </div>

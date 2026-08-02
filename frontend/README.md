@@ -6,7 +6,12 @@
   <img src="https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react&logoColor=black" />
   <img src="https://img.shields.io/badge/Vite-5-646CFF?style=for-the-badge&logo=vite&logoColor=white" />
   <img src="https://img.shields.io/badge/Tailwind-v4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white" />
+  <img src="https://img.shields.io/badge/Firebase-Hosting-FF6000?style=for-the-badge&logo=firebase&logoColor=white" />
   <img src="https://img.shields.io/badge/Socket.IO-Client-010101?style=for-the-badge&logo=socket.io&logoColor=white" />
+</p>
+
+<p align="center">
+  <strong>Live:</strong> <a href="https://himshakti2026-bb904.web.app">himshakti2026-bb904.web.app</a>
 </p>
 
 </div>
@@ -22,6 +27,18 @@ npm run dev
 
 Opens at **http://localhost:5173** — requires the backend running at port 5001.
 
+### Production Build & Deploy
+
+```bash
+# Build production bundle
+npm run build
+
+# Deploy to Firebase Hosting (from project root)
+firebase deploy --only hosting
+```
+
+**Live URL**: https://himshakti2026-bb904.web.app
+
 ---
 
 ## Project Structure
@@ -31,19 +48,20 @@ src/
 ├── pages/                     # Route-level page components
 │   ├── Home.jsx               # Parallax hero, animated stats, feature grid
 │   ├── About.jsx              # Full-bleed hero, scroll-reveal mission sections
-│   ├── Login.jsx              # Glassmorphic dual-flow: sign in + request access
+│   ├── Login.jsx              # Glassmorphic dual-flow: sign in + Google OAuth + request access
 │   ├── Dashboard.jsx          # All 6 tabs, sidebar, modals — the main app
 │   └── TracePage.jsx          # Public consumer QR scan landing page
 │
 ├── components/                # Reusable UI components
 │   ├── Navbar.jsx             # Scroll-aware: transparent on hero, solid after 70px
+│   ├── BatchDetailDrawer.jsx  # 3-tab slide-in detail panel (Overview · Notes · History)
 │   ├── CreateBatchModal.jsx   # Form modal for batch creation
 │   ├── DispatchModal.jsx      # Dispatch confirmation modal
 │   └── ErrorBoundary.jsx      # React error boundary for AI Audit tab
 │
 ├── hooks/                     # Custom React hooks
-│   ├── useAuth.js             # JWT context — login, logout, getUser(), persistence
-│   ├── useBatches.js          # Batch CRUD, QR download
+│   ├── useAuth.js             # JWT context — login, Google Sign-In, logout, persistence
+│   ├── useBatches.js          # Batch CRUD, QR download, optimistic updates + rollback
 │   ├── useDispatch.js         # Dispatch flow hook
 │   ├── useAIAudit.js          # Gemini audit trigger and response state
 │   └── useSocket.js           # Socket.IO live updates connection
@@ -68,6 +86,16 @@ src/
 | `QRTab` | `batches`, `loading`, `onDownloadQR` | QR card grid with lazy-loaded images |
 | `AIAuditTab` | `batchCount` | Gemini advisory with structured card rendering |
 | `AdminPanelTab` | _(fetches own data)_ | User management + access request workflow |
+
+### BatchDetailDrawer
+
+A slide-in panel component opened on batch row click. It contains **three tabs**:
+
+| Tab | Content |
+|---|---|
+| **Overview** | Expiry urgency bar · Quick actions (Copy Link, Download QR, Dispatch) · Batch identity cards · Raw material source · QR preview · Scan analytics |
+| **Notes** | Editable traceability note (role-gated) · Edit history timeline · Admin Danger Zone (archive/restore) |
+| **History** | Lifecycle event log (creation, note edits, dispatch, archive) · Recent QR scan events |
 
 ### Cross-Tab Navigation
 
@@ -157,19 +185,26 @@ No external state library is used. State is managed at the closest relevant scop
 
 ## Environment
 
-The frontend expects the backend at `http://localhost:5001` by default.
+### Local Development
 
-To change the API base URL, update `src/api/client.js`:
-
-```js
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+Create `frontend/.env`:
+```
+VITE_API_BASE_URL=http://localhost:5001
+VITE_GOOGLE_CLIENT_ID=your-google-client-id
 ```
 
-Create a `.env` file in the `frontend/` directory:
+### Production
+
+Create `frontend/.env.production` (already configured):
 ```
-VITE_API_URL=http://localhost:5001
+VITE_API_BASE_URL=https://him-shakti-batch-traceability-qr-ma.vercel.app
+VITE_GOOGLE_CLIENT_ID=1030258260963-ps82fu0733pe64pbbnj38hhjm5olpqrf.apps.googleusercontent.com
 ```
+
+> `VITE_API_BASE_URL` is used by `src/api/client.js` as the backend base URL.
+> `VITE_GOOGLE_CLIENT_ID` is used by the Google Sign-In button in `Login.jsx`.
 
 ---
 
-*HimShakti Food Processing — Frontend Dashboard · React 18 + Vite · 2026*
+*HimShakti Food Processing — Frontend Dashboard · React 18 + Vite · Firebase Hosting · 2026*
+*Live: https://himshakti2026-bb904.web.app*

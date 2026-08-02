@@ -6,6 +6,47 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2.2.0] — 2026-08-02
+
+### 🚀 Production Deployment — System Live
+
+This release marks the **final production deployment** of the HimShakti Batch Traceability & Dispatch Intelligence System. The application is now fully live and accessible at the permanent production URLs below.
+
+#### Deployed
+
+**Frontend — Firebase Hosting**
+- Live URL: **https://himshakti2026-bb904.web.app**
+- Platform: Firebase Hosting (`himshakti2026-bb904` project)
+- Build: `npm run build` → `frontend/dist/` → `firebase deploy`
+- SPA routing: All paths rewrite to `/index.html` via `firebase.json`
+
+**Backend API — Vercel Serverless**
+- Live API: **https://him-shakti-batch-traceability-qr-ma.vercel.app**
+- Platform: Vercel (Node.js Serverless Functions)
+- Entry: `backend/index.js` → `server.js`
+- All environment variables configured in Vercel dashboard
+
+**Production Environment**
+- `VITE_API_BASE_URL` → points to Vercel backend
+- `PUBLIC_BASE_URL` → Vercel backend URL (embedded in every QR code)
+- `FRONTEND_URL` → Firebase URL (CORS allowlist)
+- `GOOGLE_CLIENT_ID` → OAuth 2.0 credential configured
+- Gmail SMTP configured for branded invite emails
+
+#### Changed
+- `frontend/.env.production` — all production URLs configured
+- `vercel.json` — Node.js routing for serverless deployment
+- `firebase.json` — SPA rewrites configured
+
+#### Documentation
+- `intern-2/srs.md` — Updated to v2.1.0 reflecting complete deployed system
+- `final_project_report.md` — Updated with actual deployed architecture and URLs
+- `docs/DATABASE.md` — Updated batches schema with v2.0.0 soft-delete fields
+- `frontend/README.md` — Updated with deployment, BatchDetailDrawer, Google OAuth
+- `CHANGELOG.md` — This entry
+
+---
+
 ## [2.1.0] — 2026-07-05
 
 ### Bug Fixes & Reliability Hardening
