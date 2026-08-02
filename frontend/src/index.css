@@ -481,3 +481,87 @@ nav[class*="fixed bottom-0"] {
     font-size: 16px !important;
   }
 }
+
+/* ── GOD Badge — gold shimmer animation for Super Admin ─────── */
+@keyframes goldShimmer {
+  0%   { background-position: 200% center; }
+  100% { background-position: -200% center; }
+}
+
+/* Wrapper that holds the border glow while inner text has clipped gradient */
+.god-badge-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(234, 179, 8, 0.45);
+  background: rgba(234, 179, 8, 0.07);
+  box-shadow: 0 0 10px rgba(234, 179, 8, 0.18), inset 0 0 8px rgba(234, 179, 8, 0.06);
+  overflow: hidden;
+  cursor: default;
+}
+
+/* Subtle light sweep overlay */
+.god-badge-wrap::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, 0.18) 50%, transparent 60%);
+  background-size: 200% 100%;
+  animation: godSweep 2.8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes godSweep {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* The text itself — clipped gold gradient */
+.god-badge-text {
+  background: linear-gradient(90deg, #bf8f00 0%, #ffd700 28%, #fffacd 50%, #ffd700 72%, #bf8f00 100%);
+  background-size: 200% auto;
+  animation: goldShimmer 2.4s linear infinite;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  line-height: 1.6;
+}
+
+/* ── GOD Avatar — gold gradient circle for Super Admin ─────── */
+.god-avatar {
+  background: linear-gradient(135deg, #b8860b 0%, #ffd700 40%, #fffacd 65%, #ffd700 80%, #b8860b 100%);
+  background-size: 200% 200%;
+  animation: goldShimmer 2.8s linear infinite;
+  box-shadow: 0 0 0 2px rgba(234,179,8,0.3), 0 2px 8px rgba(184,134,11,0.4);
+  position: relative;
+  overflow: hidden;
+}
+
+.god-avatar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, transparent 30%, rgba(255,255,255,0.35) 50%, transparent 70%);
+  background-size: 200% 100%;
+  animation: godSweep 2.8s ease-in-out infinite;
+}
+
+/* Text inside god-avatar — dark gold so it contrasts on bright gold bg */
+.god-avatar-text {
+  position: relative;
+  z-index: 1;
+  color: #4a3200;
+  text-shadow: 0 1px 0 rgba(255,255,255,0.4);
+}
+
+/* Make god-badge-wrap auto-size to its text (fixes full-column stretch) */
+.god-badge-wrap {
+  width: fit-content !important;
+  align-self: center;
+}

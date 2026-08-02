@@ -1,8 +1,18 @@
 // src/hooks/useAuth.js
-// Parses role + name from the login response body (never from re-decoding the token).
-// The backend now returns { token, user: { username, name, role } } on login.
+// Parses role + isSuperAdmin from the login response body.
+// The backend returns { token, user: { username, name, role, isSuperAdmin } } on login.
 import { useState } from 'react';
 import client from '../api/client';
+
+// ── Role tier constants (mirrors backend getTier) ──────────────────
+export const ROLE_TIER = {
+  'factory-manager':      3,
+  'quality-inspector':    3,
+  'dispatch-coordinator': 3,
+  'manager':              2,
+  'admin':                1,
+  // super-admin is tier 0 — identified by isSuperAdmin flag
+};
 
 export function useAuth() {
   const [loading, setLoading] = useState(false);
@@ -21,6 +31,39 @@ export function useAuth() {
     }
   }
 
+  /** Returns true if the current user is the immutable Super Admin. */
+  function isSuperAdmin() {
+    return !!getUser()?.isSuperAdmin;
+  }
+
+  /** Returns true if the current user is admin OR super-admin. */
+  function isAdmin() {
+    const u = getUser();
+    return !!u?.isSuperAdmin || u?.role === 'admin';
+  }
+
+  /** Returns true if current user is manager, admin, or super-admin. */
+  function isManagerOrAbove() {
+    const u = getUser();
+    if (!u) return false;
+    return !!u.isSuperAdmin || u.role === 'admin' || u.role === 'manager';
+  }
+
+  /**
+   * canManage(targetUser) — true if the current user has a higher tier
+   * than the target user and is therefore allowed to act on them.
+   * Super Admin (tier 0) can manage everyone except themselves.
+   */
+  function canManage(targetUser) {
+    const me = getUser();
+    if (!me) return false;
+    if (me.username === targetUser?.username) return false;  // never self
+    if (me.isSuperAdmin) return !targetUser?.isSuperAdmin;   // SA manages all except SA
+    const myTier     = ROLE_TIER[me.role]   ?? 99;
+    const theirTier  = targetUser?.isSuperAdmin ? 0 : (ROLE_TIER[targetUser?.role] ?? 99);
+    return myTier < theirTier;   // lower number = higher privilege
+  }
+
   function isAuthenticated() {
     return !!getToken();
   }
@@ -35,6 +78,7 @@ export function useAuth() {
         skipAuthRedirect: true,
       });
       localStorage.setItem('hs_token', data.token);
+      // Store full user object including isSuperAdmin
       localStorage.setItem('hs_user',  JSON.stringify(data.user));
       return true;
     } catch (err) {
@@ -69,5 +113,10 @@ export function useAuth() {
     window.location.href = '/login';
   }
 
-  return { login, logout, requestAccess, isAuthenticated, getToken, getUser, loading, error };
+  return {
+    login, logout, requestAccess,
+    isAuthenticated, getToken, getUser,
+    isSuperAdmin, isAdmin, isManagerOrAbove, canManage,
+    loading, error,
+  };
 }

@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react';
+import { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import CreateBatchModal from '../components/CreateBatchModal';
@@ -1347,6 +1347,7 @@ function AIAuditTab({ batchCount }) {
 // ── Admin Panel Tab (Users + Access Requests) ──────────────────
 
 const ROLE_STYLE = {
+  'super-admin':            'bg-amber-500/10 text-amber-400 border-amber-500/30',
   'admin':                  'bg-rose-500/10 text-rose-400 border-rose-500/20',
   'manager':                'bg-brand/10 text-brand border-brand/20',
   'factory-manager':        'bg-amber-500/10 text-amber-400 border-amber-500/20',
@@ -1354,7 +1355,8 @@ const ROLE_STYLE = {
   'dispatch-coordinator':   'bg-blue-500/10 text-blue-400 border-blue-500/20',
 };
 const ROLE_LABEL = {
-  'admin':                  'Administrator',
+  'super-admin':            'Super Admin',
+  'admin':                  'Admin',
   'manager':                'Manager',
   'factory-manager':        'Factory Mgr',
   'quality-inspector':      'QA Inspector',
@@ -1382,20 +1384,44 @@ function StatCard({ icon: Icon, label, value, sub, color }) {
 }
 
 function AdminPanelTab() {
-  const [users,       setUsers]       = useState([]);
-  const [requests,    setRequests]    = useState([]);
-  const [stats,       setStats]       = useState(null);
-  const [loadingU,    setLoadingU]    = useState(true);
-  const [loadingR,    setLoadingR]    = useState(true);
-  const [rejectId,    setRejectId]    = useState(null);
-  const [rejectNote,  setRejectNote]  = useState('');
-  const [inviteLink,  setInviteLink]  = useState(null);
-  const [actionLoad,  setActionLoad]  = useState(null);
-  const [resending,   setResending]   = useState(false);
-  const [togglingId,  setTogglingId]  = useState(null);
-  const [showRawLink, setShowRawLink] = useState(false);
-  const [removeId,    setRemoveId]    = useState(null);    // which request card shows confirm
-  const [removeLoad,  setRemoveLoad]  = useState(null);    // loading state for delete
+  const { getUser } = useAuth();
+  const currentUser = getUser();
+  const isSuperAdmin = !!currentUser?.isSuperAdmin;
+  const isAdmin      = isSuperAdmin || currentUser?.role === 'admin';
+  const isReadOnly   = !isAdmin;   // Manager gets read-only view
+
+  const [users,        setUsers]        = useState([]);
+  const [requests,     setRequests]     = useState([]);
+  const [stats,        setStats]        = useState(null);
+  const [loadingU,     setLoadingU]     = useState(true);
+  const [loadingR,     setLoadingR]     = useState(true);
+  const [rejectId,     setRejectId]     = useState(null);
+  const [rejectNote,   setRejectNote]   = useState('');
+  const [inviteLink,   setInviteLink]   = useState(null);
+  const [actionLoad,   setActionLoad]   = useState(null);
+  const [resending,    setResending]    = useState(false);
+  const [togglingId,   setTogglingId]   = useState(null);
+  const [showRawLink,  setShowRawLink]  = useState(false);
+  const [removeId,     setRemoveId]     = useState(null);
+  const [removeLoad,   setRemoveLoad]   = useState(null);
+
+  // Role change state
+  const [roleChangeId,   setRoleChangeId]   = useState(null);   // user._id being changed
+  const [roleChangeVal,  setRoleChangeVal]  = useState('');
+  const [roleChanging,   setRoleChanging]   = useState(null);
+
+  // Delete state
+  const [deleteId,       setDeleteId]       = useState(null);   // user._id being deleted
+  const [deleteNote,     setDeleteNote]     = useState('');
+  const [deleteConfirm,  setDeleteConfirm]  = useState('');     // typed username for hard-delete
+  const [deleting,       setDeleting]       = useState(null);
+
+  // Recycle Bin (super-admin only)
+  const [deletedUsers,   setDeletedUsers]   = useState([]);
+  const [loadingDeleted, setLoadingDeleted] = useState(false);
+  const [restoring,      setRestoring]      = useState(null);
+  const [hardDeleting,   setHardDeleting]   = useState(null);
+  const [hardConfirm,    setHardConfirm]    = useState('');
 
   // Converts raw SMTP errors into clean, actionable messages
   function emailErrorToFriendly(raw = '') {
@@ -1441,7 +1467,19 @@ function AdminPanelTab() {
     finally { setLoadingR(false); }
   }, []);
 
+  // ── fetchDeletedUsers MUST be declared before the useEffect that lists it in deps ──
+  const fetchDeletedUsers = useCallback(async () => {
+    if (!isSuperAdmin) return;
+    setLoadingDeleted(true);
+    try {
+      const data = await client('/auth/users/deleted');
+      setDeletedUsers(data.data || []);
+    } catch { toast.error('Failed to load recycle bin'); }
+    finally { setLoadingDeleted(false); }
+  }, [isSuperAdmin]);
+
   useEffect(() => { fetchUsers(); fetchRequests(); }, [fetchUsers, fetchRequests]);
+  useEffect(() => { if (isSuperAdmin) fetchDeletedUsers(); }, [fetchDeletedUsers, isSuperAdmin]);
 
   async function handleApprove(id, name) {
     setActionLoad(id);
@@ -1512,6 +1550,60 @@ function AdminPanelTab() {
       fetchUsers();
     } catch (err) { toast.error(err.message); }
     finally { setTogglingId(null); }
+  }
+
+  async function handleChangeRole(userId, newRole) {
+    setRoleChanging(userId);
+    try {
+      const data = await client(`/auth/users/${userId}/role`, {
+        method: 'PATCH',
+        body:   JSON.stringify({ role: newRole }),
+      });
+      toast.success(data.message);
+      setRoleChangeId(null);
+      fetchUsers();
+    } catch (err) { toast.error(err.message); }
+    finally { setRoleChanging(null); }
+  }
+
+  async function handleDeleteUser(userId, username) {
+    setDeleting(userId);
+    try {
+      const body = isSuperAdmin
+        ? JSON.stringify({ confirm: deleteConfirm })
+        : JSON.stringify({ deleteNote });
+      const data = await client(`/auth/users/${userId}`, { method: 'DELETE', body });
+      toast.success(data.message);
+      setDeleteId(null); setDeleteNote(''); setDeleteConfirm('');
+      fetchUsers();
+      if (isSuperAdmin) fetchDeletedUsers();
+    } catch (err) { toast.error(err.message); }
+    finally { setDeleting(null); }
+  }
+
+
+  async function handleRestore(userId) {
+    setRestoring(userId);
+    try {
+      const data = await client(`/auth/users/${userId}/restore`, { method: 'PATCH' });
+      toast.success(data.message);
+      fetchDeletedUsers(); fetchUsers();
+    } catch (err) { toast.error(err.message); }
+    finally { setRestoring(null); }
+  }
+
+  async function handleHardDelete(userId, username) {
+    setHardDeleting(userId);
+    try {
+      const data = await client(`/auth/users/${userId}`, {
+        method: 'DELETE',
+        body:   JSON.stringify({ confirm: hardConfirm }),
+      });
+      toast.success(data.message);
+      setHardConfirm('');
+      fetchDeletedUsers();
+    } catch (err) { toast.error(err.message); }
+    finally { setHardDeleting(null); }
   }
 
   const pending  = requests.filter(r => r.status === 'pending');
@@ -1819,12 +1911,13 @@ function AdminPanelTab() {
 
       {/* ── Section Navigation ── */}
       <div className="flex items-center justify-between">
-        <div className="flex gap-0 bg-surface-2 border border-border p-1 rounded-xl w-fit">
+        <div className="flex gap-0 bg-surface-2 border border-border p-1 rounded-xl w-fit overflow-x-auto">
           {[
             { id: 'users',    label: 'Users Roster',    icon: Users,       count: users.length + peopleFromRequests.filter(p => p.reqStatus === 'approved').length },
             { id: 'requests', label: 'Access Requests', icon: ShieldCheck, count: pending.length, pulse: pending.length > 0 },
+            ...(isSuperAdmin ? [{ id: 'deleted', label: '🗑️ Recycle Bin', icon: Archive, count: deletedUsers.length }] : []),
           ].map(v => (
-            <button key={v.id} onClick={() => setActiveView(v.id)}
+            <button key={v.id} onClick={() => { setActiveView(v.id); if (v.id === 'deleted') fetchDeletedUsers(); }}
               className={`relative flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
                 activeView === v.id ? 'bg-surface shadow text-text-primary' : 'text-text-muted hover:text-text-primary'
               }`}>
@@ -1837,7 +1930,7 @@ function AdminPanelTab() {
             </button>
           ))}
         </div>
-        <button onClick={() => { fetchUsers(); fetchRequests(); }}
+        <button onClick={() => { fetchUsers(); fetchRequests(); if (isSuperAdmin) fetchDeletedUsers(); }}
           className="p-2 text-text-muted hover:text-brand rounded-lg transition-colors" title="Refresh">
           <RefreshCw className="w-4 h-4" />
         </button>
@@ -1969,12 +2062,13 @@ function AdminPanelTab() {
                   {filteredRoster.map(p => {
                     const initials = (p.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
                     const avatarColor =
-                      p.role === 'admin'                 ? 'bg-rose-500/15 text-rose-500'
-                      : p.role === 'manager'              ? 'bg-brand/15 text-brand'
-                      : p.role === 'factory-manager'      ? 'bg-amber-500/15 text-amber-500'
-                      : p.role === 'quality-inspector'    ? 'bg-teal-500/15 text-teal-500'
-                      : p.role === 'dispatch-coordinator' ? 'bg-blue-500/15 text-blue-500'
-                      :                                    'bg-surface-2 text-text-muted';
+                      p._user?.isSuperAdmin              ? 'god-avatar'
+                      : p.role === 'admin'               ? 'bg-rose-500/15 text-rose-500'
+                      : p.role === 'manager'             ? 'bg-brand/15 text-brand'
+                      : p.role === 'factory-manager'     ? 'bg-amber-500/15 text-amber-500'
+                      : p.role === 'quality-inspector'   ? 'bg-teal-500/15 text-teal-500'
+                      : p.role === 'dispatch-coordinator'? 'bg-blue-500/15 text-blue-500'
+                      :                                   'bg-surface-2 text-text-muted';
                     const joinDate = p.createdAt
                       ? new Date(p.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })
                       : '--';
@@ -1993,9 +2087,16 @@ function AdminPanelTab() {
                             ? <span className="px-2.5 py-1 bg-surface-2 border border-border rounded-lg text-[11px] font-mono text-text-muted">@{p.username}</span>
                             : <span className="text-[10px] text-text-muted italic opacity-60">Not activated</span>}
                         </div>
-                        <span className={`w-fit px-2.5 py-1 rounded-lg text-[10px] font-bold border ${ROLE_STYLE[p.role] || 'bg-surface-2 text-text-muted border-border'}`}>
-                          {ROLE_LABEL[p.role] || p.role || '--'}
-                        </span>
+                        {p._user?.isSuperAdmin ? (
+                          /* ── GOD badge — animated gold shimmer, Super Admin only ── */
+                          <span className="god-badge-wrap" title="System Owner — Super Admin">
+                            <span className="god-badge-text">⚡ GOD</span>
+                          </span>
+                        ) : (
+                          <span className={`w-fit px-2.5 py-1 rounded-lg text-[10px] font-bold border ${ROLE_STYLE[p.role] || 'bg-surface-2 text-text-muted border-border'}`}>
+                            {ROLE_LABEL[p.role] || p.role || '--'}
+                          </span>
+                        )}
                         <p className="text-xs text-text-muted hidden md:block">{joinDate}</p>
                         <div>
                           {p.kind === 'user' && p.isActive    && <p className="text-xs font-semibold text-green-500 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />Active</p>}
@@ -2003,13 +2104,108 @@ function AdminPanelTab() {
                           {p.kind === 'invite'                 && <p className="text-xs font-semibold text-blue-500 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block" />Invite Sent</p>}
                         </div>
                         <div className="flex items-center gap-1.5">
-                          {p.kind === 'user' && (
+                          {/* Super Admin owner shield — shown alongside GOD role badge */}
+                          {p._user?.isSuperAdmin && (
+                            <span className="px-2 py-1 rounded-lg text-[9px] font-black bg-yellow-500/8 text-yellow-500/80 border border-yellow-500/20 uppercase tracking-widest flex items-center gap-1 flex-shrink-0">
+                              👑 Owner
+                            </span>
+                          )}
+
+                          {/* Role change dropdown — admin+SA only, not on super-admin row, not in read-only mode */}
+                          {p.kind === 'user' && !p._user?.isSuperAdmin && isAdmin && (
+                            roleChangeId === p._id ? (
+                              <div className="flex items-center gap-1">
+                                <select
+                                  value={roleChangeVal}
+                                  onChange={e => setRoleChangeVal(e.target.value)}
+                                  className="text-xs bg-surface-2 border border-border rounded-lg px-2 py-1 text-text-primary focus:outline-none focus:ring-1 focus:ring-brand"
+                                >
+                                  {['factory-manager','quality-inspector','dispatch-coordinator','manager']
+                                    .concat(isSuperAdmin ? ['admin'] : [])
+                                    .map(r => <option key={r} value={r}>{ROLE_LABEL[r] || r}</option>)
+                                  }
+                                </select>
+                                <button
+                                  onClick={() => handleChangeRole(p._id, roleChangeVal)}
+                                  disabled={roleChanging === p._id || !roleChangeVal || roleChangeVal === p.role}
+                                  className="px-2 py-1.5 bg-brand text-white text-xs font-bold rounded-lg disabled:opacity-50"
+                                >
+                                  {roleChanging === p._id ? '…' : 'Save'}
+                                </button>
+                                <button onClick={() => setRoleChangeId(null)} className="p-1.5 border border-border text-text-muted text-xs rounded-lg">✕</button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => { setRoleChangeId(p._id); setRoleChangeVal(p.role); }}
+                                className="px-2.5 py-1.5 border border-border text-text-muted hover:text-brand hover:border-brand/30 text-xs font-semibold rounded-lg flex items-center gap-1 transition-all"
+                                title="Change role"
+                              >
+                                <Pencil className="w-3 h-3" /> Role
+                              </button>
+                            )
+                          )}
+
+                          {/* Enable/Disable toggle — admin+SA, not on super-admin row, not read-only */}
+                          {p.kind === 'user' && !p._user?.isSuperAdmin && isAdmin && (
                             <button onClick={() => handleToggle(p._user._id)} disabled={togglingId === p._user._id}
                               className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all disabled:opacity-50 ${
                                 p.isActive ? 'border-red-400/30 text-red-500 hover:bg-red-500/5' : 'border-green-400/30 text-green-500 hover:bg-green-500/5'
                               }`}>
                               {togglingId === p._user._id ? '...' : p.isActive ? 'Disable' : 'Enable'}
                             </button>
+                          )}
+
+                          {/* Delete button — admin+SA, not on super-admin row, not read-only */}
+                          {p.kind === 'user' && !p._user?.isSuperAdmin && isAdmin && (
+                            deleteId === p._id ? (
+                              <div className="flex flex-col gap-1 p-2 bg-surface-2 border border-red-500/20 rounded-lg">
+                                {isSuperAdmin ? (
+                                  <>
+                                    <p className="text-[10px] text-red-400 font-semibold">Type username to confirm permanent delete:</p>
+                                    <input
+                                      value={deleteConfirm}
+                                      onChange={e => setDeleteConfirm(e.target.value)}
+                                      placeholder={p._user.username}
+                                      className="text-xs bg-surface border border-border rounded px-2 py-1 text-text-primary w-32 focus:outline-none focus:ring-1 focus:ring-red-500"
+                                    />
+                                    <div className="flex gap-1">
+                                      <button
+                                        onClick={() => handleDeleteUser(p._id, p._user.username)}
+                                        disabled={deleteConfirm !== p._user.username || deleting === p._id}
+                                        className="flex-1 py-1 bg-red-500 text-white text-xs font-bold rounded-lg disabled:opacity-40"
+                                      >{deleting === p._id ? '…' : '⚠️ Hard Delete'}</button>
+                                      <button onClick={() => { setDeleteId(null); setDeleteConfirm(''); }} className="px-2 py-1 border border-border text-text-muted text-xs rounded-lg">Cancel</button>
+                                    </div>
+                                  </>
+                                ) : (
+                                  <>
+                                    <p className="text-[10px] text-amber-400 font-semibold">Move to Recycle Bin?</p>
+                                    <input
+                                      value={deleteNote}
+                                      onChange={e => setDeleteNote(e.target.value)}
+                                      placeholder="Reason (optional)"
+                                      className="text-xs bg-surface border border-border rounded px-2 py-1 text-text-primary w-40 focus:outline-none"
+                                    />
+                                    <div className="flex gap-1">
+                                      <button
+                                        onClick={() => handleDeleteUser(p._id, p._user.username)}
+                                        disabled={deleting === p._id}
+                                        className="flex-1 py-1 bg-amber-500 text-white text-xs font-bold rounded-lg disabled:opacity-50"
+                                      >{deleting === p._id ? '…' : 'Confirm'}</button>
+                                      <button onClick={() => { setDeleteId(null); setDeleteNote(''); }} className="px-2 py-1 border border-border text-text-muted text-xs rounded-lg">Cancel</button>
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => setDeleteId(p._id)}
+                                className="p-1.5 border border-red-400/20 text-red-400 hover:bg-red-500/5 rounded-lg transition-all"
+                                title={isSuperAdmin ? 'Permanently delete user' : 'Move to Recycle Bin'}
+                              >
+                                <Archive className="w-3 h-3" />
+                              </button>
+                            )
                           )}
                           {p.kind === 'invite' && (
                             removeId === p._id ? (
@@ -2054,6 +2250,79 @@ function AdminPanelTab() {
           </div>
         );
       })()}
+
+      {/* ══ VIEW: Recycle Bin (Super Admin Only) ══ */}
+      {activeView === 'deleted' && isSuperAdmin && (
+        <div className="bg-surface border border-border rounded-2xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-border flex items-center justify-between bg-red-500/5">
+            <div>
+              <h3 className="text-sm font-bold text-red-400 flex items-center gap-2">🗑️ Recycle Bin — Soft-Deleted Users</h3>
+              <p className="text-xs text-text-muted mt-0.5">Users deleted by Admins. You can restore or permanently remove.</p>
+            </div>
+            <button onClick={fetchDeletedUsers} className="p-2 text-text-muted hover:text-brand rounded-lg transition-colors"><RefreshCw className="w-4 h-4" /></button>
+          </div>
+          {loadingDeleted ? (
+            <div className="p-8 text-center"><div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin mx-auto" /></div>
+          ) : deletedUsers.length === 0 ? (
+            <div className="text-center py-14">
+              <p className="text-text-muted text-sm">Recycle Bin is empty.</p>
+              <p className="text-xs text-text-muted mt-1 opacity-60">Users soft-deleted by Admins will appear here.</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-border">
+              {deletedUsers.map(u => (
+                <div key={u._id} className="flex flex-col sm:flex-row sm:items-center gap-3 px-5 py-4 hover:bg-surface-2/40 transition-colors">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center text-[11px] font-black text-red-400 flex-shrink-0">
+                        {(u.name || '?').slice(0, 2).toUpperCase()}
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-text-primary">{u.name}</p>
+                        <p className="text-xs text-text-muted">{u.email} · <span className="font-mono">@{u.username}</span></p>
+                      </div>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-2 ml-10">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${ROLE_STYLE[u.role] || 'bg-surface-2 text-text-muted border-border'}`}>{ROLE_LABEL[u.role] || u.role}</span>
+                      <span className="text-[10px] text-text-muted">Deleted by <strong>{u.deletedBy}</strong> · {u.deletedAt ? new Date(u.deletedAt).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'2-digit' }) : '—'}</span>
+                      {u.deleteNote && <span className="text-[10px] text-text-muted italic">Reason: {u.deleteNote}</span>}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <button
+                      onClick={() => handleRestore(u._id)}
+                      disabled={restoring === u._id}
+                      className="px-3 py-1.5 border border-green-500/30 text-green-500 hover:bg-green-500/5 text-xs font-bold rounded-lg transition-all disabled:opacity-50"
+                    >{restoring === u._id ? '…' : '↩ Restore'}</button>
+                    {hardDeleting === u._id ? (
+                      <div className="flex items-center gap-1">
+                        <input
+                          value={hardConfirm}
+                          onChange={e => setHardConfirm(e.target.value)}
+                          placeholder={u.username}
+                          className="text-xs bg-surface border border-red-500/30 rounded px-2 py-1 text-text-primary w-28 focus:outline-none"
+                        />
+                        <button
+                          onClick={() => handleHardDelete(u._id, u.username)}
+                          disabled={hardConfirm !== u.username}
+                          className="px-2 py-1.5 bg-red-500 text-white text-xs font-bold rounded-lg disabled:opacity-40"
+                        >Delete</button>
+                        <button onClick={() => { setHardDeleting(null); setHardConfirm(''); }} className="p-1.5 border border-border text-text-muted rounded-lg text-xs">✕</button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => { setHardDeleting(u._id); setHardConfirm(''); }}
+                        className="px-3 py-1.5 border border-red-500/30 text-red-400 hover:bg-red-500/5 text-xs font-bold rounded-lg transition-all"
+                        title="Permanently remove from database"
+                      >💀 Hard Delete</button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ══ VIEW: Access Requests ══ */}
       {activeView === 'requests' && (() => {
@@ -2221,7 +2490,8 @@ export default function Dashboard() {
   const [drawerBatch, setDrawerBatch]         = useState(null);  // open detail drawer
   const [drawerOnArchived, setDrawerOnArchived] = useState(null); // callback after archive from drawer
   const { logout, getUser }                   = useAuth();
-  const user                                  = getUser(); // { username, name, role }
+  const user                                  = getUser(); // { username, name, role, isSuperAdmin }
+  const userIsSuperAdmin                      = !!user?.isSuperAdmin;
   const { batches, loading, createBatch, downloadQR, dispatchBatch, fetchBatches } = useBatches();
 
   // Connect to WebSocket for real-time batch updates across all dashboard tabs
@@ -2233,8 +2503,14 @@ export default function Dashboard() {
     setActiveTab(tabId);
   }
 
-  // Filter NAV_TABS — admin tab only visible to admin role
-  const visibleTabs = NAV_TABS.filter(t => !t.adminOnly || user?.role === 'admin');
+  // Filter NAV_TABS based on role tier:
+  //   - Super Admin + Admin: full admin tab + all tabs
+  //   - Manager: admin tab visible (read-only) + all tabs
+  //   - Others (factory-manager, quality-inspector, dispatch-coordinator): no admin tab
+  const visibleTabs = NAV_TABS.filter(t => {
+    if (!t.adminOnly) return true;
+    return userIsSuperAdmin || user?.role === 'admin' || user?.role === 'manager';
+  });
 
 
 

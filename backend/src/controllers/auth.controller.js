@@ -25,7 +25,11 @@ async function login(req, res, next) {
       return res.status(400).json({ success: false, error: 'Username and password required' });
     }
 
-    const user = await User.findOne({ username: username.toLowerCase().trim(), isActive: true });
+    const user = await User.findOne({
+      username:  username.toLowerCase().trim(),
+      isActive:  true,
+      isDeleted: { $ne: true },   // deleted users cannot log in
+    });
     if (!user) {
       return res.status(401).json({ success: false, error: 'Invalid credentials' });
     }
@@ -35,11 +39,22 @@ async function login(req, res, next) {
       return res.status(401).json({ success: false, error: 'Invalid credentials' });
     }
 
-    const token = generateToken({ username: user.username, name: user.name, role: user.role });
+    const tokenPayload = {
+      username:    user.username,
+      name:        user.name,
+      role:        user.role,
+      isSuperAdmin: !!user.isSuperAdmin,
+    };
+    const token = generateToken(tokenPayload);
     return res.json({
       success: true,
       token,
-      user: { username: user.username, name: user.name, role: user.role },
+      user: {
+        username:    user.username,
+        name:        user.name,
+        role:        user.role,
+        isSuperAdmin: !!user.isSuperAdmin,
+      },
     });
   } catch (err) {
     next(err);
@@ -50,11 +65,29 @@ async function login(req, res, next) {
 // POST /auth/request-access
 // Public — saves new request. 409 on duplicate email.
 // ─────────────────────────────────────────────────────────────────
+// ── ALLOWED_REQUEST_ROLES: roles that can be self-requested via the form.
+// 'admin' and 'super-admin' are NEVER self-requestable — admin is assigned
+// by the Super Admin directly via the Admin Panel role promotion flow.
+const ALLOWED_REQUEST_ROLES = [
+  'factory-manager',
+  'quality-inspector',
+  'dispatch-coordinator',
+  'manager',
+];
+
 async function requestAccess(req, res, next) {
   try {
     const { name, email, role } = req.body;
     if (!name || !email || !role) {
       return res.status(400).json({ success: false, error: 'name, email, and role are required' });
+    }
+
+    // Block privilege escalation via the public request form
+    if (!ALLOWED_REQUEST_ROLES.includes(role)) {
+      return res.status(400).json({
+        success: false,
+        error:   'The requested role cannot be self-assigned. Contact your Super Admin.',
+      });
     }
 
     const request = await AccessRequest.create({ name, email, role });
@@ -378,7 +411,9 @@ async function resendOtp(req, res, next) {
 // ─────────────────────────────────────────────────────────────────
 async function listUsers(req, res, next) {
   try {
-    const users = await User.find()
+    // Exclude soft-deleted users from the normal roster.
+    // Deleted users are only visible in the Super Admin's Recycle Bin (/users/deleted).
+    const users = await User.find({ isDeleted: { $ne: true } })
       .select('-passwordHash')
       .sort({ createdAt: -1 });
 
@@ -415,10 +450,20 @@ async function toggleUserStatus(req, res, next) {
   try {
     const user = await User.findById(req.params.id).select('-passwordHash');
     if (!user) return res.status(404).json({ success: false, error: 'User not found' });
-    // Prevent admin from deactivating themselves
-    if (user.username === req.user.username) {
-      return res.status(400).json({ success: false, error: 'You cannot deactivate your own account' });
+
+    // Super Admin account is immutable — cannot be deactivated by anyone
+    if (user.isSuperAdmin) {
+      return res.status(403).json({ success: false, error: 'The Super Admin account cannot be deactivated.' });
     }
+    // Secondary admins cannot deactivate other admins
+    if (user.role === 'admin' && !req.user.isSuperAdmin) {
+      return res.status(403).json({ success: false, error: 'Only the Super Admin can deactivate an Admin account.' });
+    }
+    // Prevent self-deactivation
+    if (user.username === req.user.username) {
+      return res.status(400).json({ success: false, error: 'You cannot deactivate your own account.' });
+    }
+
     user.isActive = !user.isActive;
     await user.save();
     return res.json({
@@ -721,5 +766,191 @@ async function resetPassword(req, res, next) {
   }
 }
 
-module.exports = { login, requestAccess, listRequests, approve, reject, activate, verifyOtp, resendOtp, resendInvite, removeRequest, listUsers, toggleUserStatus, linkGoogle, forgotPassword, verifyResetOtp, resetPassword };
+// ─────────────────────────────────────────────────────────────────
+// PATCH /auth/users/:id/role  [admin + super-admin]
+// Tier-guarded role promotion / demotion.
+//
+// Rules:
+//   ► Super Admin: can change anyone's role except their own
+//   ► Admin: can change Tier 2–3 users only (not other admins or super-admin)
+//   ► Neither can promote to super-admin via this endpoint (flag-only)
+// ─────────────────────────────────────────────────────────────────
+const { getTier } = require('../middleware/requireAdmin');
+
+async function changeRole(req, res, next) {
+  try {
+    const { role: newRole } = req.body;
+    const VALID_ROLES = ['admin', 'manager', 'factory-manager', 'quality-inspector', 'dispatch-coordinator'];
+    if (!newRole || !VALID_ROLES.includes(newRole)) {
+      return res.status(400).json({ success: false, error: `Invalid role. Must be one of: ${VALID_ROLES.join(', ')}` });
+    }
+
+    const target = await User.findById(req.params.id).select('-passwordHash');
+    if (!target) return res.status(404).json({ success: false, error: 'User not found' });
+    if (target.isDeleted) return res.status(404).json({ success: false, error: 'User not found' });
+
+    const actorIsSuperAdmin = !!req.user.isSuperAdmin;
+    const actorTier         = getTier(req.user.role, actorIsSuperAdmin);
+    const targetTier        = getTier(target.role,   !!target.isSuperAdmin);
+    const newRoleTier       = getTier(newRole);
+
+    // Super Admin cannot have their role changed by anyone
+    if (target.isSuperAdmin) {
+      return res.status(403).json({ success: false, error: 'The Super Admin role cannot be modified.' });
+    }
+    // Prevent self-role-change
+    if (target.username === req.user.username) {
+      return res.status(400).json({ success: false, error: 'You cannot change your own role.' });
+    }
+    // Secondary admin cannot touch other admins
+    if (!actorIsSuperAdmin && targetTier <= 1) {
+      return res.status(403).json({ success: false, error: 'Only the Super Admin can modify an Admin account.' });
+    }
+    // Secondary admin cannot promote anyone TO admin
+    if (!actorIsSuperAdmin && newRoleTier <= 1) {
+      return res.status(403).json({
+        success: false,
+        error:   'Only the Super Admin can grant Admin privileges.',
+      });
+    }
+
+    const previousRole = target.role;
+    target.role        = newRole;
+    target.previousRole = previousRole;
+    target.promotedBy  = req.user.username;
+    target.promotedAt  = new Date();
+    await target.save();
+
+    return res.json({
+      success:      true,
+      message:      `Role updated: ${target.username} is now ${newRole}`,
+      previousRole,
+      newRole,
+      promotedBy:   req.user.username,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// DELETE /auth/users/:id  [admin + super-admin]
+//
+// Admin   → Soft delete (isDeleted: true). Visible in Super Admin's Recycle Bin.
+// Super Admin → Hard delete (permanent removal from MongoDB).
+//
+// Guards:
+//   ► Super Admin cannot delete themselves
+//   ► Admin cannot delete Super Admin or other Admins
+//   ► Admin soft-deletes include a deleteNote (optional reason)
+// ─────────────────────────────────────────────────────────────────
+async function deleteUser(req, res, next) {
+  try {
+    const target = await User.findById(req.params.id);
+    if (!target || target.isDeleted) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    const actorIsSuperAdmin = !!req.user.isSuperAdmin;
+    const targetTier        = getTier(target.role, !!target.isSuperAdmin);
+
+    // Super Admin account is completely protected
+    if (target.isSuperAdmin) {
+      return res.status(403).json({ success: false, error: 'The Super Admin account cannot be deleted.' });
+    }
+    // Prevent self-deletion
+    if (target.username === req.user.username) {
+      return res.status(400).json({ success: false, error: 'You cannot delete your own account.' });
+    }
+    // Secondary admin cannot delete other admins
+    if (!actorIsSuperAdmin && targetTier <= 1) {
+      return res.status(403).json({ success: false, error: 'Only the Super Admin can delete an Admin account.' });
+    }
+
+    if (actorIsSuperAdmin) {
+      // ── HARD DELETE (Super Admin only) ───────────────────────────
+      // Requires the caller to pass { confirm: target.username } in body
+      const { confirm } = req.body;
+      if (confirm !== target.username) {
+        return res.status(400).json({
+          success: false,
+          error:   `Confirm hard-delete by passing { "confirm": "${target.username}" } in the request body.`,
+        });
+      }
+      await target.deleteOne();
+      return res.json({
+        success:  true,
+        message:  `User '${target.username}' permanently deleted.`,
+        hardDelete: true,
+      });
+    } else {
+      // ── SOFT DELETE (Secondary Admin) ────────────────────────────
+      const { deleteNote } = req.body;
+      target.isDeleted  = true;
+      target.isActive   = false;
+      target.deletedBy  = req.user.username;
+      target.deletedAt  = new Date();
+      target.deleteNote = deleteNote || null;
+      await target.save();
+      return res.json({
+        success:    true,
+        message:    `User '${target.username}' moved to Recycle Bin. Super Admin can restore or permanently remove.`,
+        softDelete: true,
+        deletedBy:  req.user.username,
+      });
+    }
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// GET /auth/users/deleted  [super-admin only]
+// Returns all soft-deleted users for the Recycle Bin panel.
+// ─────────────────────────────────────────────────────────────────
+async function listDeletedUsers(req, res, next) {
+  try {
+    const deleted = await User.find({ isDeleted: true })
+      .select('-passwordHash')
+      .sort({ deletedAt: -1 });
+    return res.json({ success: true, count: deleted.length, data: deleted });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// PATCH /auth/users/:id/restore  [super-admin only]
+// Restores a soft-deleted user — clears all isDeleted flags.
+// ─────────────────────────────────────────────────────────────────
+async function restoreUser(req, res, next) {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user || !user.isDeleted) {
+      return res.status(404).json({ success: false, error: 'Deleted user not found' });
+    }
+    user.isDeleted  = false;
+    user.isActive   = true;
+    user.deletedBy  = null;
+    user.deletedAt  = null;
+    user.deleteNote = null;
+    await user.save();
+    return res.json({
+      success:  true,
+      message:  `User '${user.username}' restored successfully.`,
+      username: user.username,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = {
+  login, requestAccess, listRequests, approve, reject,
+  activate, verifyOtp, resendOtp, resendInvite, removeRequest,
+  listUsers, toggleUserStatus, linkGoogle,
+  forgotPassword, verifyResetOtp, resetPassword,
+  // New RBAC management
+  changeRole, deleteUser, listDeletedUsers, restoreUser,
+};
 

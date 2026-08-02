@@ -1,6 +1,11 @@
 const router       = require('express').Router();
 const { protect }  = require('../middleware/auth');
-const requireAdmin = require('../middleware/requireAdmin');
+const {
+  requireAdmin,
+  requireAdminOrAbove,
+  requireSuperAdmin,
+  requireManagerOrAbove,
+} = require('../middleware/requireAdmin');
 const ctrl         = require('../controllers/auth.controller');
 const { googleLogin } = require('../controllers/googleAuth.controller');
 
@@ -8,8 +13,8 @@ const { googleLogin } = require('../controllers/googleAuth.controller');
 router.post('/login',               ctrl.login);
 router.post('/request-access',      ctrl.requestAccess);
 router.post('/activate',            ctrl.activate);
-router.post('/verify-otp',          ctrl.verifyOtp);          // NEW: verify email OTP
-router.post('/verify-otp/resend',   ctrl.resendOtp);          // NEW: resend OTP
+router.post('/verify-otp',          ctrl.verifyOtp);
+router.post('/verify-otp/resend',   ctrl.resendOtp);
 router.post('/google/token',        googleLogin);
 
 // Forgot password (public — 3-step OTP flow)
@@ -17,19 +22,27 @@ router.post('/forgot-password',     ctrl.forgotPassword);
 router.post('/verify-reset-otp',    ctrl.verifyResetOtp);
 router.post('/reset-password',      ctrl.resetPassword);
 
-// Admin only
-router.get( '/requests',              protect, requireAdmin, ctrl.listRequests);
-router.post('/requests/:id/approve',  protect, requireAdmin, ctrl.approve);
-router.post('/requests/:id/reject',   protect, requireAdmin, ctrl.reject);
-router.post('/requests/:id/resend',   protect, requireAdmin, ctrl.resendInvite);
-router.delete('/requests/:id',        protect, requireAdmin, ctrl.removeRequest); // DELETE request record
-router.get( '/users',                 protect, requireAdmin, ctrl.listUsers);
-router.patch('/users/:id/toggle',     protect, requireAdmin, ctrl.toggleUserStatus);
+// ── Admin & Super Admin routes ─────────────────────────────────────────────
+// Access Requests
+router.get( '/requests',              protect, requireAdminOrAbove, ctrl.listRequests);
+router.post('/requests/:id/approve',  protect, requireAdminOrAbove, ctrl.approve);
+router.post('/requests/:id/reject',   protect, requireAdminOrAbove, ctrl.reject);
+router.post('/requests/:id/resend',   protect, requireAdminOrAbove, ctrl.resendInvite);
+router.delete('/requests/:id',        protect, requireAdminOrAbove, ctrl.removeRequest);
+
+// Users — note: /users/deleted MUST come before /users/:id
+router.get( '/users',                 protect, requireManagerOrAbove, ctrl.listUsers);     // manager gets read-only
+router.get( '/users/deleted',         protect, requireSuperAdmin,     ctrl.listDeletedUsers); // Recycle Bin
+router.patch('/users/:id/toggle',     protect, requireAdminOrAbove,   ctrl.toggleUserStatus);
+router.patch('/users/:id/role',       protect, requireAdminOrAbove,   ctrl.changeRole);
+router.patch('/users/:id/restore',    protect, requireSuperAdmin,     ctrl.restoreUser);
+router.delete('/users/:id',           protect, requireAdminOrAbove,   ctrl.deleteUser);
 
 // Any authenticated user — link/unlink Google account email
 router.patch('/me/google-link', protect, ctrl.linkGoogle);
 
 module.exports = router;
+
 
 
 

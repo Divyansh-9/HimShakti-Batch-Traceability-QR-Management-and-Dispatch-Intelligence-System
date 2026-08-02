@@ -15,6 +15,28 @@ const userSchema = new mongoose.Schema({
     default: 'factory-manager',
   },
   isActive:       { type: Boolean, default: true },
+
+  // ── Tier 0: Super Admin guard ─────────────────────────────────────
+  // Immutable flag — identifies the one true Super Admin (Divyansh).
+  // Can only be set via setSuperAdmin.js migration script or Atlas console.
+  // No API endpoint can set this to true — enforced server-side.
+  isSuperAdmin:   { type: Boolean, default: false },
+
+  // ── Soft-Delete (Recycle Bin) ─────────────────────────────────────
+  // When an Admin deletes a user, isDeleted is set to true.
+  // The user disappears from all views except the Super Admin's Deleted Users panel.
+  // Super Admin can restore (undo) or permanently hard-delete from there.
+  isDeleted:      { type: Boolean, default: false },
+  deletedBy:      { type: String,  default: null },   // username of who deleted
+  deletedAt:      { type: Date,    default: null },
+  deleteNote:     { type: String,  default: null },   // optional reason
+
+  // ── Role Promotion Audit Trail ────────────────────────────────────
+  // Records who last changed this user's role and when.
+  promotedBy:     { type: String,  default: null },   // username of promoting admin
+  promotedAt:     { type: Date,    default: null },
+  previousRole:   { type: String,  default: null },   // role before the last change
+
   // Email verification via OTP (set during account activation)
   emailVerified:  { type: Boolean, default: false },
   otpCode:        { type: String,  default: null },   // 6-digit hashed OTP

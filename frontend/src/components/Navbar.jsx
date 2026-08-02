@@ -102,7 +102,10 @@ export default function Navbar({ onMenuClick, isSidebarOpen }) {
   }
 
   const isActive = (path) => location.pathname === path;
-  const roleMeta = ROLE_META[user?.role] || ROLE_META['manager'];
+  const isSuperAdmin = !!user?.isSuperAdmin;
+  const roleMeta = isSuperAdmin
+    ? { label: '⚡ GOD', color: 'god' }  // handled specially in JSX
+    : ROLE_META[user?.role] || ROLE_META['manager'];
 
   // Scroll listener
   useEffect(() => {
@@ -202,17 +205,29 @@ export default function Navbar({ onMenuClick, isSidebarOpen }) {
                 onClick={() => setUserMenuOpen(v => !v)}
                 className="flex items-center gap-2.5 pl-2 pr-3 py-1.5 rounded-xl hover:bg-surface-2 transition-colors border border-transparent hover:border-border group"
               >
-                {/* Avatar circle */}
-                <div className="w-8 h-8 rounded-lg bg-brand flex items-center justify-center shadow-sm flex-shrink-0">
-                  <span className="text-white text-xs font-bold">{getInitials(user?.name)}</span>
-                </div>
+                {/* Avatar circle — gold gradient for Super Admin */}
+                {isSuperAdmin ? (
+                  <div className="god-avatar w-8 h-8 rounded-lg flex items-center justify-center shadow-sm flex-shrink-0">
+                    <span className="god-avatar-text text-xs font-black">{getInitials(user?.name)}</span>
+                  </div>
+                ) : (
+                  <div className="w-8 h-8 rounded-lg bg-brand flex items-center justify-center shadow-sm flex-shrink-0">
+                    <span className="text-white text-xs font-bold">{getInitials(user?.name)}</span>
+                  </div>
+                )}
                 <div className="hidden sm:block text-left min-w-0">
                   <p className="text-sm font-semibold text-text-primary leading-none truncate max-w-[120px]">
                     {user?.name || user?.username || 'User'}
                   </p>
-                  <span className={`inline-block mt-0.5 px-1.5 py-px rounded text-[9px] font-bold uppercase tracking-wider border ${roleMeta.color}`}>
-                    {roleMeta.label}
-                  </span>
+                  {isSuperAdmin ? (
+                    <span className="god-badge-wrap mt-0.5" style={{ padding: '1px 8px' }} title="System Owner">
+                      <span className="god-badge-text">⚡ GOD</span>
+                    </span>
+                  ) : (
+                    <span className={`inline-block mt-0.5 px-1.5 py-px rounded text-[9px] font-bold uppercase tracking-wider border ${roleMeta.color}`}>
+                      {roleMeta.label}
+                    </span>
+                  )}
                 </div>
                 <ChevronDown className={`w-3.5 h-3.5 text-text-muted transition-transform duration-200 ${userMenuOpen ? 'rotate-180' : ''}`} />
               </button>
@@ -223,15 +238,28 @@ export default function Navbar({ onMenuClick, isSidebarOpen }) {
                   {/* User info header */}
                   <div className="px-4 pt-4 pb-3 border-b border-border bg-surface-2/50">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-brand flex items-center justify-center shadow-md flex-shrink-0">
-                        <span className="text-white text-sm font-bold">{getInitials(user?.name)}</span>
-                      </div>
+                      {/* Dropdown avatar — gold for SA */}
+                      {isSuperAdmin ? (
+                        <div className="god-avatar w-10 h-10 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
+                          <span className="god-avatar-text text-sm font-black">{getInitials(user?.name)}</span>
+                        </div>
+                      ) : (
+                        <div className="w-10 h-10 rounded-xl bg-brand flex items-center justify-center shadow-md flex-shrink-0">
+                          <span className="text-white text-sm font-bold">{getInitials(user?.name)}</span>
+                        </div>
+                      )}
                       <div className="min-w-0">
                         <p className="font-bold text-text-primary text-sm truncate">{user?.name || 'User'}</p>
                         <p className="text-text-muted text-xs truncate">@{user?.username || ''}</p>
-                        <span className={`inline-block mt-1 px-2 py-px rounded-full text-[9px] font-bold uppercase tracking-wider border ${roleMeta.color}`}>
-                          {roleMeta.label}
-                        </span>
+                        {isSuperAdmin ? (
+                          <span className="god-badge-wrap mt-1" style={{ padding: '1px 8px' }}>
+                            <span className="god-badge-text">⚡ GOD</span>
+                          </span>
+                        ) : (
+                          <span className={`inline-block mt-1 px-2 py-px rounded-full text-[9px] font-bold uppercase tracking-wider border ${roleMeta.color}`}>
+                            {roleMeta.label}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -246,13 +274,13 @@ export default function Navbar({ onMenuClick, isSidebarOpen }) {
                       <LayoutDashboard className="w-4 h-4" />
                       Back to Home
                     </Link>
-                    {user?.role === 'admin' && (
+                    {(user?.role === 'admin' || isSuperAdmin) && (
                       <button
                         className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm text-text-muted hover:bg-surface-2 hover:text-text-primary transition-colors"
                         onClick={() => { navigate('/dashboard?tab=admin'); setUserMenuOpen(false); }}
                       >
-                        <Shield className="w-4 h-4 text-rose-400" />
-                        Admin Panel
+                        <Shield className="w-4 h-4 text-amber-400" />
+                        {isSuperAdmin ? '👑 Admin Panel (Owner)' : 'Admin Panel'}
                       </button>
                     )}
                   </div>

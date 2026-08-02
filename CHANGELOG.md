@@ -6,6 +6,37 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2.3.0] — 2026-08-03
+
+### 👑 4-Tier RBAC, Super-Admin "GOD" Badge & Recycle Bin
+
+This release introduces a hardened **4-tier role-based access control (RBAC)** architecture with an immutable Tier-0 Super Admin role, an operations lead "Manager" role, and soft-delete / recycle-bin capabilities.
+
+#### Added
+- **Tier 0 Super Admin ("GOD" Badge)**:
+  - Immutable system owner account (`divyanshuniyal185@gmail.com`) with full administrative privileges.
+  - Premium **"⚡ GOD"** gold-shimmer animated badge and **"👑 OWNER"** shield tag displayed in the Admin Panel and top-right navigation bar.
+  - Exclusive access to the **Recycle Bin** tab for restoring soft-deleted users or permanently hard-deleting records.
+- **Tier 2 Manager Role**:
+  - Full operations access across Overview, Batches, FEFO Queue, QR Codes, and AI Audit.
+  - Read-only access to the Admin Panel (Users Roster) to view team members without destructive permissions.
+- **Recycle Bin & Deletion Model**:
+  - Soft-delete workflow (`isDeleted: true`, `deleteNote`, `deletedAt`, `deletedBy`) for secondary Administrators.
+  - Hard-delete with typed username confirmation exclusively for Super Admin.
+- **Scripts**:
+  - `setSuperAdmin.js` migration script for setting the immutable Super Admin flag on the primary system owner account.
+- **Documentation**:
+  - Created [`docs/RBAC.md`](./docs/RBAC.md) with comprehensive permission matrix and security design notes.
+  - Sanitised documentation across all `.md` files to remove plaintext/default login credentials.
+
+#### Changed
+- `User.model.js` — Added `isSuperAdmin`, `isDeleted`, `deletedBy`, `deletedAt`, `deleteNote`, `promotedBy`, `promotedAt`, and `previousRole` schema fields.
+- `requireAdmin.js` — Tiered backend middleware exporting `requireSuperAdmin`, `requireAdminOrAbove`, `requireManagerOrAbove`, and `getTier`.
+- `auth.controller.js` — Guarded destructive actions against Super Admin; added endpoints for role promotion, soft/hard deletion, deleted user listing, and account restoration.
+- `Navbar.jsx` & `Dashboard.jsx` — Enhanced Admin Panel UI with role dropdowns, status toggles, recycle bin tab, and gold-shimmer GOD badge styling.
+
+---
+
 ## [2.2.0] — 2026-08-02
 
 ### 🚀 Production Deployment — System Live

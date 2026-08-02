@@ -37,6 +37,69 @@
 
 ---
 
+## 🚀 Deployment & Infrastructure
+
+### 🌐 Live URLs
+
+| Layer | URL | Platform |
+|---|---|---|
+| **Frontend** | [himshakti2026-bb904.web.app](https://himshakti2026-bb904.web.app) | Firebase Hosting |
+| **Backend API** | [him-shakti-batch-traceability-qr-ma.vercel.app](https://him-shakti-batch-traceability-qr-ma.vercel.app) | Vercel Serverless |
+| **Health Check** | [/health](https://him-shakti-batch-traceability-qr-ma.vercel.app/health) | Vercel Serverless |
+
+---
+
+### 🏗️ Tech Stack Summary
+
+| Category | Technology | Why chosen |
+|---|---|---|
+| **Frontend** | React 18 + Vite | Fast HMR in dev, optimised production bundle |
+| **Styling** | Vanilla CSS + CSS Variables | Zero runtime overhead, full design system control |
+| **State / Data** | Custom hooks (`useBatches`, `useAuth`, `useAIAudit`) | Lightweight — no Redux overhead |
+| **Real-time** | Socket.IO | Bi-directional events for live batch updates |
+| **Backend** | Node.js + Express 5 | Familiar, flexible, great ecosystem |
+| **Database** | MongoDB Atlas (M0 free tier) | Document model fits batch schema; managed hosting |
+| **Authentication** | JWT HS256 + bcrypt | Stateless tokens, role-based access control |
+| **AI** | Google Gemini 2.5 Flash | Best cost/quality ratio for structured advisory output |
+| **QR Generation** | `qrcode` npm library | Offline, no third-party API dependency |
+| **Frontend Deploy** | Firebase Hosting | Global CDN, zero cold-start, free SSL |
+| **Backend Deploy** | Vercel Serverless Functions | Always-on free tier, zero cold-start on hobby plan |
+| **Email (future)** | Gmail SMTP via `nodemailer` | SMTP credentials stored in Vercel env vars |
+
+---
+
+### ⚠️ Why We Switched from Render to Vercel (Backend)
+
+> **Root cause: Gmail SMTP / email delivery was completely broken on Render's free tier.**
+
+The backend originally deployed to **Render (free tier)**. During integration testing of the invite-link email flow (Admin approves access request → email sent to requester), every attempt failed with connection timeout errors from within Render's infrastructure. Investigation revealed:
+
+| Problem | Detail |
+|---|---|
+| **SMTP port 587 blocked** | Render free-tier containers block outbound SMTP connections on ports 465 and 587 — the standard Gmail SMTP ports used by `nodemailer`. Emails never left the server. |
+| **Cold-start latency** | Render free tier **spins down after 15 minutes of inactivity**. The first request after idle takes **30–60 seconds** to wake up the container — unacceptable for a production demo. |
+| **No persistent processes** | Render's free tier kills long-running processes, which caused Socket.IO connections to drop unpredictably. |
+
+**Migration to Vercel** resolved all three issues:
+- Vercel Serverless Functions do **not** block SMTP ports — Gmail `nodemailer` email delivery works reliably.
+- Vercel's hobby tier has **no spin-down** — endpoints respond in milliseconds.
+- Serverless architecture is stateless by design, which pairs cleanly with Socket.IO using a separate connection manager.
+
+---
+
+### 🐢 Known Limitations on Free Tier
+
+| Limitation | Detail | Workaround |
+|---|---|---|
+| **MongoDB Atlas M0 — 512 MB storage cap** | Free cluster allows max 512 MB data. Sufficient for demo scale (hundreds of batches + QR images). | Upgrade to M2 ($9/mo) for production scale. |
+| **MongoDB Atlas M0 — 100 connection limit** | Shared cluster caps simultaneous connections. | Use connection pooling (already configured via Mongoose). |
+| **Vercel Serverless — 10-second function timeout** | Hobby plan functions timeout after 10s. Gemini AI audit calls are cached (4hr) to avoid repeated slow calls. | Cache is the primary mitigation; upgrade to Pro ($20/mo) for 60s timeout. |
+| **Vercel Serverless — No persistent Socket.IO** | Serverless functions are stateless; Socket.IO real-time requires a separate managed Socket layer in production. | For demo purposes, Socket.IO events are emitted per-request. In production, use Vercel + Ably/Pusher. |
+| **Firebase Hosting — 10 GB/month egress** | Free Spark plan allows 10 GB/month data transfer. | Sufficient for demo; upgrade to Blaze (pay-as-you-go) for production. |
+| **Gemini API — free tier rate limits** | Google AI Studio free tier: 15 RPM, 1,500 RPD. The 4-hour in-memory cache on the backend prevents hitting this limit under normal usage. | Cache is the primary mitigation. |
+
+---
+
 ## 🗂️ Table of Contents
 
 - [What is this?](#-what-is-this)
@@ -835,14 +898,17 @@ run();
 
 ### Default Development Credentials
 
-> ⚠️ **Change all passwords before deploying to production.**
 
-| Username | Password | Role | Notes |
-|---|---|---|---|
-| `divyansh` | `Uniyal@05` | Admin | Primary admin — Google OAuth linked |
-| `admin` | `himshakti_admin_2026` | Admin | Backup admin account |
-| `manager` | `himshakti2026` | Manager | Operations manager |
-| `staff` | `himshakti_staff_2026` | Factory Manager | Warehouse staff |
+> ⚠️ **Change all passwords before deploying to production. Do not commit credentials to version control.**
+
+| Username | Role | Notes |
+|---|---|---|
+| `divyansh` | 👑 Super Admin | Primary system owner — Google OAuth linked |
+| `admin` | ⚙️ Admin | Backup secondary admin |
+| `manager` | 💼 Manager | Operations lead |
+| `staff` | 🏭 Factory Manager | Warehouse staff |
+
+> See [docs/RBAC.md](./docs/RBAC.md) for the full role hierarchy and permission matrix.
 
 ### Google Sign-In fails with "No account linked"
 
@@ -862,8 +928,10 @@ This was caused by a `u.name.split()` crash when any user in MongoDB had a null/
 
 | Document | Purpose | Status |
 |---|---|---|
-| [`README.md`](./README.md) | System overview, setup, API reference | ✅ v2.2.0 |
-| [`CHANGELOG.md`](./CHANGELOG.md) | Full version history | ✅ v2.2.0 |
+| [`README.md`](./README.md) | System overview, setup, API reference | ✅ v2.3.0 |
+| [`CHANGELOG.md`](./CHANGELOG.md) | Full version history | ✅ v2.3.0 |
+| [`docs/RBAC.md`](./docs/RBAC.md) | Role hierarchy, permission matrix, promotion rules | ✅ **v2.3.0 New** |
+| [`docs/USER_GUIDE.md`](./docs/USER_GUIDE.md) | End-user onboarding guide | ✅ **v2.3.0 Updated** |
 | [`docs/BATCH_MANAGEMENT.md`](./docs/BATCH_MANAGEMENT.md) | Batch management workflow, drawer UI, RBAC, soft delete, API | ✅ v2.0.0 |
 | [`docs/DATABASE.md`](./docs/DATABASE.md) | Full database design, schema reference & Atlas setup | ✅ v2.1.0 |
 | [`docs/schema-diagram.png`](./docs/schema-diagram.png) | Visual ER diagram — all collections & relationships | ✅ Current |

@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useGoogleLogin } from '@react-oauth/google';
@@ -82,7 +82,7 @@ const ROLES = [
   { value: 'factory-manager',      label: 'Factory Manager',       icon: '🏭', desc: 'Create batches, run dispatch, manage inventory' },
   { value: 'quality-inspector',    label: 'Quality Inspector',     icon: '🔍', desc: 'Monitor quality flags, audit compliance records' },
   { value: 'dispatch-coordinator', label: 'Dispatch Coordinator',  icon: '🚚', desc: 'Manage FEFO queues and outbound shipments' },
-  { value: 'admin',                label: 'Administrator',         icon: '⚙️', desc: 'Full system access, user and role management' },
+  { value: 'manager',              label: 'Manager',               icon: '💼', desc: 'Full operations access · AI Audit · Read-only team view' },
 ];
 
 function RoleSelector({ value, onChange }) {
