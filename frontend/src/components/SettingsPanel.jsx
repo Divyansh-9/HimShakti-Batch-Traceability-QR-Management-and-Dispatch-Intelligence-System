@@ -585,27 +585,80 @@ export default function SettingsPanel() {
           {activeSection === 'notifications' && (
             <div className="bg-surface border border-border rounded-xl shadow-sm overflow-hidden">
               <div className="px-5 py-5">
-                <SectionHeader icon={Bell} title="Notifications" />
-                <div className="space-y-0.5">
+                <SectionHeader icon={Bell} title="Notification events" />
+                <p className="text-xs text-text-muted -mt-2 mb-4">
+                  Role-targeted push notifications — delivered in real-time via Socket.io and stored for 7 days.
+                </p>
+
+                <div className="divide-y divide-border rounded-xl border border-border overflow-hidden">
                   {[
-                    { label: 'Batch creation alerts',   desc: 'Notify factory managers when a new batch is registered.', phase: 3 },
-                    { label: 'Inspection updates',      desc: 'Alert managers when a quality inspection is completed.',  phase: 3 },
-                    { label: 'Dispatch notifications',  desc: 'Notify coordinators and managers on outbound shipments.', phase: 3 },
-                    { label: 'Admin activity log',      desc: 'Alert Super Admin when admin actions are taken.',         phase: 3 },
+                    {
+                      label:    'Batch created',
+                      desc:     'Triggered when a new batch is registered in the system.',
+                      roles:    ['factory-manager', 'manager'],
+                      active:   true,
+                    },
+                    {
+                      label:    'Batch dispatched',
+                      desc:     'Triggered when a batch status is updated to DISPATCHED.',
+                      roles:    ['manager', 'factory-manager'],
+                      active:   true,
+                    },
+                    {
+                      label:    'Quality inspection',
+                      desc:     'Triggered when an inspection record is submitted.',
+                      roles:    ['manager'],
+                      active:   false,
+                      note:     'Pending — no inspection controller in codebase yet.',
+                    },
+                    {
+                      label:    'Admin: member approved',
+                      desc:     'Triggered when an admin approves a new access request.',
+                      roles:    ['super-admin'],
+                      active:   true,
+                    },
+                    {
+                      label:    'Admin: role changed',
+                      desc:     'Triggered when an admin changes a user\'s role.',
+                      roles:    ['super-admin'],
+                      active:   true,
+                    },
+                    {
+                      label:    'Admin: user removed',
+                      desc:     'Triggered when an admin soft-deletes a user account.',
+                      roles:    ['super-admin'],
+                      active:   true,
+                    },
                   ].map((item, i) => (
-                    <div key={i} className="flex items-center justify-between gap-4 py-3 border-b border-border last:border-0">
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-text-primary">{item.label}</p>
+                    <div key={i} className="flex items-start gap-3 px-4 py-3 bg-surface hover:bg-surface-2/40 transition-colors">
+                      <div className={`flex-shrink-0 mt-0.5 w-2 h-2 rounded-full ${item.active ? 'bg-green-500' : 'bg-border'}`} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-sm font-medium text-text-primary">{item.label}</p>
+                          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                            item.active
+                              ? 'bg-green-500/10 text-green-500'
+                              : 'bg-surface-2 text-text-muted border border-border'
+                          }`}>
+                            {item.active ? '● Active' : '○ Pending'}
+                          </span>
+                        </div>
                         <p className="text-xs text-text-muted mt-0.5">{item.desc}</p>
+                        {item.note && <p className="text-[11px] text-amber-500/80 mt-0.5">{item.note}</p>}
+                        <div className="flex flex-wrap gap-1.5 mt-1.5">
+                          {item.roles.map(r => (
+                            <span key={r} className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium bg-brand/8 text-brand border border-brand/15 capitalize">
+                              {r}
+                            </span>
+                          ))}
+                        </div>
                       </div>
-                      <span className="flex-shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-surface-2 text-text-muted border border-border">
-                        Phase 3
-                      </span>
                     </div>
                   ))}
                 </div>
-                <p className="mt-4 text-[11px] text-text-muted border-t border-border pt-3 leading-relaxed">
-                  Role-based push notifications arriving in Phase 3. The system will deliver targeted alerts to Factory Managers, Quality Inspectors, Dispatch Coordinators, and Administrators.
+
+                <p className="mt-4 text-[11px] text-text-muted leading-relaxed">
+                  Notifications are delivered in real-time via Socket.io room targeting and persisted to MongoDB with a 7-day TTL. Bell icon in the header shows live unread count.
                 </p>
               </div>
             </div>

@@ -161,6 +161,17 @@ async function approve(req, res, next) {
     const frontendUrl = getFrontendUrl();
     const inviteLink  = `${frontendUrl}/invite?token=${rawToken}`;
 
+    // ── Notify Super Admin about the new approval ──────────────────────────
+    notify(req.app, {
+      recipientRole: 'super-admin',
+      type:    'admin_action',
+      title:   'New member approved',
+      message: `${req.user.name || req.user.username} approved ${request.name || request.email} as ${request.role}.`,
+      refId:   request.email || request.name,
+      refType: 'user',
+      triggeredBy: { userId: req.user._id, name: req.user.name || req.user.username, role: req.user.role },
+    }); // fire-and-forget
+
     // ── Auto-send approval email ──────────────────────────────────────────
     let emailResult = { sent: false, reason: 'no email address on record' };
     if (request.email) {

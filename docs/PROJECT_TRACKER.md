@@ -148,20 +148,24 @@
 
 ---
 
-### STORY-02-07 · Role-Based Notifications ⏳ (Phase 3)
+### STORY-02-07 · Role-Based Notifications ✅ (Phase 3 — 2026-08-05)
 
 | Task ID | Task | Status | Priority | Files Affected |
 |---|---|---|---|---|
-| T-060 | Create `Notification.model.js` (userId, role, type, message, read, TTL) | ⏳ | 🔴 | `backend/src/models/Notification.model.js` |
-| T-061 | Create `notificationService.js` (create + broadcast via Socket.io) | ⏳ | 🔴 | `backend/src/services/notificationService.js` |
-| T-062 | Batch creation → notify Factory Manager | ⏳ | 🟠 | `backend/src/controllers/` |
-| T-063 | Quality inspection completed → notify Manager | ⏳ | 🟠 | `backend/src/controllers/` |
-| T-064 | Dispatch event → notify Manager + Factory Manager | ⏳ | 🟠 | `backend/src/controllers/` |
-| T-065 | Admin action (add/change/delete user) → notify Super Admin | ⏳ | 🟠 | `backend/src/controllers/auth.controller.js` |
-| T-066 | Navbar bell icon + unread badge counter | ⏳ | 🟠 | `frontend/src/components/Navbar.jsx` |
-| T-067 | Notification dropdown panel component | ⏳ | 🟠 | `frontend/src/components/NotificationPanel.jsx` |
-| T-068 | Mark-as-read + clear-all actions | ⏳ | 🟡 | `frontend/src/components/NotificationPanel.jsx` |
-| T-069 | Socket.io room-based push to correct role groups | ⏳ | 🔴 | `backend/server.js` |
+| T-060 | Create `Notification.model.js` (role, type, message, read, 7-day TTL) | ✅ | 🔴 | `backend/src/models/Notification.model.js` |
+| T-061 | Create `notificationService.js` (notify + notifyRoles, fire-and-forget) | ✅ | 🔴 | `backend/src/services/notificationService.js` |
+| T-062 | Batch creation → notify `factory-manager` + `manager` | ✅ | 🟠 | `backend/src/controllers/batches.controller.js` |
+| T-063 | Quality inspection → notify `manager` | ⏸️ | 🟠 | No inspection controller in codebase yet — hook ready, trigger pending |
+| T-064 | Dispatch → notify `manager` + `factory-manager` | ✅ | 🟠 | `backend/src/controllers/batches.controller.js` |
+| T-065 | Admin approve/changeRole/deleteUser → notify `super-admin` | ✅ | 🟠 | `backend/src/controllers/auth.controller.js` |
+| T-066 | Navbar bell icon + animated unread badge | ✅ | 🟠 | `frontend/src/components/Navbar.jsx` |
+| T-067 | NotificationPanel dropdown (type icons, timestamps, refId) | ✅ | 🟠 | `frontend/src/components/NotificationPanel.jsx` |
+| T-068 | Mark-one-read (on click) + mark-all-read + clear-read | ✅ | 🟡 | `frontend/src/components/NotificationPanel.jsx` |
+| T-069 | Socket.io `role:X` room routing, `auth:join` event, super-admin → admin room | ✅ | 🔴 | `backend/server.js` |
+| T-070 | REST endpoints: GET, GET /unread, PATCH /:id/read, PATCH /read-all, DELETE /clear | ✅ | 🟠 | `backend/src/controllers/notifications.controller.js`, `backend/src/routes/notifications.routes.js` |
+| T-071 | `useNotifications` hook — socket singleton, optimistic updates, merge strategy | ✅ | 🔴 | `frontend/src/hooks/useNotifications.js` |
+| T-072 | Settings panel Notifications tab — live active/pending status per event | ✅ | 🟡 | `frontend/src/components/SettingsPanel.jsx` |
+| T-073 | `animate-pulse-once` badge animation keyframe | ✅ | 🟡 | `frontend/src/index.css` |
 
 ---
 
