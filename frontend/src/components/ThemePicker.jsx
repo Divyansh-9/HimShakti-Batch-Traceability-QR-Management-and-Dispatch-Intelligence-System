@@ -116,8 +116,16 @@ export default function ThemePicker({ transparent = false }) {
           })}
 
           {/* Footer */}
-          <div className="px-3 py-2 border-t border-border">
-            <p className="text-[10px] text-text-muted leading-tight">Applies across the whole app.</p>
+          <div className="px-3 py-2 border-t border-border space-y-1">
+            {activeMode === 'system' && (
+              <p className="text-[10px] text-text-muted leading-tight">
+                System resolved to <span className="font-semibold text-text-primary capitalize">{resolvedMode}</span>.
+                {resolvedMode === 'light' && (
+                  <> If your OS is dark, set Chrome → Appearance → Mode to <span className="font-semibold">Dark</span> or use <span className="font-semibold">Dark</span> mode directly.</>
+                )}
+              </p>
+            )}
+            <p className="text-[10px] text-text-muted leading-tight">Synced across all devices.</p>
           </div>
         </div>
       )}
