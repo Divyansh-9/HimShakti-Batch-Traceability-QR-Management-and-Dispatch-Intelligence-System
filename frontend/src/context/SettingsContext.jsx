@@ -1,6 +1,24 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import client from '../api/client';
+/**
+ * SettingsContext — Phase 2 (System-mode fix)
+ *
+ * Root cause of "system" mode rendering broken:
+ *   The Tailwind custom variant is defined as:
+ *     @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *))
+ *   Writing data-theme="system" to the DOM bypasses this entirely, so every
+ *   Tailwind `dark:` class is un-applied while CSS-var overrides still fire —
+ *   producing a broken half-dark hybrid (dark backgrounds, light card surfaces).
+ *
+ * Fix:
+ *   Never write "system" to the DOM. Instead, resolve the actual OS preference
+ *   via matchMedia and write "dark" or "light". Store "system" in localStorage
+ *   and the DB as the user's intent, but only resolved values touch data-theme.
+ *
+ *   Also attach a matchMedia listener so if the user changes their OS theme
+ *   while the app is open, the UI updates in real-time.
+ */
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
+import { useQuery }          from '@tanstack/react-query';
+import client                from '../api/client';
 import { useSettingsMutation } from '../hooks/useSettingsMutation';
 
 const SettingsContext = createContext();
@@ -13,7 +31,6 @@ export const DEFAULTS = {
   density: 'normal',
 };
 
-// Map font id → CSS font-family value
 export const FONT_FAMILIES = {
   inter:   "'Inter', system-ui, -apple-system, sans-serif",
   dmsans:  "'DM Sans', system-ui, sans-serif",
@@ -21,8 +38,14 @@ export const FONT_FAMILIES = {
   manrope: "'Manrope', system-ui, sans-serif",
 };
 
+/** Resolve "system" to "dark" or "light" using the OS preference. */
+function resolveMode(mode) {
+  if (mode !== 'system') return mode;
+  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
 export const SettingsProvider = ({ children }) => {
-  // 1. Initialise from localStorage or DEFAULTS — zero flash
+  // Initialise from localStorage or DEFAULTS — zero flash
   const [prefs, setPrefsState] = useState(() => {
     try {
       const stored = localStorage.getItem('hs_prefs');
@@ -32,24 +55,28 @@ export const SettingsProvider = ({ children }) => {
     }
   });
 
-  // 2. Apply preferences to the DOM (data-attributes + CSS vars)
+  // Keep a stable ref to prefs for the matchMedia listener
+  const prefsRef = useRef(prefs);
+  useEffect(() => { prefsRef.current = prefs; }, [prefs]);
+
+  /**
+   * Apply preferences to the DOM.
+   *
+   * KEY RULE: data-theme is always written as "dark" or "light" — never "system".
+   * The stored prefs.mode value can be "system", but what hits the DOM is resolved.
+   */
   const applyPrefsToDOM = useCallback((p) => {
-    const root = document.documentElement;
+    const root    = document.documentElement;
+    const resolved = resolveMode(p.mode); // "dark" | "light"
 
-    // Theme mode
-    root.setAttribute('data-theme', p.mode);
-
-    // Colour palette
+    root.setAttribute('data-theme',   resolved);       // Tailwind dark: classes work ✓
     root.setAttribute('data-palette', p.palette);
-
-    // Density
     root.setAttribute('data-density', p.density || 'normal');
 
-    // Accent — 'auto' means let palette define brand-primary
+    // Accent — 'auto' means palette defines brand-primary
     if (p.accent && p.accent !== 'auto') {
       root.style.setProperty('--brand-primary', p.accent);
-      // Derive a slightly darker hover from the same hue
-      root.style.setProperty('--brand-hover', p.accent);
+      root.style.setProperty('--brand-hover',   p.accent);
     } else {
       root.style.removeProperty('--brand-primary');
       root.style.removeProperty('--brand-hover');
@@ -65,7 +92,28 @@ export const SettingsProvider = ({ children }) => {
     applyPrefsToDOM(prefs);
   }, [prefs, applyPrefsToDOM]);
 
-  // 3. Load saved preferences from the DB (cross-device sync)
+  /**
+   * Real-time OS preference listener.
+   * When the user changes Light/Dark in System Preferences while the app is open,
+   * we re-apply DOM attributes so the theme updates without a page reload.
+   * Only active when prefs.mode === "system".
+   */
+  useEffect(() => {
+    const mq = window.matchMedia?.('(prefers-color-scheme: dark)');
+    if (!mq) return;
+
+    const handler = () => {
+      if (prefsRef.current.mode === 'system') {
+        applyPrefsToDOM(prefsRef.current);
+      }
+    };
+
+    // addEventListener is supported in all modern browsers
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, [applyPrefsToDOM]);
+
+  // Load saved preferences from the DB (cross-device sync)
   const { data: dbUser } = useQuery({
     queryKey: ['me'],
     queryFn:  () => client('/auth/me', { skipAuthRedirect: true }).then(res => res.data),
@@ -73,7 +121,6 @@ export const SettingsProvider = ({ children }) => {
     retry: false,
   });
 
-  // 4. Persist mutation
   const mutation = useSettingsMutation();
 
   // Merge DB preferences when they arrive
@@ -88,7 +135,6 @@ export const SettingsProvider = ({ children }) => {
     }
   }, [dbUser?.preferences, applyPrefsToDOM]);
 
-  // 5. Exposed functions
   const setPref = useCallback((key, value) => {
     setPrefsState(prev => {
       const updated = { ...prev, [key]: value };

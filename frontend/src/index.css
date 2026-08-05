@@ -1,4 +1,4 @@
-@import "tailwindcss";
+﻿@import "tailwindcss";
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 @theme {
@@ -49,51 +49,24 @@
     --status-error: #f87171;
   }
 
-  /* ── Phase 1: System mode ──────────────────── */
-  @media (prefers-color-scheme: dark) {
-    :root[data-theme="system"] {
-      --bg-primary: #0f172a;
-      --bg-surface: #16213e;
-      --bg-surface-2: #1d2a4d;
-      --text-primary: #f8fafc;
-      --text-muted: #94a3b8;
-      --border-color: #2a3a5f;
-      --bg-nav: #111c3a;
-      --brand-primary: #f97316;
-      --brand-hover: #fb923c;
-      --status-success: #22c55e;
-      --status-warning: #facc15;
-      --status-pending: #60a5fa;
-      --status-error: #f87171;
-    }
-  }
-  @media (prefers-color-scheme: light) {
-    :root[data-theme="system"] {
-      --bg-primary: #f6f8fc;
-      --bg-surface: #ffffff;
-      --bg-surface-2: #eef2f8;
-      --text-primary: #172033;
-      --text-muted: #667085;
-      --border-color: #d9e1ec;
-      --bg-nav: #27439b;
-      --brand-primary: #ea580c;
-      --brand-hover: #c2410c;
-      --status-success: #16a34a;
-      --status-warning: #d97706;
-      --status-pending: #2563eb;
-      --status-error: #dc2626;
-    }
-  }
+  /*
+   * NOTE: data-theme="system" is NEVER written to the DOM.
+   * SettingsContext resolves "system" to "dark" or "light" via matchMedia
+   * before calling setAttribute('data-theme', ...). This ensures Tailwind's
+   * @custom-variant dark (&:where([data-theme="dark"] ...)) always matches.
+   * The old @media (prefers-color-scheme) blocks that targeted [data-theme="system"]
+   * have been removed â€” they are dead code and caused the broken hybrid render.
+   */
 
-  /* ── Phase 1: 8 starter palettes ────────────── */
-  /* Default handled above. */
-  
+  /* â”€â”€ Phase 1: 8 starter palettes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+  /* Default palette uses :root vars above. */
+
   [data-palette="midnight"] {
     --bg-primary: #ffffff; --bg-surface: #f8fafc; --bg-surface-2: #f1f5f9;
     --text-primary: #0f172a; --text-muted: #64748b; --border-color: #e2e8f0;
     --bg-nav: #312e81; --brand-primary: #4338ca; --brand-hover: #3730a3;
   }
-  [data-palette="midnight"][data-theme="dark"], [data-palette="midnight"][data-theme="system"] {
+  [data-palette="midnight"][data-theme="dark"] {
     --bg-primary: #040410; --bg-surface: #0a0a1a; --bg-surface-2: #14142a;
     --text-primary: #e8e8f8; --text-muted: #8a8aab; --border-color: #1e1e3a;
     --bg-nav: #060618; --brand-primary: #6366f1; --brand-hover: #818cf8;
@@ -104,7 +77,7 @@
     --text-primary: #064e3b; --text-muted: #10b981; --border-color: #d1e8db;
     --bg-nav: #064e3b; --brand-primary: #10b981; --brand-hover: #059669;
   }
-  [data-palette="forest"][data-theme="dark"], [data-palette="forest"][data-theme="system"] {
+  [data-palette="forest"][data-theme="dark"] {
     --bg-primary: #061f14; --bg-surface: #0a2f1f; --bg-surface-2: #11422d;
     --text-primary: #e2f8eb; --text-muted: #34d399; --border-color: #1c593f;
     --bg-nav: #03140a; --brand-primary: #10b981; --brand-hover: #34d399;
@@ -115,7 +88,7 @@
     --text-primary: #4a4031; --text-muted: #8c7e63; --border-color: #d6ccb5;
     --bg-nav: #78350f; --brand-primary: #d97706; --brand-hover: #b45309;
   }
-  [data-palette="warmsand"][data-theme="dark"], [data-palette="warmsand"][data-theme="system"] {
+  [data-palette="warmsand"][data-theme="dark"] {
     --bg-primary: #1f1b16; --bg-surface: #2b251e; --bg-surface-2: #3a3229;
     --text-primary: #f5f0e6; --text-muted: #a69a83; --border-color: #4a4135;
     --bg-nav: #14100c; --brand-primary: #f59e0b; --brand-hover: #fbbf24;
@@ -126,7 +99,7 @@
     --text-primary: #7c2d12; --text-muted: #ea580c; --border-color: #fed7aa;
     --bg-nav: #7c2d12; --brand-primary: #c2410c; --brand-hover: #9a3412;
   }
-  [data-palette="copper"][data-theme="dark"], [data-palette="copper"][data-theme="system"] {
+  [data-palette="copper"][data-theme="dark"] {
     --bg-primary: #241108; --bg-surface: #361a0d; --bg-surface-2: #4f2715;
     --text-primary: #ffedd5; --text-muted: #fdba74; --border-color: #6d3820;
     --bg-nav: #1a0b04; --brand-primary: #f97316; --brand-hover: #fb923c;
@@ -137,7 +110,7 @@
     --text-primary: #134e4a; --text-muted: #14b8a6; --border-color: #99f6e4;
     --bg-nav: #134e4a; --brand-primary: #0d9488; --brand-hover: #0f766e;
   }
-  [data-palette="mint"][data-theme="dark"], [data-palette="mint"][data-theme="system"] {
+  [data-palette="mint"][data-theme="dark"] {
     --bg-primary: #041d1a; --bg-surface: #0a2f2a; --bg-surface-2: #114b43;
     --text-primary: #ccfbf1; --text-muted: #5eead4; --border-color: #1a6d61;
     --bg-nav: #02120e; --brand-primary: #14b8a6; --brand-hover: #2dd4bf;
@@ -148,7 +121,7 @@
     --text-primary: #581c87; --text-muted: #a855f7; --border-color: #e9d5ff;
     --bg-nav: #581c87; --brand-primary: #7e22ce; --brand-hover: #6b21a8;
   }
-  [data-palette="plum"][data-theme="dark"], [data-palette="plum"][data-theme="system"] {
+  [data-palette="plum"][data-theme="dark"] {
     --bg-primary: #1d0f2e; --bg-surface: #2b1744; --bg-surface-2: #3d215d;
     --text-primary: #f3e8ff; --text-muted: #d8b4fe; --border-color: #552f82;
     --bg-nav: #130a1f; --brand-primary: #a855f7; --brand-hover: #c084fc;
@@ -159,20 +132,20 @@
     --text-primary: #0c4a6e; --text-muted: #38bdf8; --border-color: #bae6fd;
     --bg-nav: #0c4a6e; --brand-primary: #0284c7; --brand-hover: #0369a1;
   }
-  [data-palette="nordicfrost"][data-theme="dark"], [data-palette="nordicfrost"][data-theme="system"] {
+  [data-palette="nordicfrost"][data-theme="dark"] {
     --bg-primary: #061828; --bg-surface: #0a2640; --bg-surface-2: #103c62;
     --text-primary: #e0f2fe; --text-muted: #7dd3fc; --border-color: #185a8f;
     --bg-nav: #03101c; --brand-primary: #38bdf8; --brand-hover: #7dd3fc;
   }
 
-  /* ── Phase 2: Palettes 9–25 ──────────────────────────────── */
+  /* â”€â”€ Phase 2: Palettes 9â€“25 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
   [data-palette="rose"] {
     --bg-primary: #ffffff; --bg-surface: #fff1f2; --bg-surface-2: #ffe4e6;
     --text-primary: #881337; --text-muted: #e11d48; --border-color: #fecdd3;
     --bg-nav: #881337; --brand-primary: #e11d48; --brand-hover: #be123c;
   }
-  [data-palette="rose"][data-theme="dark"], [data-palette="rose"][data-theme="system"] {
+  [data-palette="rose"][data-theme="dark"] {
     --bg-primary: #1f0613; --bg-surface: #2d0d1c; --bg-surface-2: #3f1529;
     --text-primary: #ffe4e6; --text-muted: #fda4af; --border-color: #5e1a33;
     --bg-nav: #130308; --brand-primary: #fb7185; --brand-hover: #fda4af;
@@ -183,7 +156,7 @@
     --text-primary: #0f172a; --text-muted: #475569; --border-color: #cbd5e1;
     --bg-nav: #1e293b; --brand-primary: #334155; --brand-hover: #1e293b;
   }
-  [data-palette="slate"][data-theme="dark"], [data-palette="slate"][data-theme="system"] {
+  [data-palette="slate"][data-theme="dark"] {
     --bg-primary: #020617; --bg-surface: #0f172a; --bg-surface-2: #1e293b;
     --text-primary: #f1f5f9; --text-muted: #94a3b8; --border-color: #334155;
     --bg-nav: #010409; --brand-primary: #64748b; --brand-hover: #94a3b8;
@@ -194,7 +167,7 @@
     --text-primary: #1e3a8a; --text-muted: #3b82f6; --border-color: #bfceff;
     --bg-nav: #1e3a8a; --brand-primary: #2563eb; --brand-hover: #1d4ed8;
   }
-  [data-palette="ocean"][data-theme="dark"], [data-palette="ocean"][data-theme="system"] {
+  [data-palette="ocean"][data-theme="dark"] {
     --bg-primary: #080f2a; --bg-surface: #0f1d45; --bg-surface-2: #1a2d62;
     --text-primary: #dbeafe; --text-muted: #93c5fd; --border-color: #1e3a8a;
     --bg-nav: #040a1a; --brand-primary: #3b82f6; --brand-hover: #60a5fa;
@@ -205,7 +178,7 @@
     --text-primary: #7f1d1d; --text-muted: #dc2626; --border-color: #fca5a5;
     --bg-nav: #7f1d1d; --brand-primary: #dc2626; --brand-hover: #b91c1c;
   }
-  [data-palette="crimson"][data-theme="dark"], [data-palette="crimson"][data-theme="system"] {
+  [data-palette="crimson"][data-theme="dark"] {
     --bg-primary: #1c0505; --bg-surface: #2a0a0a; --bg-surface-2: #3d1010;
     --text-primary: #fee2e2; --text-muted: #fca5a5; --border-color: #5a1616;
     --bg-nav: #100202; --brand-primary: #ef4444; --brand-hover: #f87171;
@@ -216,7 +189,7 @@
     --text-primary: #365314; --text-muted: #65a30d; --border-color: #d9e8b8;
     --bg-nav: #365314; --brand-primary: #65a30d; --brand-hover: #4d7c0f;
   }
-  [data-palette="olive"][data-theme="dark"], [data-palette="olive"][data-theme="system"] {
+  [data-palette="olive"][data-theme="dark"] {
     --bg-primary: #0e1a04; --bg-surface: #182808; --bg-surface-2: #243d0e;
     --text-primary: #ecfccb; --text-muted: #a3e635; --border-color: #365314;
     --bg-nav: #07100201; --brand-primary: #84cc16; --brand-hover: #a3e635;
@@ -227,7 +200,7 @@
     --text-primary: #4c1d95; --text-muted: #7c3aed; --border-color: #ddd6fe;
     --bg-nav: #4c1d95; --brand-primary: #7c3aed; --brand-hover: #6d28d9;
   }
-  [data-palette="lavender"][data-theme="dark"], [data-palette="lavender"][data-theme="system"] {
+  [data-palette="lavender"][data-theme="dark"] {
     --bg-primary: #120a2e; --bg-surface: #1c1045; --bg-surface-2: #2d1b63;
     --text-primary: #ede9fe; --text-muted: #c4b5fd; --border-color: #3d2a7a;
     --bg-nav: #0a0519; --brand-primary: #8b5cf6; --brand-hover: #a78bfa;
@@ -238,7 +211,7 @@
     --text-primary: #78350f; --text-muted: #d97706; --border-color: #fde68a;
     --bg-nav: #78350f; --brand-primary: #f59e0b; --brand-hover: #d97706;
   }
-  [data-palette="citrus"][data-theme="dark"], [data-palette="citrus"][data-theme="system"] {
+  [data-palette="citrus"][data-theme="dark"] {
     --bg-primary: #1c1100; --bg-surface: #2a1c00; --bg-surface-2: #3d2b00;
     --text-primary: #fef3c7; --text-muted: #fcd34d; --border-color: #5c4200;
     --bg-nav: #100a00; --brand-primary: #fbbf24; --brand-hover: #fcd34d;
@@ -249,7 +222,7 @@
     --text-primary: #14532d; --text-muted: #059669; --border-color: #6ee7b7;
     --bg-nav: #14532d; --brand-primary: #059669; --brand-hover: #047857;
   }
-  [data-palette="aurora"][data-theme="dark"], [data-palette="aurora"][data-theme="system"] {
+  [data-palette="aurora"][data-theme="dark"] {
     --bg-primary: #022c16; --bg-surface: #054723; --bg-surface-2: #096335;
     --text-primary: #dcfce7; --text-muted: #4ade80; --border-color: #147243;
     --bg-nav: #011508; --brand-primary: #22c55e; --brand-hover: #4ade80;
@@ -260,7 +233,7 @@
     --text-primary: #2e1065; --text-muted: #6d28d9; --border-color: #c4b5fd;
     --bg-nav: #2e1065; --brand-primary: #6d28d9; --brand-hover: #5b21b6;
   }
-  [data-palette="dusk"][data-theme="dark"], [data-palette="dusk"][data-theme="system"] {
+  [data-palette="dusk"][data-theme="dark"] {
     --bg-primary: #0d0520; --bg-surface: #170a35; --bg-surface-2: #22114e;
     --text-primary: #ede9fe; --text-muted: #a78bfa; --border-color: #3b2070;
     --bg-nav: #060210; --brand-primary: #7c3aed; --brand-hover: #8b5cf6;
@@ -271,7 +244,7 @@
     --text-primary: #831843; --text-muted: #db2777; --border-color: #fbcfe8;
     --bg-nav: #831843; --brand-primary: #db2777; --brand-hover: #be185d;
   }
-  [data-palette="sakura"][data-theme="dark"], [data-palette="sakura"][data-theme="system"] {
+  [data-palette="sakura"][data-theme="dark"] {
     --bg-primary: #200510; --bg-surface: #320a1c; --bg-surface-2: #48102a;
     --text-primary: #fce7f3; --text-muted: #f9a8d4; --border-color: #65173e;
     --bg-nav: #110208; --brand-primary: #ec4899; --brand-hover: #f472b6;
@@ -282,7 +255,7 @@
     --text-primary: #3d1f0a; --text-muted: #8b5e3c; --border-color: #d4c4b5;
     --bg-nav: #3d1f0a; --brand-primary: #92400e; --brand-hover: #78350f;
   }
-  [data-palette="espresso"][data-theme="dark"], [data-palette="espresso"][data-theme="system"] {
+  [data-palette="espresso"][data-theme="dark"] {
     --bg-primary: #120700; --bg-surface: #1e0f05; --bg-surface-2: #2e1a0d;
     --text-primary: #fdf8f4; --text-muted: #c4956a; --border-color: #4a2a12;
     --bg-nav: #090300; --brand-primary: #b45309; --brand-hover: #d97706;
@@ -293,7 +266,7 @@
     --text-primary: #1e40af; --text-muted: #2563eb; --border-color: #93c5fd;
     --bg-nav: #1e40af; --brand-primary: #1d4ed8; --brand-hover: #1e3a8a;
   }
-  [data-palette="cobalt"][data-theme="dark"], [data-palette="cobalt"][data-theme="system"] {
+  [data-palette="cobalt"][data-theme="dark"] {
     --bg-primary: #070e2c; --bg-surface: #0d1945; --bg-surface-2: #152460;
     --text-primary: #dbeafe; --text-muted: #93c5fd; --border-color: #1e3a8a;
     --bg-nav: #030711; --brand-primary: #3b82f6; --brand-hover: #60a5fa;
@@ -304,7 +277,7 @@
     --text-primary: #134e4a; --text-muted: #0f766e; --border-color: #5eead4;
     --bg-nav: #134e4a; --brand-primary: #0f766e; --brand-hover: #0d6b63;
   }
-  [data-palette="jade"][data-theme="dark"], [data-palette="jade"][data-theme="system"] {
+  [data-palette="jade"][data-theme="dark"] {
     --bg-primary: #031c18; --bg-surface: #072e28; --bg-surface-2: #0e463d;
     --text-primary: #ccfbf1; --text-muted: #2dd4bf; --border-color: #145f55;
     --bg-nav: #010f0c; --brand-primary: #14b8a6; --brand-hover: #2dd4bf;
@@ -315,7 +288,7 @@
     --text-primary: #0f172a; --text-muted: #64748b; --border-color: #94a3b8;
     --bg-nav: #334155; --brand-primary: #475569; --brand-hover: #334155;
   }
-  [data-palette="storm"][data-theme="dark"], [data-palette="storm"][data-theme="system"] {
+  [data-palette="storm"][data-theme="dark"] {
     --bg-primary: #03070f; --bg-surface: #0a1628; --bg-surface-2: #131f35;
     --text-primary: #e2e8f0; --text-muted: #94a3b8; --border-color: #1e2d45;
     --bg-nav: #010407; --brand-primary: #64748b; --brand-hover: #94a3b8;
@@ -326,7 +299,7 @@
     --text-primary: #713f12; --text-muted: #ca8a04; --border-color: #fde047;
     --bg-nav: #713f12; --brand-primary: #ca8a04; --brand-hover: #a16207;
   }
-  [data-palette="saffron"][data-theme="dark"], [data-palette="saffron"][data-theme="system"] {
+  [data-palette="saffron"][data-theme="dark"] {
     --bg-primary: #1a0f00; --bg-surface: #281900; --bg-surface-2: #3d2600;
     --text-primary: #fefce8; --text-muted: #facc15; --border-color: #5a3c00;
     --bg-nav: #0d0700; --brand-primary: #eab308; --brand-hover: #facc15;
@@ -337,13 +310,13 @@
     --text-primary: #431407; --text-muted: #c2410c; --border-color: #fdba74;
     --bg-nav: #431407; --brand-primary: #ea580c; --brand-hover: #c2410c;
   }
-  [data-palette="ember"][data-theme="dark"], [data-palette="ember"][data-theme="system"] {
+  [data-palette="ember"][data-theme="dark"] {
     --bg-primary: #150500; --bg-surface: #230c02; --bg-surface-2: #351606;
     --text-primary: #ffedd5; --text-muted: #fb923c; --border-color: #5c2008;
     --bg-nav: #0a0200; --brand-primary: #f97316; --brand-hover: #fb923c;
   }
 
-  /* ── Phase 2: Font family vars ────────────────────────────── */
+  /* â”€â”€ Phase 2: Font family vars â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
   :root {
     --font-body: 'Inter', system-ui, -apple-system, sans-serif;
     --font-mono: 'JetBrains Mono', ui-monospace, monospace;
@@ -358,7 +331,7 @@
     font-family: var(--font-body);
   }
 
-  /* ── Phase 2: Density variants ────────────────────────────── */
+  /* â”€â”€ Phase 2: Density variants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
   [data-density="compact"] {
     --density-padding-sm: 0.25rem;
     --density-padding-md: 0.375rem;
@@ -378,7 +351,7 @@
   /* normal is the default :root values above */
 }
 
-/* ── Dashboard tab animations ──────────────────────────────── */
+/* â”€â”€ Dashboard tab animations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 @keyframes dashTabIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
@@ -387,7 +360,7 @@
   animation: dashTabIn 0.25s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-/* ── ThemePicker popover animation ─────────────────────────── */
+/* â”€â”€ ThemePicker popover animation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 @keyframes popoverIn {
   from { opacity: 0; transform: translateY(-6px) scale(0.97); }
   to   { opacity: 1; transform: translateY(0)    scale(1);    }
@@ -402,15 +375,15 @@
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-/* ── Pass 1: Glossy button sweep ─────────────────────────────── */
-/* GPU-composited layer — prevents sweep from causing layout recalc */
+/* â”€â”€ Pass 1: Glossy button sweep â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* GPU-composited layer â€” prevents sweep from causing layout recalc */
 .btn-glossy {
   position: relative;
   overflow: hidden;
   transform: translateZ(0);
   transition: transform 200ms ease, box-shadow 200ms ease;
 }
-/* Diagonal light sweep via ::before — translates across on hover */
+/* Diagonal light sweep via ::before â€” translates across on hover */
 /* Note: dark: prefix cannot reach pseudo-elements in Tailwind v4;
    all dark overrides use :root[data-theme="dark"] attribute selectors */
 .btn-glossy::before {
@@ -428,16 +401,16 @@
 .btn-glossy:hover::before { transform: translateX(110%); }
 .btn-glossy:active        { transform: scale(0.98); }
 
-/* Primary (brand/orange) glow — light mode */
+/* Primary (brand/orange) glow â€” light mode */
 .btn-primary-glossy:hover {
   box-shadow: 0 4px 20px rgba(234, 88, 12, 0.40);
 }
-/* Primary glow — dark mode (slightly warmer, higher opacity) */
+/* Primary glow â€” dark mode (slightly warmer, higher opacity) */
 :root[data-theme="dark"] .btn-primary-glossy:hover {
   box-shadow: 0 4px 20px rgba(249, 115, 22, 0.45);
 }
 
-/* Secondary / ghost glow — neutral, never introduces a new hue */
+/* Secondary / ghost glow â€” neutral, never introduces a new hue */
 .btn-secondary-glossy:hover {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
 }
@@ -445,7 +418,7 @@
   box-shadow: 0 4px 16px rgba(255, 255, 255, 0.08);
 }
 
-/* ── Pass 1: Nav tab sliding indicator ───────────────────────── */
+/* â”€â”€ Pass 1: Nav tab sliding indicator â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 /* Indicator pill slides under active tab via JS-set inline left/width */
 .nav-tab-group    { position: relative; }
 .nav-tab-indicator {
@@ -460,7 +433,7 @@
   pointer-events: none;
 }
 
-/* ── Pass 1: Navbar glass-on-scroll ─────────────────────────── */
+/* â”€â”€ Pass 1: Navbar glass-on-scroll â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 /* Replaces the hard bg-surface/95 color swap with a frosted glass
    transition. Fallback (no @supports block) is always readable. */
 .navbar-scrolled {
@@ -486,8 +459,8 @@
   }
 }
 
-/* ── Pass 2: Ambient gradient behind card grids ───────────── */
-/* Cards sit on flat color — blur has nothing to blur without this.
+/* â”€â”€ Pass 2: Ambient gradient behind card grids â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* Cards sit on flat color â€” blur has nothing to blur without this.
    Scoped to the grid container, not the cards themselves. */
 .card-grid-ambient { position: relative; }
 .card-grid-ambient::before {
@@ -504,8 +477,8 @@
     rgba(249, 115, 22, 0.04) 0%, transparent 70%);
 }
 
-/* ── Pass 2: Glass card base ──────────────────────────────── */
-/* Fallback — always readable without backdrop-filter */
+/* â”€â”€ Pass 2: Glass card base â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* Fallback â€” always readable without backdrop-filter */
 .glass-card {
   background: rgba(255, 255, 255, 0.80);
   border: 1px solid rgba(0, 0, 0, 0.08);
@@ -537,7 +510,7 @@
 /* Card hover lift */
 .glass-card:hover { transform: translateY(-4px); }
 
-/* ── Pass 2: Gradient border (top-bright → bottom-fade) ─────── */
+/* â”€â”€ Pass 2: Gradient border (top-bright â†’ bottom-fade) â”€â”€â”€â”€â”€â”€â”€ */
 .glass-card-border { position: relative; }
 .glass-card-border::after {
   content: '';
@@ -558,7 +531,7 @@
     rgba(255,255,255,0.12), rgba(255,255,255,0.02)) border-box;
 }
 
-/* ── Pass 2: Semantic hover glows by status ─────────────────── */
+/* â”€â”€ Pass 2: Semantic hover glows by status â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .glass-card-brand:hover   { box-shadow: 0 8px 32px rgba(234,88,12,0.15),  inset 0 1px 0 rgba(255,255,255,0.60); }
 .glass-card-urgent:hover  { box-shadow: 0 8px 32px rgba(220,38,38,0.15),  inset 0 1px 0 rgba(255,255,255,0.60); }
 .glass-card-warning:hover { box-shadow: 0 8px 32px rgba(217,119,6,0.15),  inset 0 1px 0 rgba(255,255,255,0.60); }
@@ -571,7 +544,7 @@
 :root[data-theme="dark"] .glass-card-ready:hover   { box-shadow: 0 8px 32px rgba(34,197,94,0.18),   inset 0 1px 0 rgba(255,255,255,0.12); }
 :root[data-theme="dark"] .glass-card-blue:hover    { box-shadow: 0 8px 32px rgba(96,165,250,0.18),  inset 0 1px 0 rgba(255,255,255,0.12); }
 
-/* ── Pass 2: Icon badge inner glow ─────────────────────────── */
+/* â”€â”€ Pass 2: Icon badge inner glow â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .icon-badge {
   transition: transform 200ms ease;
   box-shadow: inset 0 0 8px rgba(0,0,0,0.08);
@@ -585,7 +558,7 @@
 /* Icon scales on parent card hover, not its own hover zone */
 .glass-card:hover .icon-badge { transform: scale(1.1); }
 
-/* ── Pass 2: Table row status accents (no lift) ─────────────── */
+/* â”€â”€ Pass 2: Table row status accents (no lift) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .batch-row { transition: background 150ms ease, box-shadow 150ms ease; }
 .batch-row-urgent:hover  { background: rgba(220,38,38,0.04);  box-shadow: inset 3px 0 0 rgba(220,38,38,0.6); }
 .batch-row-warning:hover { background: rgba(217,119,6,0.04);  box-shadow: inset 3px 0 0 rgba(217,119,6,0.6); }
@@ -595,24 +568,24 @@
 :root[data-theme="dark"] .batch-row-warning:hover { background: rgba(217,119,6,0.06);  box-shadow: inset 3px 0 0 rgba(250,204,21,0.4); }
 :root[data-theme="dark"] .batch-row-ready:hover   { background: rgba(22,163,74,0.06);  box-shadow: inset 3px 0 0 rgba(34,197,94,0.5); }
 
-/* ── Pass 2: Staggered card entrance ────────────────────────── */
+/* â”€â”€ Pass 2: Staggered card entrance â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 /* Reuses existing dashTabIn keyframe from above */
 .card-stagger-1 { animation: dashTabIn 0.25s cubic-bezier(0.22,1,0.36,1) 0ms   both; }
 .card-stagger-2 { animation: dashTabIn 0.25s cubic-bezier(0.22,1,0.36,1) 60ms  both; }
 .card-stagger-3 { animation: dashTabIn 0.25s cubic-bezier(0.22,1,0.36,1) 120ms both; }
 .card-stagger-4 { animation: dashTabIn 0.25s cubic-bezier(0.22,1,0.36,1) 180ms both; }
 
-/* ── Pass 2: FEFO #1 priority ring ──────────────────────────── */
+/* â”€â”€ Pass 2: FEFO #1 priority ring â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .fefo-top-badge { box-shadow: 0 0 0 2px var(--brand-primary); }
 
-/* ── Pass 3: Sidebar Premium Glass ──────────────────────────── */
-/* ALWAYS dark — sidebar uses white text system so must stay dark.
+/* â”€â”€ Pass 3: Sidebar Premium Glass â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ALWAYS dark â€” sidebar uses white text system so must stay dark.
    This is the correct premium design pattern (Apple, Linear, Notion).
    Progressive enhancement: @supports adds blur on capable browsers. */
 .sidebar-premium {
   background: rgba(10, 15, 32, 0.97);
   border-right: 1px solid rgba(255, 255, 255, 0.06);
-  /* Depth gradient — top slightly lighter, bottom darker */
+  /* Depth gradient â€” top slightly lighter, bottom darker */
   box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.04),
               4px 0 24px rgba(0, 0, 0, 0.18);
 }
@@ -623,7 +596,7 @@
     -webkit-backdrop-filter: blur(20px) saturate(180%);
   }
 }
-/* Subtle gradient overlay via ::before — depth without a DOM node */
+/* Subtle gradient overlay via ::before â€” depth without a DOM node */
 .sidebar-premium::before {
   content: '';
   position: absolute;
@@ -636,7 +609,7 @@
   pointer-events: none;
   z-index: 0;
 }
-/* Bottom ambient glow strip — brand accent bleeds in from bottom-left */
+/* Bottom ambient glow strip â€” brand accent bleeds in from bottom-left */
 .sidebar-premium::after {
   content: '';
   position: absolute;
@@ -648,8 +621,8 @@
   z-index: 0;
 }
 
-/* ── Pass 3: Hero ambient light layer ───────────────────────── */
-/* No mix-blend-mode — plain gradient, no compositing surprise.
+/* â”€â”€ Pass 3: Hero ambient light layer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* No mix-blend-mode â€” plain gradient, no compositing surprise.
    Sits below the dark overlay scrim (z-index 2) at z-index 1. */
 @keyframes heroAmbientShift {
   0%   { opacity: 0.06; transform: translate(0%,  0%)  scale(1.00); }
@@ -666,8 +639,8 @@
   z-index: 1;
 }
 
-/* ── Pass 4: Skeleton shimmer sweep ─────────────────────────── */
-/* Infinite left-to-right light band — replaces animate-pulse */
+/* â”€â”€ Pass 4: Skeleton shimmer sweep â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* Infinite left-to-right light band â€” replaces animate-pulse */
 @keyframes shimmerSweep {
   from { background-position: -200% center; }
   to   { background-position:  200% center; }
@@ -689,9 +662,9 @@
   background-size: 200% 100%;
 }
 
-/* ── Pass 4: KPI Alert Dot — professional notification indicator ── */
+/* â”€â”€ Pass 4: KPI Alert Dot â€” professional notification indicator â”€â”€ */
 /* Small pulsing dot next to the "Need Attention" count.
-   Uses a ping/ripple pattern (like iOS badge) — far cleaner than
+   Uses a ping/ripple pattern (like iOS badge) â€” far cleaner than
    a box-shadow glow directly on text. */
 @keyframes kpiDotPing {
   0%    { transform: scale(1);   opacity: 0.85; }
@@ -722,8 +695,8 @@
 :root[data-theme="dark"] .kpi-alert-dot        { background: #f87171; }
 :root[data-theme="dark"] .kpi-alert-dot::before { background: #f87171; }
 
-/* ── Pass 4: Urgent pulse glow — kept for FEFO badge only ─────── */
-/* NOTE: no longer applied to the KPI number — use .kpi-alert-dot instead */
+/* â”€â”€ Pass 4: Urgent pulse glow â€” kept for FEFO badge only â”€â”€â”€â”€â”€â”€â”€ */
+/* NOTE: no longer applied to the KPI number â€” use .kpi-alert-dot instead */
 @keyframes urgentPulse {
   0%, 100% { box-shadow: 0 0 4px  rgba(220,38,38,0.50); }
   50%       { box-shadow: 0 0 14px rgba(220,38,38,0.85); }
@@ -739,7 +712,7 @@
   .kpi-alert-dot::before  { animation: none; }
 }
 
-/* ── Mobile / Touch optimizations ───────────────────────────── */
+/* â”€â”€ Mobile / Touch optimizations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 /* Prevent horizontal overflow on mobile */
 html, body {
@@ -752,7 +725,7 @@ html, body {
   -webkit-overflow-scrolling: touch;
 }
 
-/* ── Mobile-only touch target & sizing ──────────────────────── */
+/* â”€â”€ Mobile-only touch target & sizing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 @media (max-width: 767px) {
   /* Minimum touch target size for accessibility (iOS HIG: 44x44pt) */
   button, a {
@@ -770,7 +743,7 @@ html, body {
     min-width: 0 !important;
   }
 
-  /* TabBanner — shorter on mobile (176px on desktop) */
+  /* TabBanner â€” shorter on mobile (176px on desktop) */
   .tab-banner {
     height: 120px !important;
   }
@@ -787,14 +760,14 @@ nav[class*="fixed bottom-0"] {
   height: calc(60px + env(safe-area-inset-bottom, 0px));
 }
 
-/* ── Responsive table improvements ──────────────────────────── */
+/* â”€â”€ Responsive table improvements â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 /* Tables scroll horizontally on mobile instead of breaking layout */
 .table-mobile-scroll {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }
 
-/* ── Mobile card hover: disable lift on touch (no hover state) ── */
+/* â”€â”€ Mobile card hover: disable lift on touch (no hover state) â”€â”€ */
 @media (hover: none) {
   .glass-card:hover   { transform: none; }
   .btn-glossy:hover   { transform: none; }
@@ -802,7 +775,7 @@ nav[class*="fixed bottom-0"] {
 }
 
 
-/* ── FilterTabBar mobile scroll ──────────────────────────────── */
+/* â”€â”€ FilterTabBar mobile scroll â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .nav-tab-group {
   scrollbar-width: none; /* Firefox */
   -ms-overflow-style: none; /* IE */
@@ -811,7 +784,7 @@ nav[class*="fixed bottom-0"] {
   display: none; /* Chrome/Safari */
 }
 
-/* ── Mobile Typography Scale ─────────────────────────────────── */
+/* â”€â”€ Mobile Typography Scale â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 @media (max-width: 640px) {
   /* Prevent zoom on input focus on iOS */
   input, select, textarea {
@@ -819,7 +792,7 @@ nav[class*="fixed bottom-0"] {
   }
 }
 
-/* ── GOD Badge — gold shimmer animation for Super Admin ─────── */
+/* â”€â”€ GOD Badge â€” gold shimmer animation for Super Admin â”€â”€â”€â”€â”€â”€â”€ */
 @keyframes goldShimmer {
   0%   { background-position: 200% center; }
   100% { background-position: -200% center; }
@@ -855,7 +828,7 @@ nav[class*="fixed bottom-0"] {
   100% { background-position: 200% 0; }
 }
 
-/* The text itself — clipped gold gradient */
+/* The text itself â€” clipped gold gradient */
 .god-badge-text {
   background: linear-gradient(90deg, #bf8f00 0%, #ffd700 28%, #fffacd 50%, #ffd700 72%, #bf8f00 100%);
   background-size: 200% auto;
@@ -870,7 +843,7 @@ nav[class*="fixed bottom-0"] {
   line-height: 1.6;
 }
 
-/* ── GOD Avatar — gold gradient circle for Super Admin ─────── */
+/* â”€â”€ GOD Avatar â€” gold gradient circle for Super Admin â”€â”€â”€â”€â”€â”€â”€ */
 .god-avatar {
   background: linear-gradient(135deg, #b8860b 0%, #ffd700 40%, #fffacd 65%, #ffd700 80%, #b8860b 100%);
   background-size: 200% 200%;
@@ -889,7 +862,7 @@ nav[class*="fixed bottom-0"] {
   animation: godSweep 2.8s ease-in-out infinite;
 }
 
-/* Text inside god-avatar — dark gold so it contrasts on bright gold bg */
+/* Text inside god-avatar â€” dark gold so it contrasts on bright gold bg */
 .god-avatar-text {
   position: relative;
   z-index: 1;
@@ -903,11 +876,11 @@ nav[class*="fixed bottom-0"] {
   align-self: center;
 }
 
-/* ═══════════════════════════════════════════════════════════════════
-   HELP & WALKTHROUGH — Tour + Welcome Modal System
-   ═══════════════════════════════════════════════════════════════════ */
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   HELP & WALKTHROUGH â€” Tour + Welcome Modal System
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
-/* ── Tour backdrop ──────────────────────────────────────────────── */
+/* â”€â”€ Tour backdrop â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .tour-backdrop {
   position: fixed;
   inset: 0;
@@ -924,7 +897,7 @@ nav[class*="fixed bottom-0"] {
   to   { opacity: 1; }
 }
 
-/* ── Spotlight ring — glowing cutout around target element ───────── */
+/* â”€â”€ Spotlight ring â€” glowing cutout around target element â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .tour-spotlight-ring {
   position: absolute;       /* absolute so top/left are page-relative */
   z-index: 9991;
@@ -947,7 +920,7 @@ nav[class*="fixed bottom-0"] {
   to   { opacity: 1; transform: scale(1); }
 }
 
-/* ── Tour card — glassmorphism step tooltip ───────────────────────── */
+/* â”€â”€ Tour card â€” glassmorphism step tooltip â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 @keyframes tourCardIn {
   from { opacity: 0; transform: scale(0.93) translateY(8px); }
   to   { opacity: 1; transform: scale(1)    translateY(0); }
@@ -1035,7 +1008,7 @@ nav[class*="fixed bottom-0"] {
   border-top: 1px solid rgba(255, 255, 255, 0.07);
 }
 
-/* ── Step dots ────────────────────────────────────────────────────── */
+/* â”€â”€ Step dots â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .tour-dots {
   display: flex;
   align-items: center;
@@ -1062,7 +1035,7 @@ nav[class*="fixed bottom-0"] {
   background: rgba(249, 115, 22, 0.35);
 }
 
-/* ── Tour nav buttons ─────────────────────────────────────────────── */
+/* â”€â”€ Tour nav buttons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .tour-card-nav {
   display: flex;
   align-items: center;
@@ -1113,9 +1086,9 @@ nav[class*="fixed bottom-0"] {
   box-shadow: 0 4px 12px rgba(34, 197, 94, 0.5);
 }
 
-/* ═══════════════════════════════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    WELCOME CHOICE MODAL
-   ═══════════════════════════════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 .welcome-modal-overlay {
   position: fixed;
@@ -1266,7 +1239,7 @@ nav[class*="fixed bottom-0"] {
   margin: 0 0 12px 0;
 }
 
-/* ── Choice cards ────────────────────────────────────────────────── */
+/* â”€â”€ Choice cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .welcome-choices-grid {
   display: flex;
   flex-direction: column;
@@ -1383,7 +1356,7 @@ nav[class*="fixed bottom-0"] {
   transform: translateX(3px);
 }
 
-/* ── Modal footer ──────────────────────────────────────────────── */
+/* â”€â”€ Modal footer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .welcome-modal-footer {
   display: flex;
   flex-direction: column;
@@ -1415,9 +1388,9 @@ nav[class*="fixed bottom-0"] {
   margin: 0;
 }
 
-/* ═══════════════════════════════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    FLOATING ? HELP FAB
-   ═══════════════════════════════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 .help-fab {
   position: fixed;
@@ -1462,7 +1435,7 @@ nav[class*="fixed bottom-0"] {
   transform: scale(0.97);
 }
 
-/* Pulsing ring for new users — draws attention to the FAB */
+/* Pulsing ring for new users â€” draws attention to the FAB */
 .help-fab--new-user {
   animation: fabPop 0.4s cubic-bezier(0.22, 1, 0.36, 1) 1.8s both,
              fabRingPulse 2s ease-in-out 2.5s 4;
@@ -1497,7 +1470,7 @@ nav[class*="fixed bottom-0"] {
   opacity: 1;
 }
 
-/* ── Sidebar help button pulse ring (new users only) ────────────── */
+/* â”€â”€ Sidebar help button pulse ring (new users only) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 @keyframes sidebarHelpPulse {
   0%   { box-shadow: 0 0 0 0   rgba(249, 115, 22, 0.6); }
   70%  { box-shadow: 0 0 0 6px rgba(249, 115, 22, 0); }
@@ -1508,7 +1481,7 @@ nav[class*="fixed bottom-0"] {
   animation: sidebarHelpPulse 1.8s ease-out 2s 3;
 }
 
-/* ── "Explore Myself" nudge — gentle pulse on key element ─────────── */
+/* â”€â”€ "Explore Myself" nudge â€” gentle pulse on key element â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 @keyframes nudgePulse {
   0%   { box-shadow: 0 0 0 0   rgba(249,115,22,0.7), 0 0 0 0   rgba(249,115,22,0.3); }
   40%  { box-shadow: 0 0 0 6px rgba(249,115,22,0.4), 0 0 0 12px rgba(249,115,22,0.15); }
@@ -1524,7 +1497,7 @@ nav[class*="fixed bottom-0"] {
   transition: outline 0.3s;
 }
 
-/* ── Mobile — hide FAB when bottom nav is visible (< md) ────────── */
+/* â”€â”€ Mobile â€” hide FAB when bottom nav is visible (< md) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 @media (max-width: 767px) {
   .help-fab {
     display: none;

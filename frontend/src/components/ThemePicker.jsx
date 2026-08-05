@@ -1,26 +1,39 @@
 /**
- * ThemePicker — a compact popover with Light / Dark / System options.
- * Replaces the old ThemeToggle binary icon.
- * Reads / writes from SettingsContext so the choice persists cross-device.
+ * ThemePicker — compact 3-option popover: Light / Dark / System.
+ * Connected to SettingsContext. Works consistently on Home, About, Dashboard.
+ *
+ * System mode UX:
+ *  - The trigger icon shows the RESOLVED mode (Sun/Moon) so the user can see
+ *    what's actually being applied right now, not just the abstract "System" label.
+ *  - The label shows "System" so they know it's following OS preference.
+ *  - The popover still shows the Monitor icon for the System row.
  */
 import { useState, useRef, useEffect } from 'react';
 import { Sun, Moon, Monitor, ChevronDown } from 'lucide-react';
 import { useSettings } from '../context/SettingsContext';
 
 const MODES = [
-  { id: 'light',  label: 'Light',  Icon: Sun },
-  { id: 'dark',   label: 'Dark',   Icon: Moon },
-  { id: 'system', label: 'System', Icon: Monitor },
+  { id: 'light',  label: 'Light',  Icon: Sun,     desc: 'Always light'            },
+  { id: 'dark',   label: 'Dark',   Icon: Moon,    desc: 'Always dark'             },
+  { id: 'system', label: 'System', Icon: Monitor, desc: 'Follows your OS setting' },
 ];
 
-const MODE_ICON = { light: Sun, dark: Moon, system: Monitor };
+/** Resolve "system" to actual OS preference for icon display. */
+function resolveForDisplay(mode) {
+  if (mode !== 'system') return mode;
+  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
+const RESOLVED_ICON = { light: Sun, dark: Moon };
 
 export default function ThemePicker({ transparent = false }) {
   const { prefs, setPref } = useSettings();
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-  const activeMode = prefs?.mode || 'dark';
-  const ActiveIcon = MODE_ICON[activeMode] || Moon;
+  const [open, setOpen]     = useState(false);
+  const ref                 = useRef(null);
+
+  const activeMode    = prefs?.mode || 'dark';
+  const resolvedMode  = resolveForDisplay(activeMode);   // "dark" | "light"
+  const TriggerIcon   = RESOLVED_ICON[resolvedMode] ?? Moon;
 
   // Close on outside click
   useEffect(() => {
@@ -32,13 +45,24 @@ export default function ThemePicker({ transparent = false }) {
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
+  // If system mode is active, re-render when OS preference changes
+  useEffect(() => {
+    if (activeMode !== 'system') return;
+    const mq = window.matchMedia?.('(prefers-color-scheme: dark)');
+    if (!mq) return;
+    const handler = () => {}; // force re-render via state
+    const forceUpdate = () => { setOpen(o => o); }; // cheap re-render
+    mq.addEventListener('change', forceUpdate);
+    return () => mq.removeEventListener('change', forceUpdate);
+  }, [activeMode]);
+
   return (
     <div className="relative" ref={ref}>
-      {/* Trigger button */}
+      {/* Trigger */}
       <button
         id="theme-picker-trigger"
         onClick={() => setOpen(v => !v)}
-        aria-label="Change theme mode"
+        aria-label={`Theme: ${activeMode}`}
         aria-expanded={open}
         aria-haspopup="listbox"
         className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 min-h-[36px] min-w-[36px] ${
@@ -47,7 +71,9 @@ export default function ThemePicker({ transparent = false }) {
             : 'text-text-muted hover:bg-surface-2 hover:text-text-primary border border-transparent hover:border-border'
         } focus:outline-none focus-visible:ring-2 focus-visible:ring-brand`}
       >
-        <ActiveIcon className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
+        {/* Show the resolved icon (sun/moon) so user sees current state */}
+        <TriggerIcon className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
+        {/* Show stored mode label (Light / Dark / System) */}
         <span className="hidden sm:inline capitalize text-xs tracking-wide">{activeMode}</span>
         <ChevronDown className={`w-3 h-3 flex-shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
       </button>
@@ -57,7 +83,7 @@ export default function ThemePicker({ transparent = false }) {
         <div
           role="listbox"
           aria-label="Select theme mode"
-          className="absolute right-0 top-full mt-2 w-44 z-50 rounded-xl border border-border bg-surface shadow-xl shadow-black/10 overflow-hidden animate-popover-in"
+          className="absolute right-0 top-full mt-2 w-48 z-50 rounded-xl border border-border bg-surface shadow-xl shadow-black/10 overflow-hidden animate-popover-in"
           style={{ animationDuration: '150ms' }}
         >
           {/* Header */}
@@ -65,7 +91,7 @@ export default function ThemePicker({ transparent = false }) {
             <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Theme mode</p>
           </div>
 
-          {MODES.map(({ id, label, Icon }) => {
+          {MODES.map(({ id, label, Icon, desc }) => {
             const isActive = activeMode === id;
             return (
               <button
@@ -80,15 +106,16 @@ export default function ThemePicker({ transparent = false }) {
                 }`}
               >
                 <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-brand' : 'text-text-muted'}`} />
-                <span className="flex-1 text-left">{label}</span>
-                {isActive && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-brand flex-shrink-0" />
-                )}
+                <div className="flex-1 text-left">
+                  <div>{label}</div>
+                  <div className={`text-[10px] font-normal ${isActive ? 'text-brand/70' : 'text-text-muted'}`}>{desc}</div>
+                </div>
+                {isActive && <span className="w-1.5 h-1.5 rounded-full bg-brand flex-shrink-0" />}
               </button>
             );
           })}
 
-          {/* Footer note */}
+          {/* Footer */}
           <div className="px-3 py-2 border-t border-border">
             <p className="text-[10px] text-text-muted leading-tight">Applies across the whole app.</p>
           </div>
