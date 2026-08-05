@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import ThemeToggle from './ThemeToggle';
+import ThemePicker from './ThemePicker';
 import { Menu, X, LayoutDashboard, LogIn, LogOut, ChevronDown, User, Settings, Shield, Link2, LinkIcon, Unlink } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import client from '../api/client';
@@ -201,7 +201,7 @@ export default function Navbar({ onMenuClick, isSidebarOpen }) {
 
           {/* Right: Theme + User dropdown */}
           <div className="flex items-center gap-2">
-            <ThemeToggle />
+            <ThemePicker />
 
             {/* User avatar + dropdown */}
             <div className="relative" ref={userMenuRef}>
@@ -415,7 +415,7 @@ export default function Navbar({ onMenuClick, isSidebarOpen }) {
             )}
 
             <div className="flex items-center ml-4 space-x-3 pl-4 border-l border-white/20">
-              <ThemeToggle />
+              <ThemePicker transparent={transparent} />
               {isLoggedIn ? (
                 // Pass 1: btn-glossy + btn-secondary-glossy — neutral glow, light sweep
                 <button
@@ -446,7 +446,7 @@ export default function Navbar({ onMenuClick, isSidebarOpen }) {
 
           {/* Mobile toggle */}
           <div className="flex items-center md:hidden space-x-3">
-            <ThemeToggle />
+            <ThemePicker transparent={transparent} />
             <button
               onClick={() => setIsOpen(!isOpen)}
               className={`p-2 rounded-md transition-colors ${transparent ? 'text-white hover:bg-white/10' : 'text-text-muted hover:bg-surface-2'}`}

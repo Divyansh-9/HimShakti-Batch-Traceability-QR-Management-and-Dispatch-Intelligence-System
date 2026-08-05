@@ -6,6 +6,12 @@ const userSchema = new mongoose.Schema({
   passwordHash: { type: String, required: true },
   name:         { type: String, required: true, trim: true },
   email:        { type: String, default: '', lowercase: true, trim: true },
+  phone:        { type: String, default: '' },
+  preferences: {
+    mode:    { type: String, default: 'dark' },
+    palette: { type: String, default: 'default' },
+    accent:  { type: String, default: 'auto' },
+  },
   // Linked Google account email — optional, set via 'Link Google Account' in dashboard
   googleEmail:  { type: String, default: null, lowercase: true, trim: true, sparse: true },
   googleLinkedAt: { type: Date, default: null },

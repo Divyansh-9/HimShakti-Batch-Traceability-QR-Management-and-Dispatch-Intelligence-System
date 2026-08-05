@@ -2,9 +2,11 @@ const crypto        = require('crypto');
 const bcrypt        = require('bcryptjs');
 const User          = require('../models/User.model');
 const AccessRequest = require('../models/AccessRequest.model');
+const LoginEvent    = require('../models/LoginEvent.model');
 const { generateToken } = require('../middleware/auth');
 const jwt = require('jsonwebtoken');
 const { sendApprovalEmail, sendRejectionEmail, sendOtpEmail, sendPasswordResetOtpEmail } = require('../services/emailService');
+const { appendLoginEvent } = require('../services/loginHistory.service');
 
 function getFrontendUrl() {
   const envUrl = process.env.FRONTEND_URL;
@@ -46,13 +48,14 @@ async function login(req, res, next) {
     }
 
     const tokenPayload = {
+      _id:          user._id,
       username:     user.username,
       name:         user.name,
       role:         user.role,
       isSuperAdmin: isSA,
     };
     const token = generateToken(tokenPayload);
-    return res.json({
+    res.json({
       success: true,
       token,
       user: {
@@ -62,6 +65,11 @@ async function login(req, res, next) {
         isSuperAdmin: isSA,
       },
     });
+    
+    appendLoginEvent(user, req, 'password').catch(err =>
+      console.error('[LoginHistory] Unhandled:', err.message)
+    );
+    return;
   } catch (err) {
     next(err);
   }
@@ -958,6 +966,67 @@ async function restoreUser(req, res, next) {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────
+// GET /auth/me
+async function getMe(req, res, next) {
+  try {
+    const user = await User.findById(req.user._id).select('-passwordHash -otpCode -resetToken');
+    if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+    return res.json({ success: true, data: user });
+  } catch (err) { next(err); }
+}
+
+// PATCH /auth/me
+async function updateProfile(req, res, next) {
+  try {
+    const { name, phone } = req.body;
+    const updates = {};
+    if (name !== undefined) updates.name = name;
+    if (phone !== undefined) updates.phone = phone;
+    
+    const user = await User.findByIdAndUpdate(req.user._id, updates, { new: true }).select('-passwordHash');
+    return res.json({ success: true, data: user });
+  } catch (err) { next(err); }
+}
+
+// PATCH /auth/me/settings
+async function updateSettings(req, res, next) {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+    
+    user.preferences = { ...user.preferences, ...req.body };
+    await user.save();
+    return res.json({ success: true, data: user.preferences });
+  } catch (err) { next(err); }
+}
+
+// POST /auth/me/change-password
+async function changePassword(req, res, next) {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) return res.status(400).json({ success: false, error: 'Missing fields' });
+    
+    const user = await User.findById(req.user._id);
+    const valid = await user.comparePassword(currentPassword);
+    if (!valid) return res.status(401).json({ success: false, error: 'Incorrect current password' });
+    
+    user.passwordHash = await bcrypt.hash(newPassword, 10);
+    await user.save();
+    return res.json({ success: true, message: 'Password updated successfully' });
+  } catch (err) { next(err); }
+}
+
+// GET /auth/me/login-history
+async function getLoginHistory(req, res, next) {
+  try {
+    const events = await LoginEvent.find({ userId: req.user._id })
+      .sort({ createdAt: -1 })
+      .limit(10);
+    return res.json({ success: true, count: events.length, data: events });
+  } catch (err) { next(err); }
+}
+
 module.exports = {
   login, requestAccess, listRequests, approve, reject,
   activate, verifyOtp, resendOtp, resendInvite, removeRequest,
@@ -965,5 +1034,6 @@ module.exports = {
   forgotPassword, verifyResetOtp, resetPassword,
   // New RBAC management
   changeRole, deleteUser, listDeletedUsers, restoreUser,
+  getMe, updateProfile, updateSettings, changePassword, getLoginHistory,
 };
 

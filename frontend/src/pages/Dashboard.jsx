@@ -16,11 +16,12 @@ import {
   Package, Truck, QrCode, LayoutDashboard, Bot,
   LogOut, Download, AlertTriangle, CheckCircle, Clock, RefreshCw, Menu, Search, Leaf, Plus,
   ShieldCheck, Users, XCircle, Copy, ExternalLink, Zap, TrendingUp, Activity, Info,
-  Eye, Archive, Pencil, RotateCcw, HelpCircle, ChevronLeft, ChevronRight
+  Eye, Archive, Pencil, RotateCcw, HelpCircle, ChevronLeft, ChevronRight, Settings
 } from 'lucide-react';
 import { WalkthroughProvider, useWalkthrough } from '../context/WalkthroughContext';
 import WelcomeChoiceModal from '../components/WelcomeChoiceModal';
 import WalkthroughTour from '../components/WalkthroughTour';
+import SettingsPanel from '../components/SettingsPanel';
 
 
 // ── Tab metadata ───────────────────────────────────────────────────
@@ -2517,6 +2518,7 @@ const NAV_TABS = [
   { id: 'fefo',      label: 'FEFO Queue',    icon: Truck },
   { id: 'qr',        label: 'QR Codes',      icon: QrCode },
   { id: 'ai',        label: 'AI Audit',      icon: Bot },
+  { id: 'settings',  label: 'Settings',      icon: Settings },
   { id: 'admin',     label: 'Admin Panel',   icon: ShieldCheck, adminOnly: true },
 ];
 
@@ -2871,6 +2873,9 @@ function DashboardInner() {
                   <AIAuditTab batchCount={batches.length} />
                 </ErrorBoundary>
               </>
+            )}
+            {activeTab === 'settings' && (
+              <SettingsPanel />
             )}
             {activeTab === 'admin' && (
               <>

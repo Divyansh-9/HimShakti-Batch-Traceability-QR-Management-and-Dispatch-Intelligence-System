@@ -41,6 +41,13 @@ router.delete('/users/:id',           protect, requireAdminOrAbove,   ctrl.delet
 // Any authenticated user — link/unlink Google account email
 router.patch('/me/google-link', protect, ctrl.linkGoogle);
 
+// ── Self-service — any authenticated user ──────────────────────────
+router.get(  '/me',                 protect, ctrl.getMe);
+router.patch('/me',                 protect, ctrl.updateProfile);
+router.patch('/me/settings',        protect, ctrl.updateSettings);
+router.post( '/me/change-password', protect, ctrl.changePassword);
+router.get(  '/me/login-history',   protect, ctrl.getLoginHistory);
+
 module.exports = router;
 
 

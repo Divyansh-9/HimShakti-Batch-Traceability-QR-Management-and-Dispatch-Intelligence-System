@@ -13,6 +13,7 @@
 'use strict';
 const User             = require('../models/User.model');
 const { generateToken } = require('../middleware/auth');
+const { appendLoginEvent } = require('../services/loginHistory.service');
 
 // ─────────────────────────────────────────────────────────────────
 // POST /auth/google/token  [public]
@@ -80,9 +81,13 @@ async function googleLogin(req, res, next) {
     }
 
     // ── 3. Issue JWT ───────────────────────────────────────────────
-    const token = generateToken({ username: user.username, role: user.role });
+    const token = generateToken({ 
+      _id: user._id, 
+      username: user.username, 
+      role: user.role 
+    });
 
-    return res.json({
+    res.json({
       success: true,
       token,
       user: {
@@ -92,6 +97,11 @@ async function googleLogin(req, res, next) {
         role:     user.role,
       },
     });
+
+    appendLoginEvent(user, req, 'google').catch(err => 
+      console.error('[LoginHistory] Google path unhandled:', err.message)
+    );
+    return;
 
   } catch (err) {
     next(err);

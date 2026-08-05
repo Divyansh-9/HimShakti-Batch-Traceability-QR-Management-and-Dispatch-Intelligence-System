@@ -29,7 +29,7 @@ async function client(path, options = {}) {
   if (res.status === 401 && !skipAuthRedirect) {
     localStorage.removeItem('hs_token');
     window.location.href = '/login';
-    return;
+    throw new Error('Unauthorized');
   }
 
   const data = await res.json();
