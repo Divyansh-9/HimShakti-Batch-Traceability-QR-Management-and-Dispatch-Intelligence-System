@@ -66,7 +66,7 @@
 ## EPIC-02 · Settings Centre
 
 > **Goal:** A polished, cross-device settings panel covering profile, theme, security, and role-based notifications.
-> **Status:** 🔄 In Progress (Phase 1 complete; Phase 2 and 3 planned)
+> **Status:** ✅ Done (Phase 1, Phase 2, and Phase 3 completed)
 
 ---
 
@@ -155,7 +155,7 @@
 | T-060 | Create `Notification.model.js` (role, type, message, read, 7-day TTL) | ✅ | 🔴 | `backend/src/models/Notification.model.js` |
 | T-061 | Create `notificationService.js` (notify + notifyRoles, fire-and-forget) | ✅ | 🔴 | `backend/src/services/notificationService.js` |
 | T-062 | Batch creation → notify `factory-manager` + `manager` | ✅ | 🟠 | `backend/src/controllers/batches.controller.js` |
-| T-063 | Quality inspection → notify `manager` | ⏸️ | 🟠 | No inspection controller in codebase yet — hook ready, trigger pending |
+| T-063 | Quality inspection → notify `manager` | ✅ | 🟠 | `backend/src/controllers/inspections.controller.js` (Completed) |
 | T-064 | Dispatch → notify `manager` + `factory-manager` | ✅ | 🟠 | `backend/src/controllers/batches.controller.js` |
 | T-065 | Admin approve/changeRole/deleteUser → notify `super-admin` | ✅ | 🟠 | `backend/src/controllers/auth.controller.js` |
 | T-066 | Navbar bell icon + animated unread badge | ✅ | 🟠 | `frontend/src/components/Navbar.jsx` |

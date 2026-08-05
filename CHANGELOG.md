@@ -6,6 +6,30 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2.5.0] — 2026-08-05
+
+### 🔔 Role-Based Notifications & Quality Inspection System
+
+This release introduces a fully functional real-time notification system and a comprehensive Quality Inspection workflow, fulfilling Phase 3 of the Settings Centre and enabling the QA Inspector role.
+
+#### Added
+
+**Real-Time Notifications (Phase 3)**
+- `Notification.model.js` — MongoDB collection for role-based notifications with a 7-day TTL.
+- `notificationService.js` — Core service to trigger notifications across the system.
+- Real-time Socket.io integration with `role:X` rooms for targeted broadcasting.
+- Full UI integration: Navbar bell icon with pulse animation, and a NotificationPanel dropdown.
+- REST endpoints for fetching unread count, marking read, and clearing history.
+- `useNotifications` hook in frontend for optimistic updates and state merging.
+- Event triggers added to batch creation (manager/factory-manager), dispatch, and admin actions.
+
+**Quality Inspection System**
+- Complete QA workflow enabling the `qa-inspector` role to log inspections on batches.
+- Integration with notifications: triggers an alert to `manager` upon inspection completion.
+- Full quality inspection suite including defect logging and status tracking.
+
+---
+
 ## [2.4.0] — 2026-08-05
 
 ### 🎨 Settings Centre — Phase 1 & 2 (Profile · Customisation · Security · ThemePicker)

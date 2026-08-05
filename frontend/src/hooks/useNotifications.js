@@ -16,7 +16,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import client              from '../api/client';
 import { useAuth }         from './useAuth';
 
-const SOCKET_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+const SOCKET_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001';
 
 // ── Singleton socket — one connection per browser tab ───────────────
 let _socket = null;
