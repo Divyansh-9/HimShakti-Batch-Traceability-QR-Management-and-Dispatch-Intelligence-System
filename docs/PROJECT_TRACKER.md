@@ -1,4 +1,4 @@
-﻿# HimShakti — Project Tracker
+# HimShakti — Project Tracker
 
 > Living document. Updated after every development session.
 > Organized by: **Epic → Story → Task** (Jira-style).
@@ -128,22 +128,23 @@
 
 ---
 
-### STORY-02-05 · Additional Palettes ⏳ (Phase 2)
+### STORY-02-05 · Additional Palettes ✅ (Phase 2 — 2026-08-05)
 
 | Task ID | Task | Status | Priority | Files Affected |
 |---|---|---|---|---|
-| T-050 | Add palettes 9–25 to `index.css` (light + dark variants each) | ⏳ | 🟠 | `frontend/src/index.css` |
-| T-051 | Add palette metadata to `PALETTES` array in `SettingsPanel.jsx` | ⏳ | 🟠 | `frontend/src/components/SettingsPanel.jsx` |
+| T-050 | Add palettes 9–25 to `index.css` (light + dark variants each) | ✅ | 🟠 | `frontend/src/index.css` |
+| T-051 | Add palette metadata to `PALETTES` array in `SettingsPanel.jsx` | ✅ | 🟠 | `frontend/src/components/SettingsPanel.jsx` |
 
 ---
 
-### STORY-02-06 · Advanced Customisation Controls ⏳ (Phase 2)
+### STORY-02-06 · Advanced Customisation Controls ✅ (Phase 2 — 2026-08-05)
 
 | Task ID | Task | Status | Priority | Files Affected |
 |---|---|---|---|---|
-| T-052 | Accent colour selector (16 swatches + Auto option) | ⏳ | 🟡 | `frontend/src/components/SettingsPanel.jsx`, `frontend/src/index.css` |
-| T-053 | Font family selector (Inter, DM Sans, Outfit, Manrope) | ⏳ | 🟡 | `frontend/src/components/SettingsPanel.jsx`, `frontend/src/index.css` |
-| T-054 | Density selector (Compact / Normal / Cozy) | ⏳ | 🟡 | `frontend/src/components/SettingsPanel.jsx`, `frontend/src/index.css` |
+| T-052 | Accent colour selector (17 swatches + Auto) | ✅ | 🟡 | `frontend/src/components/SettingsPanel.jsx`, `frontend/src/index.css` |
+| T-053 | Font family selector (Inter, DM Sans, Outfit, Manrope) via Google Fonts | ✅ | 🟡 | `frontend/src/components/SettingsPanel.jsx`, `frontend/src/index.css`, `frontend/index.html` |
+| T-054 | Density selector (Compact / Normal / Cozy) | ✅ | 🟡 | `frontend/src/components/SettingsPanel.jsx`, `frontend/src/index.css` |
+| T-055 | Extend `SettingsContext` DEFAULTS + `applyPrefsToDOM` for font + density | ✅ | 🔴 | `frontend/src/context/SettingsContext.jsx` |
 
 ---
 

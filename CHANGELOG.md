@@ -6,6 +6,66 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2.4.0] — 2026-08-05
+
+### 🎨 Settings Centre — Phase 1 & 2 (Profile · Customisation · Security · ThemePicker)
+
+This release delivers the full **Settings Centre** across two phases, including a premium-redesigned settings panel, a 3-mode theme picker in every header, 25 handcrafted palettes, accent swatches, font selection, and density controls — all persisted cross-device via the backend.
+
+#### Added
+
+**Settings Infrastructure**
+- `LoginEvent.model.js` — separate MongoDB collection for login history with a 30-day TTL index (auto-expiry, no manual cron required).
+- `loginHistory.service.js` — non-blocking fire-and-forget service that resolves UA (browser/OS/device) and geolocation (city/country via `ip-api.com`) then writes a `LoginEvent` document after the HTTP response is already sent.
+- `SettingsContext.jsx` — React context managing `mode`, `palette`, `accent`, `font`, and `density` with zero-flash localStorage initialisation and cross-device DB sync.
+- `useSettingsMutation.js` — TanStack Query mutation hook for saving preference changes to the backend.
+- `ThemePicker.jsx` — compact popover dropdown in every app header (Home, About, Dashboard) with **Light / Dark / System** options. Shows the active mode label + chevron; replaces the old binary sun/moon toggle.
+
+**Backend Self-Service Endpoints**
+- `GET /auth/me` — fetch own profile including preferences.
+- `PATCH /auth/me` — update name and phone number.
+- `PATCH /auth/me/settings` — save theme/font/density preferences (persisted to `User.preferences`).
+- `POST /auth/me/change-password` — bcrypt-guarded password change.
+- `GET /auth/me/login-history` — last 10 `LoginEvent` records for the authenticated user.
+
+**Settings Panel — Profile**
+- Compact header summary block: avatar initials circle, name, email, role badge.
+- Editable fields: Full Name, Mobile Number.
+- Read-only fields: Username, Email, Role.
+
+**Settings Panel — Customisation (Phase 2)**
+- **25 palettes** — each individually tuned for light and dark mode, displayed as 3-stripe colour preview cards with checkmark on active selection:
+  - Phase 1 (8): HimShakti, Midnight, Forest, Warm Sand, Copper, Mint, Plum, Nordic Frost.
+  - Phase 2 (17): Rose, Slate, Ocean, Crimson, Olive, Lavender, Citrus, Aurora, Dusk, Sakura, Espresso, Cobalt, Jade, Storm, Saffron, Ember.
+- **17 accent swatches + Auto** — circular colour pickers overriding `--brand-primary` for buttons, links, and highlights. Auto defers to the active palette.
+- **4 font families** — Inter (default), DM Sans, Outfit, Manrope — loaded via Google Fonts, shown with live `Aa` preview at each card's typeface. Selection immediately updates `--font-body` CSS var.
+- **3 density modes** — Compact / Normal / Cozy — adjusts padding, gap, and text-size spacing vars via `data-density` attribute on `<html>`.
+- **Reset button** — single click restores all Customisation preferences to defaults.
+- Segmented Light / Dark / System control (same logic as ThemePicker, in-context).
+
+**Settings Panel — Security**
+- Eye-reveal toggle on all password fields (Current Password, New Password, Confirm Password).
+- 4-bar password strength meter on the New Password field (Weak → Fair → Good → Strong).
+- Icon-rich login history: each sign-in row shows method badge (Google/Password), city/country, browser + OS, and timestamp.
+
+**Settings Panel — Notifications (Phase 3 structure)**
+- Four intentional notification rows with role-based descriptions and Phase 3 badges — not a blank placeholder.
+
+#### Changed
+- `User.model.js` — added `phone`, `preferences` (mode, palette, accent, font, density) schema fields.
+- `auth.controller.js` — added `getMe`, `updateProfile`, `updateSettings`, `changePassword`, `getLoginHistory`; both `login()` and `googleLogin()` now call `appendLoginEvent` fire-and-forget after response.
+- `auth.controller.js` + `googleAuth.controller.js` — JWT payload now includes `_id` so `req.user._id` resolves in all protected self-service routes.
+- `index.css` — added system-mode media queries, 25 palette CSS variable blocks, `--font-body` var, `--density-*` spacing vars, `animate-popover-in` keyframe.
+- `index.html` — added Google Fonts preconnect + stylesheet for Inter, DM Sans, Outfit, and Manrope.
+- `Navbar.jsx` — replaced `ThemeToggle` (binary icon) with `ThemePicker` (3-option dropdown) in all 3 placement sites (dashboard header, public nav desktop row, mobile row).
+- `useTheme.js` — refactored to thin proxy over `SettingsContext`; eliminates competing `localStorage('theme')` key.
+
+#### Fixed
+- **Login redirect loop** — `SettingsContext` `/auth/me` query now uses `skipAuthRedirect: true` + `retry: false`, preventing the 401 → hard reload → 401 cycle on the login page when `SettingsProvider` wraps the whole app.
+- **Silent login history failure** — JWT token was missing `_id` in the payload; `req.user._id` was `undefined` in protected routes, causing login event writes to silently fail.
+
+---
+
 ## [2.3.0] — 2026-08-03
 
 ### 👑 4-Tier RBAC, Super-Admin "GOD" Badge & Recycle Bin
