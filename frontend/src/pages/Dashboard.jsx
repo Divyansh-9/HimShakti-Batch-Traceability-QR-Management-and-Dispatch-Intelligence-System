@@ -16,12 +16,15 @@ import {
   Package, Truck, QrCode, LayoutDashboard, Bot,
   LogOut, Download, AlertTriangle, CheckCircle, Clock, RefreshCw, Menu, Search, Leaf, Plus,
   ShieldCheck, Users, XCircle, Copy, ExternalLink, Zap, TrendingUp, Activity, Info,
-  Eye, Archive, Pencil, RotateCcw, HelpCircle, ChevronLeft, ChevronRight, Settings
+  Eye, Archive, Pencil, RotateCcw, HelpCircle, ChevronLeft, ChevronRight, Settings,
+  ClipboardCheck, Star, CheckCircle2,
 } from 'lucide-react';
 import { WalkthroughProvider, useWalkthrough } from '../context/WalkthroughContext';
 import WelcomeChoiceModal from '../components/WelcomeChoiceModal';
 import WalkthroughTour from '../components/WalkthroughTour';
 import SettingsPanel from '../components/SettingsPanel';
+import InspectionModal from '../components/InspectionModal';
+import { useInspectionList, useMyInspections } from '../hooks/useInspections';
 
 
 // ── Tab metadata ───────────────────────────────────────────────────
@@ -115,6 +118,21 @@ const TAB_META = {
     desc:        'User roster, role assignments, and access request management. Full visibility into who can access what.',
     dot:         'bg-rose-500',
     mainTint:    'bg-rose-500/[0.015]',
+  },
+  inspection: {
+    wash:        'bg-teal-500/[0.03]',
+    border:      'border-teal-400/25',
+    accentBar:   'bg-teal-500',
+    accentText:  'text-teal-700',
+    accentLight: 'text-teal-300',
+    accentIcon:  'text-teal-400',
+    image:       '/about-hero.png',
+    icon:        ClipboardCheck,
+    eyebrow:     'Quality Control',
+    title:       'Inspection Centre',
+    desc:        'Submit and review structured quality inspections for every batch. Checklist-driven verdicts with real-time manager notifications.',
+    dot:         'bg-teal-500',
+    mainTint:    'bg-teal-500/[0.015]',
   },
 };
 
@@ -2512,14 +2530,170 @@ function AdminPanelTab() {
   );
 }
 
+// ── Tab: Inspection Centre ─────────────────────────────────────────
+function InspectionTab({ batches, onOpenInspection, userRole }) {
+  const isQI = userRole === 'quality-inspector';
+
+  // QI sees their own submissions; managers/admins see all
+  const { data: listData, isLoading: listLoading }   = useInspectionList();
+  const { data: myData,   isLoading: myLoading }     = useMyInspections();
+
+  const allInspections = (isQI ? myData?.data : listData?.data) ?? [];
+  const isLoading      = isQI ? myLoading : listLoading;
+
+  const VERDICT_COLOUR = {
+    PASSED:  'text-green-500 bg-green-500/10 border-green-500/20',
+    FAILED:  'text-rose-500  bg-rose-500/10  border-rose-500/20',
+    FLAGGED: 'text-amber-500 bg-amber-500/10 border-amber-500/20',
+  };
+  const VERDICT_ICON = {
+    PASSED:  <CheckCircle2 className="w-3.5 h-3.5" />,
+    FAILED:  <XCircle      className="w-3.5 h-3.5" />,
+    FLAGGED: <AlertTriangle className="w-3.5 h-3.5" />,
+  };
+
+  function timeAgo(date) {
+    const diff = Date.now() - new Date(date).getTime();
+    const m = Math.floor(diff / 60000);
+    if (m < 1)  return 'just now';
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h ago`;
+    return `${Math.floor(h / 24)}d ago`;
+  }
+
+  const passedCount  = allInspections.filter(i => i.status === 'PASSED').length;
+  const failedCount  = allInspections.filter(i => i.status === 'FAILED').length;
+  const flaggedCount = allInspections.filter(i => i.status === 'FLAGGED').length;
+
+  return (
+    <div className="px-4 sm:px-6 pb-6 space-y-6">
+      {/* Header row */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-sm font-bold text-text-primary">
+            {isQI ? 'My Inspections' : 'All Inspections'}
+          </h2>
+          <p className="text-xs text-text-muted mt-0.5">
+            {isQI
+              ? 'Inspection records you have submitted'
+              : 'Latest inspection per batch across the system'}
+          </p>
+        </div>
+        {isQI && (
+          <button
+            onClick={() => onOpenInspection(null)}
+            className="flex items-center gap-2 px-4 py-2 bg-teal-500 hover:bg-teal-600 text-white text-sm font-semibold rounded-xl transition-all shadow-sm"
+          >
+            <ClipboardCheck className="w-4 h-4" />
+            New Inspection
+          </button>
+        )}
+      </div>
+
+      {/* Summary cards */}
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          { label: 'Passed',  count: passedCount,  colour: 'text-green-500', bg: 'bg-green-500/10', border: 'border-green-500/20' },
+          { label: 'Flagged', count: flaggedCount, colour: 'text-amber-500', bg: 'bg-amber-500/10', border: 'border-amber-500/20' },
+          { label: 'Failed',  count: failedCount,  colour: 'text-rose-500',  bg: 'bg-rose-500/10',  border: 'border-rose-500/20'  },
+        ].map(s => (
+          <div key={s.label} className={`${s.bg} ${s.border} border rounded-xl px-4 py-3`}>
+            <p className={`text-2xl font-black ${s.colour}`}>{s.count}</p>
+            <p className={`text-xs font-medium ${s.colour} opacity-80 mt-0.5`}>{s.label}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Inspection list */}
+      <div className="bg-surface border border-border rounded-xl overflow-hidden">
+        {isLoading ? (
+          <div className="py-12 flex flex-col items-center gap-2 text-text-muted">
+            <div className="w-5 h-5 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
+            <p className="text-xs">Loading inspections…</p>
+          </div>
+        ) : allInspections.length === 0 ? (
+          <div className="py-12 flex flex-col items-center gap-3 text-text-muted">
+            <ClipboardCheck className="w-10 h-10 opacity-20" />
+            <div className="text-center">
+              <p className="text-sm font-semibold">No inspections yet</p>
+              {isQI && (
+                <p className="text-xs mt-1 text-text-muted/60">Click "New Inspection" to submit your first report.</p>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-border">
+              <thead>
+                <tr className="bg-surface-2/40">
+                  {['Batch', 'Product', 'Verdict', 'Rating', 'Inspector', 'Time', isQI ? '' : 'Action'].map((h, i) => (
+                    <th key={i} className="px-4 py-2.5 text-left text-[10px] font-bold text-text-muted uppercase tracking-wider">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {allInspections.map(ins => (
+                  <tr key={ins._id} className="hover:bg-surface-2/40 transition-colors">
+                    <td className="px-4 py-3">
+                      <span className="font-mono text-xs font-bold text-text-primary">{ins.batchCode}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <p className="text-xs text-text-primary truncate max-w-[140px]">{ins.productName}</p>
+                      <p className="text-[10px] text-text-muted">{ins.sku}</p>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border ${VERDICT_COLOUR[ins.status]}`}>
+                        {VERDICT_ICON[ins.status]}
+                        {ins.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-0.5">
+                        {[1,2,3,4,5].map(s => (
+                          <Star key={s} className={`w-3 h-3 ${s <= ins.rating ? 'fill-amber-400 text-amber-400' : 'fill-transparent text-border'}`} />
+                        ))}
+                        <span className="ml-1 text-[10px] text-text-muted">{ins.rating}/5</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <p className="text-xs text-text-primary">{ins.inspectedBy?.name}</p>
+                    </td>
+                    <td className="px-4 py-3">
+                      <p className="text-[10px] text-text-muted">{timeAgo(ins.createdAt)}</p>
+                    </td>
+                    {isQI ? (
+                      <td />
+                    ) : (
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => onOpenInspection(ins.batchId ? batches.find(b => b._id === ins.batchId) : null)}
+                          className="text-[10px] text-brand hover:underline"
+                        >
+                          Inspect again
+                        </button>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const NAV_TABS = [
-  { id: 'overview',  label: 'Overview',      icon: LayoutDashboard },
-  { id: 'batches',   label: 'Batches',       icon: Package },
-  { id: 'fefo',      label: 'FEFO Queue',    icon: Truck },
-  { id: 'qr',        label: 'QR Codes',      icon: QrCode },
-  { id: 'ai',        label: 'AI Audit',      icon: Bot },
-  { id: 'settings',  label: 'Settings',      icon: Settings },
-  { id: 'admin',     label: 'Admin Panel',   icon: ShieldCheck, adminOnly: true },
+  { id: 'overview',    label: 'Overview',      icon: LayoutDashboard },
+  { id: 'batches',     label: 'Batches',       icon: Package },
+  { id: 'fefo',        label: 'FEFO Queue',    icon: Truck },
+  { id: 'qr',          label: 'QR Codes',      icon: QrCode },
+  { id: 'ai',          label: 'AI Audit',      icon: Bot },
+  { id: 'inspection',  label: 'Inspections',   icon: ClipboardCheck, qiOnly: true },
+  { id: 'settings',    label: 'Settings',      icon: Settings },
+  { id: 'admin',       label: 'Admin Panel',   icon: ShieldCheck, adminOnly: true },
 ];
 
 
@@ -2539,6 +2713,8 @@ function DashboardInner() {
     });
   };
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showInspectionModal, setShowInspectionModal] = useState(false);
+  const [inspectionPrefillBatch, setInspectionPrefillBatch] = useState(null);
   const [batchToDispatch, setBatchToDispatch] = useState(null);
   const [batchesFilter, setBatchesFilter]     = useState('all'); // cross-tab filter from Overview
   const [drawerBatch, setDrawerBatch]         = useState(null);  // open detail drawer
@@ -2594,8 +2770,9 @@ function DashboardInner() {
   //   - Manager: admin tab visible (read-only) + all tabs
   //   - Others (factory-manager, quality-inspector, dispatch-coordinator): no admin tab
   const visibleTabs = NAV_TABS.filter(t => {
-    if (!t.adminOnly) return true;
-    return userIsSuperAdmin || user?.role === 'admin' || user?.role === 'manager';
+    if (t.adminOnly) return userIsSuperAdmin || user?.role === 'admin' || user?.role === 'manager';
+    if (t.qiOnly)    return user?.role === 'quality-inspector' || user?.role === 'manager' || user?.role === 'admin' || userIsSuperAdmin;
+    return true;
   });
 
 
@@ -2874,6 +3051,19 @@ function DashboardInner() {
                 </ErrorBoundary>
               </>
             )}
+            {activeTab === 'inspection' && (
+              <>
+                <TabBanner tabId="inspection" />
+                <InspectionTab
+                  batches={batches}
+                  userRole={user?.role}
+                  onOpenInspection={(prefillBatch) => {
+                    setInspectionPrefillBatch(prefillBatch || null);
+                    setShowInspectionModal(true);
+                  }}
+                />
+              </>
+            )}
             {activeTab === 'settings' && (
               <SettingsPanel />
             )}
@@ -2925,6 +3115,12 @@ function DashboardInner() {
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         onCreated={handleCreateBatch}
+      />
+      <InspectionModal
+        isOpen={showInspectionModal}
+        onClose={() => { setShowInspectionModal(false); setInspectionPrefillBatch(null); }}
+        batches={batches}
+        prefillBatch={inspectionPrefillBatch}
       />
       <DispatchModal
         batch={batchToDispatch}

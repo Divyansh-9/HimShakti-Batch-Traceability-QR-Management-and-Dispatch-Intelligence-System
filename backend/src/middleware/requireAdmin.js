@@ -76,4 +76,25 @@ function getTier(role, isSuperAdmin = false) {
   return ROLE_TIER[role] ?? 99;
 }
 
-module.exports = { requireAdmin, requireAdminOrAbove, requireSuperAdmin, requireManagerOrAbove, getTier };
+/**
+ * requireQIOrAbove — allows quality-inspector and all tiers above.
+ * Used for: reading inspection records (everyone operational can see them)
+ */
+function requireQIOrAbove(req, res, next) {
+  const { role } = req.user || {};
+  const allowed  = ['quality-inspector', 'manager', 'admin', 'factory-manager', 'dispatch-coordinator'];
+  if (isSAUser(req.user) || allowed.includes(role)) return next();
+  return res.status(403).json({ success: false, error: 'Insufficient permissions to view inspections' });
+}
+
+/**
+ * requireQualityInspector — allows ONLY quality-inspector (+ admin/super-admin for testing).
+ * Used for: creating inspection records.
+ */
+function requireQualityInspector(req, res, next) {
+  const { role } = req.user || {};
+  if (isSAUser(req.user) || role === 'admin' || role === 'quality-inspector') return next();
+  return res.status(403).json({ success: false, error: 'Quality Inspector access required to submit inspections' });
+}
+
+module.exports = { requireAdmin, requireAdminOrAbove, requireSuperAdmin, requireManagerOrAbove, requireQIOrAbove, requireQualityInspector, getTier };

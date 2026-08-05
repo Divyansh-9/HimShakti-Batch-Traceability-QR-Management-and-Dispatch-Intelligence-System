@@ -607,9 +607,8 @@ export default function SettingsPanel() {
                     {
                       label:    'Quality inspection',
                       desc:     'Triggered when an inspection record is submitted.',
-                      roles:    ['manager'],
-                      active:   false,
-                      note:     'Pending — no inspection controller in codebase yet.',
+                      roles:    ['manager', 'admin'],
+                      active:   true,
                     },
                     {
                       label:    'Admin: member approved',
