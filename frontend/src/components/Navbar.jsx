@@ -1,5 +1,6 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import ThemePicker from './ThemePicker';
+import NotificationPanel from './NotificationPanel';
 import { Menu, X, LayoutDashboard, LogIn, LogOut, ChevronDown, User, Settings, Shield, Link2, LinkIcon, Unlink } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import client from '../api/client';
@@ -199,9 +200,10 @@ export default function Navbar({ onMenuClick, isSidebarOpen }) {
             <span className="text-text-muted/40 text-xs">/ Operations</span>
           </div>
 
-          {/* Right: Theme + User dropdown */}
+          {/* Right: Theme + Notifications + User dropdown */}
           <div className="flex items-center gap-2">
             <ThemePicker />
+            <NotificationPanel />
 
             {/* User avatar + dropdown */}
             <div className="relative" ref={userMenuRef}>

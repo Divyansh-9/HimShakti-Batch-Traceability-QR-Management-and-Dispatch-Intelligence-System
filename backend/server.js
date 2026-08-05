@@ -15,7 +15,8 @@ const productRoutes  = require('./src/routes/products.routes');
 const batchRoutes    = require('./src/routes/batches.routes');
 const dispatchRoutes = require('./src/routes/dispatch.routes');
 const qrRoutes       = require('./src/routes/qr.routes');
-const aiRoutes       = require('./src/routes/ai.routes');
+const aiRoutes            = require('./src/routes/ai.routes');
+const notificationRoutes  = require('./src/routes/notifications.routes');
 
 const app    = express();
 const server = http.createServer(app);
@@ -31,13 +32,31 @@ const CORS_ORIGINS = [
   'https://him-shakti-batch-traceability-qr-ma.vercel.app',
 ];
 
-// ── Socket.io — real-time batch updates ────────────────────────────
+// ── Socket.io — real-time updates + role rooms ─────────────────────
 const io = new Server(server, {
   cors: { origin: CORS_ORIGINS, methods: ['GET', 'POST'] },
 });
 
 io.on('connection', (socket) => {
   console.log(`[Socket.io] Client connected: ${socket.id}`);
+
+  /**
+   * Clients emit 'auth:join' right after connecting with their role.
+   * The server joins the socket to the role room so targeted
+   * notifications reach only the correct role group.
+   *
+   * Client usage (in useNotifications hook):
+   *   socket.emit('auth:join', { role: user.role, userId: user._id })
+   */
+  socket.on('auth:join', ({ role, userId } = {}) => {
+    if (role) {
+      socket.join(`role:${role}`);
+      // Super admin also receives admin-tier notifications
+      if (role === 'super-admin') socket.join('role:admin');
+      console.log(`[Socket.io] ${socket.id} joined role:${role} (userId=${userId})`);
+    }
+  });
+
   socket.on('disconnect', () => {
     console.log(`[Socket.io] Client disconnected: ${socket.id}`);
   });
@@ -88,7 +107,8 @@ app.use('/api/qr', qrRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/batches',  batchRoutes);
 app.use('/api/dispatch', dispatchRoutes);
-app.use('/api/ai',       aiRoutes);
+app.use('/api/ai',            aiRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 app.use(errorHandler);
 

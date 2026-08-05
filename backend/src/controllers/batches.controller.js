@@ -5,6 +5,7 @@ const { calculateExpiry, getBatchStatus, calculatePriorityScore } = require('../
 const { generateBatchCode } = require('../utils/batchCodeGenerator');
 const { generateBatchQR }   = require('../services/qrGenerator');
 const { assertProductContract } = require('../utils/productContract');
+const { notifyRoles }       = require('../services/notificationService');
 
 // ── Helper: enrich batch with live daysUntilExpiry ──────────────────
 function enrichBatch(b) {
@@ -65,6 +66,20 @@ async function createBatch(req, res, next) {
     const io = req.app.get('io');
     if (io) io.emit('batch:created', enrichBatch(batch));
 
+    // Phase 3: notify factory-manager and manager roles
+    notifyRoles(req.app, ['factory-manager', 'manager'], {
+      type:    'batch_created',
+      title:   'New batch registered',
+      message: `Batch ${batchCode} — ${batch.productName} (${quantityProduced}${unit}) packed by ${farmerName || 'unknown'}.`,
+      refId:   batchCode,
+      refType: 'batch',
+      triggeredBy: {
+        userId: req.user?._id || null,
+        name:   req.user?.name || req.user?.username || 'System',
+        role:   req.user?.role || null,
+      },
+    }); // fire-and-forget
+
     res.status(201).json({
       success: true,
       message: `Batch ${batchCode} created successfully`,
@@ -118,6 +133,20 @@ async function recordDispatch(req, res, next) {
 
     const io = req.app.get('io');
     if (io) io.emit('batch:updated', { batchId: batch._id, batchCode: batch.batchCode, status: 'DISPATCHED' });
+
+    // Phase 3: notify manager and factory-manager
+    notifyRoles(req.app, ['manager', 'factory-manager'], {
+      type:    'batch_dispatched',
+      title:   'Batch dispatched',
+      message: `Batch ${batch.batchCode} — ${batch.productName} dispatched to ${buyerName}.`,
+      refId:   batch.batchCode,
+      refType: 'batch',
+      triggeredBy: {
+        userId: req.user?._id || null,
+        name:   req.user?.name || req.user?.username || 'System',
+        role:   req.user?.role || null,
+      },
+    }); // fire-and-forget
 
     res.json({ success: true, message: `Batch ${batch.batchCode} marked as DISPATCHED`, data: batch });
   } catch (err) { next(err); }

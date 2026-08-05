@@ -7,6 +7,7 @@ const { generateToken } = require('../middleware/auth');
 const jwt = require('jsonwebtoken');
 const { sendApprovalEmail, sendRejectionEmail, sendOtpEmail, sendPasswordResetOtpEmail } = require('../services/emailService');
 const { appendLoginEvent } = require('../services/loginHistory.service');
+const { notify, notifyRoles } = require('../services/notificationService');
 
 function getFrontendUrl() {
   const envUrl = process.env.FRONTEND_URL;
@@ -842,6 +843,17 @@ async function changeRole(req, res, next) {
     target.promotedAt  = new Date();
     await target.save();
 
+    // Notify Super Admin about role change
+    notify(req.app, {
+      recipientRole: 'super-admin',
+      type:    'admin_action',
+      title:   'Role changed',
+      message: `${req.user.name || req.user.username} changed ${target.name || target.username}'s role from ${previousRole} to ${newRole}.`,
+      refId:   target.username,
+      refType: 'user',
+      triggeredBy: { userId: req.user._id, name: req.user.name || req.user.username, role: req.user.role },
+    }); // fire-and-forget
+
     return res.json({
       success:      true,
       message:      `Role updated: ${target.username} is now ${newRole}`,
@@ -913,6 +925,18 @@ async function deleteUser(req, res, next) {
       target.deletedAt  = new Date();
       target.deleteNote = deleteNote || null;
       await target.save();
+
+      // Notify Super Admin about the soft delete
+      notify(req.app, {
+        recipientRole: 'super-admin',
+        type:    'admin_action',
+        title:   'User removed',
+        message: `${req.user.name || req.user.username} moved ${target.name || target.username} (@${target.username}) to the Recycle Bin.${deleteNote ? ' Note: ' + deleteNote : ''}`,
+        refId:   target.username,
+        refType: 'user',
+        triggeredBy: { userId: req.user._id, name: req.user.name || req.user.username, role: req.user.role },
+      }); // fire-and-forget
+
       return res.json({
         success:    true,
         message:    `User '${target.username}' moved to Recycle Bin. Super Admin can restore or permanently remove.`,
