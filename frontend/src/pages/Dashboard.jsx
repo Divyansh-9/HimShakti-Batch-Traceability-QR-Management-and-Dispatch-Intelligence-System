@@ -16,8 +16,11 @@ import {
   Package, Truck, QrCode, LayoutDashboard, Bot,
   LogOut, Download, AlertTriangle, CheckCircle, Clock, RefreshCw, Menu, Search, Leaf, Plus,
   ShieldCheck, Users, XCircle, Copy, ExternalLink, Zap, TrendingUp, Activity, Info,
-  Eye, Archive, Pencil, RotateCcw
+  Eye, Archive, Pencil, RotateCcw, HelpCircle, ChevronLeft, ChevronRight
 } from 'lucide-react';
+import { WalkthroughProvider, useWalkthrough } from '../context/WalkthroughContext';
+import WelcomeChoiceModal from '../components/WelcomeChoiceModal';
+import WalkthroughTour from '../components/WalkthroughTour';
 
 
 // ── Tab metadata ───────────────────────────────────────────────────
@@ -290,7 +293,7 @@ function OverviewTab({ batches, loading, onTabSwitch }) {
   return (
     <div className="space-y-4 sm:space-y-5">
       {/* KPI Cards — Pass 2: card-grid-ambient gives backdrop-filter something to blur */}
-      <div className="card-grid-ambient grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div data-tour="kpi-grid" className="card-grid-ambient grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {kpis.map((kpi, idx) => (
           <div key={kpi.label} className={`glass-card glass-card-border ${GLOW_MAP[kpi.color] || 'glass-card-brand'} ${'card-stagger-' + (idx+1)} rounded-xl p-3 sm:p-5 ${kpi.border} cursor-default transition-all duration-500`}>
             <div className="flex items-start justify-between mb-2 sm:mb-3">
@@ -530,6 +533,7 @@ function BatchesTab({ batches, loading, onNewBatch, onDownloadQR, onDispatch, on
               {SORT_OPTIONS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
             </select>
             <button onClick={onNewBatch}
+              data-tour="new-batch-btn"
               className="btn-glossy btn-primary-glossy inline-flex items-center gap-1.5 px-4 py-2 bg-brand hover:bg-brand-hover text-white text-sm font-semibold rounded-lg transition-colors">
               <Plus className="w-4 h-4" /> New Batch
             </button>
@@ -791,7 +795,7 @@ function FEFOTab() {
       {error && <div className="p-4 text-red-400 text-sm">{error}</div>}
 
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-border">
+        <table data-tour="fefo-table" className="min-w-full divide-y divide-border">
           <thead className="bg-surface-2">
             <tr>
               {['Priority', 'Batch Code', 'Product', 'Status', 'Days Left', 'Urgency', 'Score'].map(h => (
@@ -1019,7 +1023,7 @@ function QRTab({ batches, loading, onDownloadQR }) {
       </div>
 
       {/* QR grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      <div data-tour="qr-grid" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {loading
           ? [...Array(8)].map((_, i) => (
             <div key={i} className="bg-surface border border-border rounded-2xl overflow-hidden animate-pulse">
@@ -1143,6 +1147,7 @@ function AIAuditTab({ batchCount }) {
             <button
               onClick={runAudit}
               disabled={loading}
+              data-tour="ai-run-btn"
               className="btn-glossy btn-primary-glossy inline-flex items-center gap-2 px-4 py-2 bg-brand hover:bg-brand-hover text-white text-sm font-semibold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm hover:shadow-md">
               {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
               {loading ? 'Analysing…' : report ? 'Re-run Audit' : 'Run Audit'}
@@ -1463,9 +1468,13 @@ function AdminPanelTab() {
     try {
       const data = await client('/auth/requests');
       setRequests(data.data || []);
-    } catch { toast.error('Failed to load requests'); }
+    } catch (err) {
+      // Managers (read-only) may get 403 — silently show empty list instead of alarming them
+      if (isReadOnly) { setRequests([]); }
+      else { toast.error('Failed to load requests'); }
+    }
     finally { setLoadingR(false); }
-  }, []);
+  }, [isReadOnly]);
 
   // ── fetchDeletedUsers MUST be declared before the useEffect that lists it in deps ──
   const fetchDeletedUsers = useCallback(async () => {
@@ -1682,6 +1691,20 @@ function AdminPanelTab() {
 
   return (
     <div className="space-y-5">
+
+      {/* ── Read-only notice for managers ── */}
+      {isReadOnly && (
+        <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-amber-500/25 bg-amber-500/8">
+          <div className="w-7 h-7 rounded-lg bg-amber-500/15 flex items-center justify-center flex-shrink-0">
+            <Eye className="w-3.5 h-3.5 text-amber-500" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-amber-500">Read-only view</p>
+            <p className="text-xs text-text-muted mt-0.5">As a Manager, you can view all user and access request data but cannot make changes. Contact an Admin to take action.</p>
+          </div>
+          <span className="flex-shrink-0 text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-full bg-amber-500/15 text-amber-500 border border-amber-500/25">Manager</span>
+        </div>
+      )}
 
       {/* ══ Invite / Approval Modal ══ */}
       {inviteLink && (
@@ -2211,25 +2234,32 @@ function AdminPanelTab() {
                             )
                           )}
                           {p.kind === 'invite' && (
-                            removeId === p._id ? (
-                              <div className="flex items-center gap-1">
-                                <button onClick={() => handleRemove(p._id, p.name)} disabled={removeLoad === p._id}
-                                  className="px-2.5 py-1.5 bg-red-500 text-white text-xs font-bold rounded-lg disabled:opacity-50">
-                                  {removeLoad === p._id ? '...' : 'Confirm'}
-                                </button>
-                                <button onClick={() => setRemoveId(null)} className="px-2 py-1.5 border border-border text-text-muted text-xs rounded-lg">x</button>
-                              </div>
+                            isAdmin ? (
+                              removeId === p._id ? (
+                                <div className="flex items-center gap-1">
+                                  <button onClick={() => handleRemove(p._id, p.name)} disabled={removeLoad === p._id}
+                                    className="px-2.5 py-1.5 bg-red-500 text-white text-xs font-bold rounded-lg disabled:opacity-50">
+                                    {removeLoad === p._id ? '...' : 'Confirm'}
+                                  </button>
+                                  <button onClick={() => setRemoveId(null)} className="px-2 py-1.5 border border-border text-text-muted text-xs rounded-lg">x</button>
+                                </div>
+                              ) : (
+                                <>
+                                  <button onClick={() => setInviteLink({ id: p._id, link: `${window.location.origin}/invite?token=`, name: p.name, emailSent: false })}
+                                    className="px-2.5 py-1.5 border border-brand/30 text-brand hover:bg-brand/5 text-xs font-bold rounded-lg flex items-center gap-1">
+                                    <RefreshCw className="w-3 h-3" /> Resend
+                                  </button>
+                                  <button onClick={() => setRemoveId(p._id)}
+                                    className="p-1.5 border border-red-400/20 text-red-400 hover:bg-red-500/5 rounded-lg" title="Remove">
+                                    <Archive className="w-3 h-3" />
+                                  </button>
+                                </>
+                              )
                             ) : (
-                              <>
-                                <button onClick={() => setInviteLink({ id: p._id, link: `${window.location.origin}/invite?token=`, name: p.name, emailSent: false })}
-                                  className="px-2.5 py-1.5 border border-brand/30 text-brand hover:bg-brand/5 text-xs font-bold rounded-lg flex items-center gap-1">
-                                  <RefreshCw className="w-3 h-3" /> Resend
-                                </button>
-                                <button onClick={() => setRemoveId(p._id)}
-                                  className="p-1.5 border border-red-400/20 text-red-400 hover:bg-red-500/5 rounded-lg" title="Remove">
-                                  <Archive className="w-3 h-3" />
-                                </button>
-                              </>
+                              // Manager read-only: show status label, no actions
+                              <span className="flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-500/8 border border-amber-500/20 text-[10px] font-semibold text-amber-500/75">
+                                <Eye className="w-3 h-3 flex-shrink-0" /> View only
+                              </span>
                             )
                           )}
                         </div>
@@ -2399,36 +2429,45 @@ function AdminPanelTab() {
                         )}
 
                         {r.status === 'pending' && (
-                          rejectId === r._id ? (
-                            <div className="space-y-1.5">
-                              <textarea value={rejectNote} onChange={e => setRejectNote(e.target.value)}
-                                placeholder="Rejection reason (optional)" rows={2}
-                                className="w-full px-3 py-2 text-xs bg-surface-2 border border-border rounded-lg text-text-primary placeholder:text-text-muted resize-none focus:outline-none focus:ring-2 focus:ring-red-400/30" />
-                              <div className="flex gap-2">
-                                <button onClick={() => handleReject(r._id)} disabled={actionLoad === r._id}
-                                  className="flex-1 py-2 bg-red-500 hover:bg-red-600 text-white text-xs font-bold rounded-lg transition-all disabled:opacity-50">
-                                  {actionLoad === r._id ? '...' : 'Confirm Reject'}
-                                </button>
-                                <button onClick={() => { setRejectId(null); setRejectNote(''); }}
-                                  className="px-3 py-2 border border-border text-text-muted text-xs rounded-lg hover:bg-surface-2">Cancel</button>
+                          isAdmin ? (
+                            // Admin/SuperAdmin: show Approve + Reject action buttons
+                            rejectId === r._id ? (
+                              <div className="space-y-1.5">
+                                <textarea value={rejectNote} onChange={e => setRejectNote(e.target.value)}
+                                  placeholder="Rejection reason (optional)" rows={2}
+                                  className="w-full px-3 py-2 text-xs bg-surface-2 border border-border rounded-lg text-text-primary placeholder:text-text-muted resize-none focus:outline-none focus:ring-2 focus:ring-red-400/30" />
+                                <div className="flex gap-2">
+                                  <button onClick={() => handleReject(r._id)} disabled={actionLoad === r._id}
+                                    className="flex-1 py-2 bg-red-500 hover:bg-red-600 text-white text-xs font-bold rounded-lg transition-all disabled:opacity-50">
+                                    {actionLoad === r._id ? '...' : 'Confirm Reject'}
+                                  </button>
+                                  <button onClick={() => { setRejectId(null); setRejectNote(''); }}
+                                    className="px-3 py-2 border border-border text-text-muted text-xs rounded-lg hover:bg-surface-2">Cancel</button>
+                                </div>
                               </div>
-                            </div>
+                            ) : (
+                              <div className="flex gap-2">
+                                <button onClick={() => handleApprove(r._id, r.name)} disabled={actionLoad === r._id}
+                                  className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-green-500 hover:bg-green-600 text-white text-xs font-bold rounded-lg transition-all disabled:opacity-50">
+                                  <CheckCircle className="w-3.5 h-3.5" />
+                                  {actionLoad === r._id ? '...' : 'Approve'}
+                                </button>
+                                <button onClick={() => setRejectId(r._id)}
+                                  className="flex-1 flex items-center justify-center gap-1.5 py-2 border border-red-400/30 text-red-500 hover:bg-red-500/5 text-xs font-bold rounded-lg transition-all">
+                                  <XCircle className="w-3.5 h-3.5" /> Reject
+                                </button>
+                              </div>
+                            )
                           ) : (
-                            <div className="flex gap-2">
-                              <button onClick={() => handleApprove(r._id, r.name)} disabled={actionLoad === r._id}
-                                className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-green-500 hover:bg-green-600 text-white text-xs font-bold rounded-lg transition-all disabled:opacity-50">
-                                <CheckCircle className="w-3.5 h-3.5" />
-                                {actionLoad === r._id ? '...' : 'Approve'}
-                              </button>
-                              <button onClick={() => setRejectId(r._id)}
-                                className="flex-1 flex items-center justify-center gap-1.5 py-2 border border-red-400/30 text-red-500 hover:bg-red-500/5 text-xs font-bold rounded-lg transition-all">
-                                <XCircle className="w-3.5 h-3.5" /> Reject
-                              </button>
+                            // Manager: read-only indicator instead of action buttons
+                            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-500/8 border border-amber-500/20">
+                              <Eye className="w-3 h-3 text-amber-500/70 flex-shrink-0" />
+                              <span className="text-[10px] font-semibold text-amber-500/80">Pending — Admin action required</span>
                             </div>
                           )
                         )}
 
-                        {(r.status === 'approved' || r.status === 'rejected') && (
+                        {(r.status === 'approved' || r.status === 'rejected') && isAdmin && (
                           <div className="flex items-center justify-between mt-1">
                             {r.status === 'approved' && (
                               <button
@@ -2482,11 +2521,21 @@ const NAV_TABS = [
 ];
 
 
-export default function Dashboard() {
+function DashboardInner() {
   const { id: tabParam } = Object.fromEntries(new URLSearchParams(window.location.search));
   const [activeTab, setActiveTab]           = useState(tabParam || 'overview');
 
   const [isSidebarOpen, setIsSidebarOpen]   = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(
+    () => localStorage.getItem('hs_sidebar_collapsed') === 'true'
+  );
+  const toggleSidebarCollapse = () => {
+    setIsSidebarCollapsed(prev => {
+      const next = !prev;
+      localStorage.setItem('hs_sidebar_collapsed', String(next));
+      return next;
+    });
+  };
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [batchToDispatch, setBatchToDispatch] = useState(null);
   const [batchesFilter, setBatchesFilter]     = useState('all'); // cross-tab filter from Overview
@@ -2496,6 +2545,38 @@ export default function Dashboard() {
   const user                                  = getUser(); // { username, name, role, isSuperAdmin }
   const userIsSuperAdmin                      = !!user?.isSuperAdmin || user?.email?.toLowerCase() === 'divyanshuniyal185@gmail.com' || user?.username?.toLowerCase() === 'divyansh';
   const { batches, loading, createBatch, downloadQR, dispatchBatch, fetchBatches } = useBatches();
+
+  // ── Walkthrough integration ──────────────────────────────────
+  const { registerTabSwitcher, openHelp, nudgeMode } = useWalkthrough();
+  const hasSeen = !!localStorage.getItem(`hs_tour_seen_${user?.role}`);
+
+  // Register tab-switcher so tour can navigate tabs
+  useEffect(() => {
+    registerTabSwitcher((tabId) => setActiveTab(tabId));
+  }, [registerTabSwitcher]);
+
+  // "Explore Myself" nudge — pulse the role's key element for 3.5s
+  useEffect(() => {
+    if (!nudgeMode) {
+      document.querySelectorAll('[data-tour-nudge]').forEach(el => el.removeAttribute('data-tour-nudge'));
+      return;
+    }
+    const nudgeMap = {
+      'factory-manager':      'new-batch-btn',
+      'quality-inspector':    'kpi-grid',
+      'dispatch-coordinator': 'fefo-table',
+      'manager':              'kpi-grid',
+      'admin':                'new-batch-btn',
+      'super-admin':          'kpi-grid',
+    };
+    const targetSelector = nudgeMap[user?.role] || 'kpi-grid';
+    const tabMap = { 'new-batch-btn': 'batches', 'fefo-table': 'fefo', 'qr-grid': 'qr' };
+    setActiveTab(tabMap[targetSelector] || 'overview');
+    setTimeout(() => {
+      const el = document.querySelector(`[data-tour="${targetSelector}"]`);
+      if (el) { el.setAttribute('data-tour-nudge', 'true'); el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+    }, 400);
+  }, [nudgeMode, user?.role]);
 
   // Connect to WebSocket for real-time batch updates across all dashboard tabs
   useSocket();
@@ -2547,21 +2628,28 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-background pt-[72px]">
+    <div className="h-screen overflow-hidden flex flex-col bg-background">
+      {/* Welcome modal + Tour engine — rendered at root level */}
+      <WelcomeChoiceModal user={user} />
+      <WalkthroughTour userRole={user?.role} />
+
       <Navbar onMenuClick={() => setIsSidebarOpen(v => !v)} isSidebarOpen={isSidebarOpen} />
-      <div className="flex flex-1 overflow-hidden h-[calc(100vh-72px)]">
+      <div className="flex flex-1 overflow-hidden" style={{ marginTop: '72px', height: 'calc(100vh - 72px)' }}>
         {/* Mobile overlay */}
         {isSidebarOpen && (
           <div className="fixed inset-0 bg-black/50 z-20 md:hidden" onClick={() => setIsSidebarOpen(false)} />
         )}
 
-        {/* Sidebar — fixed on mobile (out of flow), in-flow on md+ */}
-        <aside className={`
-          sidebar-premium overflow-hidden
-          fixed top-[72px] left-0 bottom-0 z-30 w-64 flex-shrink-0 transition-transform duration-300
-          md:relative md:top-0 md:bottom-auto md:translate-x-0 md:w-56
-          ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
-        `}>
+        {/* Sidebar — always fixed, slides in on mobile, collapses to icon-rail on desktop */}
+        <aside
+          className={`
+            sidebar-premium flex flex-col
+            fixed top-[72px] left-0 bottom-0 z-30 transition-all duration-300 ease-in-out
+            ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+            ${isSidebarCollapsed ? 'md:w-16' : 'md:w-56'}
+            w-56
+          `}
+        >
           {/* Mountain watermark */}
           <div className="absolute inset-0 opacity-5 pointer-events-none overflow-hidden">
             <svg viewBox="0 0 200 200" className="w-full h-full" fill="white">
@@ -2571,79 +2659,165 @@ export default function Dashboard() {
             </svg>
           </div>
 
-          <div className="h-full flex flex-col pt-4 pb-6 overflow-y-auto relative">
-            {/* Brand mark */}
-            <div className="px-4 mb-6">
-              <div className="flex items-center gap-2.5 px-2 py-1">
-                {/* Brand icon with glow ring */}
-                <div className="relative">
-                  <div className="absolute inset-0 rounded-lg bg-brand/30 blur-[6px]" />
-                  <div className="relative w-7 h-7 bg-brand rounded-lg flex items-center justify-center flex-shrink-0 shadow-lg shadow-brand/40">
-                    <Leaf className="w-3.5 h-3.5 text-white" />
-                  </div>
-                </div>
-                <div>
-                  <p className="text-white text-xs font-bold leading-tight tracking-wide">HimShakti</p>
-                  <p className="text-white/35 text-[9px] leading-tight tracking-widest uppercase">Operations</p>
+          {/* ── ZONE 1: Brand mark + inline collapse toggle ── */}
+          <div className="flex-shrink-0 px-3 pt-4 pb-3 overflow-hidden">
+            <div className={`flex items-center gap-2 px-2 py-1 ${isSidebarCollapsed ? 'justify-center' : ''}`}>
+              {/* Brand icon */}
+              <div className="relative flex-shrink-0">
+                <div className="absolute inset-0 rounded-lg bg-brand/30 blur-[6px]" />
+                <div className="relative w-7 h-7 bg-brand rounded-lg flex items-center justify-center shadow-lg shadow-brand/40">
+                  <Leaf className="w-3.5 h-3.5 text-white" />
                 </div>
               </div>
-              <div className="mt-3 h-px bg-gradient-to-r from-white/10 via-white/5 to-transparent" />
-            </div>
 
-            {/* Nav */}
-            <nav className="flex-1 space-y-0.5 px-3">
+              {/* Brand name — hidden when collapsed */}
+              {!isSidebarCollapsed && (
+                <div className="flex-1 min-w-0 overflow-hidden">
+                  <p className="text-white text-xs font-bold leading-tight tracking-wide truncate">HimShakti</p>
+                  <p className="text-white/35 text-[9px] leading-tight tracking-widest uppercase truncate">Operations</p>
+                </div>
+              )}
+
+              {/* Collapse toggle — desktop only, inline in header */}
+              <button
+                onClick={toggleSidebarCollapse}
+                title={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                className={`hidden md:flex flex-shrink-0 items-center justify-center rounded-lg
+                  w-6 h-6 text-white/30 hover:text-white hover:bg-white/10
+                  transition-all duration-200 ${isSidebarCollapsed ? 'mt-0' : ''}`}
+              >
+                {isSidebarCollapsed
+                  ? <ChevronRight className="w-3.5 h-3.5" />
+                  : <ChevronLeft className="w-3.5 h-3.5" />
+                }
+              </button>
+            </div>
+            <div className="mt-3 h-px bg-gradient-to-r from-white/10 via-white/5 to-transparent" />
+          </div>
+
+          {/* ── ZONE 2: Navigation — scrollable middle, clips x-overflow ── */}
+          <nav className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 space-y-0.5 px-2 py-2 relative">
+            {!isSidebarCollapsed && (
               <p className="text-white/25 text-[9px] font-bold uppercase tracking-widest px-2 mb-2">Navigation</p>
-              {visibleTabs.map(tab => {
-                const Icon = tab.icon;
-                const isActive = activeTab === tab.id;
-                const meta = TAB_META[tab.id];
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => { setActiveTab(tab.id); setIsSidebarOpen(false); }}
-                    className={`w-full flex items-center px-3 py-2.5 text-sm font-medium rounded-xl transition-all duration-200 relative group ${
+            )}
+            {visibleTabs.map(tab => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              const meta = TAB_META[tab.id];
+              return (
+                <button
+                  key={tab.id}
+                  data-tour={`${tab.id}-tab`}
+                  onClick={() => { setActiveTab(tab.id); setIsSidebarOpen(false); }}
+                  title={isSidebarCollapsed ? tab.label : ''}
+                  className={`relative group w-full flex items-center rounded-xl transition-all duration-200
+                    ${isSidebarCollapsed ? 'justify-center px-0 py-2.5' : 'px-3 py-2.5'}
+                    text-sm font-medium ${
                       isActive
                         ? 'text-white shadow-sm'
                         : 'text-white/45 hover:text-white/85 hover:bg-white/[0.06]'
                     }`}
-                    style={isActive ? {
-                      background: 'linear-gradient(135deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.06) 100%)',
-                      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.10), 0 1px 8px rgba(0,0,0,0.20)'
-                    } : {}}
-                  >
-                    {/* Active left accent bar */}
-                    {isActive && (
-                      <span className={`absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r-full shadow-[0_0_6px_currentColor] ${meta?.dot || 'bg-brand'}`} />
-                    )}
-                    <Icon className={`flex-shrink-0 w-4 h-4 mr-3 transition-colors ${
-                      isActive ? 'text-white drop-shadow-sm' : 'text-white/35 group-hover:text-white/65'
-                    }`} />
-                    {tab.label}
-                    {/* Active indicator dot on right */}
-                    {isActive && (
-                      <span className={`ml-auto w-1.5 h-1.5 rounded-full ${meta?.dot || 'bg-brand'} shadow-[0_0_4px_currentColor]`} />
-                    )}
-                  </button>
-                );
-              })}
-            </nav>
+                  style={isActive ? {
+                    background: 'linear-gradient(135deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.06) 100%)',
+                    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.10), 0 1px 8px rgba(0,0,0,0.20)'
+                  } : {}}
+                >
+                  {isActive && (
+                    <span className={`absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r-full shadow-[0_0_6px_currentColor] ${meta?.dot || 'bg-brand'}`} />
+                  )}
+                  <Icon className={`flex-shrink-0 w-4 h-4 transition-colors ${
+                    isSidebarCollapsed ? '' : 'mr-3'
+                  } ${
+                    isActive ? 'text-white drop-shadow-sm' : 'text-white/35 group-hover:text-white/65'
+                  }`} />
+                  {!isSidebarCollapsed && tab.label}
+                  {!isSidebarCollapsed && isActive && (
+                    <span className={`ml-auto w-1.5 h-1.5 rounded-full ${meta?.dot || 'bg-brand'} shadow-[0_0_4px_currentColor]`} />
+                  )}
+                  {/* Collapsed tooltip */}
+                  {isSidebarCollapsed && (
+                    <span className="pointer-events-none absolute left-full ml-3 px-2.5 py-1.5 rounded-lg text-xs font-medium
+                      bg-[#1e2433] text-white border border-white/10 shadow-xl whitespace-nowrap
+                      opacity-0 group-hover:opacity-100 translate-x-[-4px] group-hover:translate-x-0
+                      transition-all duration-200 z-50">
+                      {tab.label}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </nav>
 
-            {/* Bottom actions */}
-            <div className="px-3 mt-4 pt-4 space-y-1" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
-              <p className="text-white/25 text-[9px] font-bold uppercase tracking-widest px-2 mb-2">Account</p>
-              <button
-                onClick={logout}
-                className="w-full flex items-center px-3 py-2.5 text-sm font-medium text-white/45 hover:bg-red-500/12 hover:text-red-400 rounded-xl transition-all duration-200 group"
-              >
-                <LogOut className="w-4 h-4 mr-3 text-white/30 group-hover:text-red-400 transition-colors" />
-                Sign Out
-              </button>
-            </div>
+          {/* ── ZONE 3: Footer actions — always pinned at bottom ── */}
+          <div className="flex-shrink-0 px-2 py-3 relative" style={{
+            borderTop: '1px solid rgba(255,255,255,0.07)',
+            background: 'linear-gradient(to top, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.10) 100%)',
+            backdropFilter: 'blur(12px)',
+          }}>
+            {/* Help & Walkthrough */}
+            <button
+              id="sidebar-help-btn"
+              onClick={openHelp}
+              title={isSidebarCollapsed ? 'Help & Walkthrough' : ''}
+              className={`relative group w-full flex items-center gap-3 rounded-xl text-sm font-medium
+                transition-all duration-200 mb-1
+                ${isSidebarCollapsed ? 'justify-center px-0 py-2.5' : 'px-3 py-2.5'}
+                ${
+                  hasSeen
+                    ? 'text-white/50 hover:bg-white/[0.06] hover:text-brand'
+                    : 'text-brand/80 hover:bg-brand/10 hover:text-brand help-sidebar-btn-new'
+                }`}
+            >
+              <HelpCircle className={`w-4 h-4 flex-shrink-0 transition-colors ${
+                hasSeen ? 'text-white/25 group-hover:text-brand' : 'text-brand/60 group-hover:text-brand'
+              }`} />
+              {!isSidebarCollapsed && (
+                <>
+                  <span>Help &amp; Walkthrough</span>
+                  {!hasSeen && (
+                    <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-brand/20 text-brand border border-brand/30 animate-pulse">NEW</span>
+                  )}
+                </>
+              )}
+              {isSidebarCollapsed && (
+                <span className="pointer-events-none absolute left-full ml-3 px-2.5 py-1.5 rounded-lg text-xs font-medium
+                  bg-[#1e2433] text-white border border-white/10 shadow-xl whitespace-nowrap
+                  opacity-0 group-hover:opacity-100 translate-x-[-4px] group-hover:translate-x-0
+                  transition-all duration-200 z-50">
+                  Help &amp; Walkthrough
+                </span>
+              )}
+            </button>
+
+            <div className="mx-2 my-1 h-px" style={{ background: 'rgba(255,255,255,0.05)' }} />
+
+            {/* Sign Out */}
+            <button
+              onClick={logout}
+              title={isSidebarCollapsed ? 'Sign Out' : ''}
+              className={`relative group w-full flex items-center gap-3 rounded-xl text-sm font-medium
+                text-white/40 hover:bg-red-500/10 hover:text-red-400 transition-all duration-200
+                ${isSidebarCollapsed ? 'justify-center px-0 py-2.5' : 'px-3 py-2.5'}`}
+            >
+              <LogOut className="w-4 h-4 flex-shrink-0 text-white/20 group-hover:text-red-400 transition-colors" />
+              {!isSidebarCollapsed && <span>Sign Out</span>}
+              {isSidebarCollapsed && (
+                <span className="pointer-events-none absolute left-full ml-3 px-2.5 py-1.5 rounded-lg text-xs font-medium
+                  bg-[#1e2433] text-red-400 border border-white/10 shadow-xl whitespace-nowrap
+                  opacity-0 group-hover:opacity-100 translate-x-[-4px] group-hover:translate-x-0
+                  transition-all duration-200 z-50">
+                  Sign Out
+                </span>
+              )}
+            </button>
           </div>
         </aside>
 
-        {/* Main — subtle per-tab background tint */}
-        <main className={`flex-1 overflow-y-auto p-4 sm:p-6 pb-20 md:pb-6 transition-colors duration-500 ${TAB_META[activeTab]?.mainTint || ''}`}>
+        {/* Main — offset dynamically based on sidebar state */}
+        <main
+          className={`flex-1 overflow-y-auto p-4 sm:p-6 pb-20 md:pb-6 transition-all duration-300 ease-in-out ${TAB_META[activeTab]?.mainTint || ''}`}
+          style={{ marginLeft: isSidebarCollapsed ? '4rem' : '14rem' }}
+        >
           {/* Remove old header bar — each tab now has its own TabBanner */}
 
           {/* Wrapped in key div for fade-slide-in on every tab switch */}
@@ -2767,6 +2941,29 @@ export default function Dashboard() {
           onDownloadQR={() => handleDownloadQR(drawerBatch._id, drawerBatch.batchCode)}
         />
       )}
+
+      {/* Floating ? Help FAB — desktop only (hidden on mobile via CSS) */}
+      <button
+        id="help-fab-btn"
+        onClick={openHelp}
+        className={`help-fab ${hasSeen ? '' : 'help-fab--new-user'}`}
+        aria-label="Help & Walkthrough"
+        title="Help & Walkthrough"
+      >
+        <span className="help-fab-tooltip">Help &amp; Walkthrough</span>
+        ?
+      </button>
     </div>
+  );
+}
+
+// ── Public export: wraps DashboardInner in WalkthroughProvider ────
+export default function Dashboard() {
+  const { getUser } = useAuth();
+  const user = getUser();
+  return (
+    <WalkthroughProvider userRole={user?.role}>
+      <DashboardInner />
+    </WalkthroughProvider>
   );
 }

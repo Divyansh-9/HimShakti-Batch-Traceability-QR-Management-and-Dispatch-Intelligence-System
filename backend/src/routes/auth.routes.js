@@ -24,7 +24,7 @@ router.post('/reset-password',      ctrl.resetPassword);
 
 // ── Admin & Super Admin routes ─────────────────────────────────────────────
 // Access Requests
-router.get( '/requests',              protect, requireAdminOrAbove, ctrl.listRequests);
+router.get( '/requests',              protect, requireManagerOrAbove, ctrl.listRequests);  // manager gets read-only view
 router.post('/requests/:id/approve',  protect, requireAdminOrAbove, ctrl.approve);
 router.post('/requests/:id/reject',   protect, requireAdminOrAbove, ctrl.reject);
 router.post('/requests/:id/resend',   protect, requireAdminOrAbove, ctrl.resendInvite);

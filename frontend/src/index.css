@@ -565,3 +565,632 @@ nav[class*="fixed bottom-0"] {
   width: fit-content !important;
   align-self: center;
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   HELP & WALKTHROUGH — Tour + Welcome Modal System
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Tour backdrop ──────────────────────────────────────────────── */
+.tour-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.72);
+  z-index: 9990;
+  pointer-events: all;
+  backdrop-filter: blur(1px);
+  -webkit-backdrop-filter: blur(1px);
+  animation: tourFadeIn 0.3s ease both;
+}
+
+@keyframes tourFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ── Spotlight ring — glowing cutout around target element ───────── */
+.tour-spotlight-ring {
+  position: absolute;       /* absolute so top/left are page-relative */
+  z-index: 9991;
+  border-radius: 12px;
+  pointer-events: none;
+  /* Transparent centre + massive outward shadow = spotlight effect */
+  box-shadow:
+    0 0 0 4px rgba(249, 115, 22, 0.85),    /* brand orange ring */
+    0 0 0 8px rgba(249, 115, 22, 0.25),    /* soft outer glow */
+    0 0 24px 8px rgba(249, 115, 22, 0.18); /* ambient halo */
+  animation: spotlightAppear 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+  transition: top 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+              left 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+              width 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+              height 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes spotlightAppear {
+  from { opacity: 0; transform: scale(0.94); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* ── Tour card — glassmorphism step tooltip ───────────────────────── */
+@keyframes tourCardIn {
+  from { opacity: 0; transform: scale(0.93) translateY(8px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0); }
+}
+
+.tour-card {
+  background: rgba(15, 23, 42, 0.92);
+  border: 1px solid rgba(249, 115, 22, 0.25);
+  border-radius: 16px;
+  padding: 18px 20px 16px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.06) inset,
+    0 4px 6px rgba(0, 0, 0, 0.4),
+    0 24px 48px rgba(0, 0, 0, 0.5),
+    0 0 32px rgba(249, 115, 22, 0.08);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.tour-card--visible {
+  opacity: 1;
+  pointer-events: all;
+  animation: tourCardIn 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.tour-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.tour-card-step-label {
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(249, 115, 22, 0.9);
+  font-family: var(--font-mono, monospace);
+}
+
+.tour-card-close {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.35);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.tour-card-close:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.tour-card-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: #f8fafc;
+  margin: 0 0 6px 0;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+
+.tour-card-desc {
+  font-size: 12px;
+  line-height: 1.6;
+  color: rgba(148, 163, 184, 0.9);
+  margin: 0 0 14px 0;
+}
+
+.tour-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+/* ── Step dots ────────────────────────────────────────────────────── */
+.tour-dots {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.tour-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18);
+  transition: all 0.25s ease;
+  display: inline-block;
+}
+
+.tour-dot--active {
+  width: 18px;
+  border-radius: 3px;
+  background: rgba(249, 115, 22, 0.9);
+  box-shadow: 0 0 6px rgba(249, 115, 22, 0.5);
+}
+
+.tour-dot--done {
+  background: rgba(249, 115, 22, 0.35);
+}
+
+/* ── Tour nav buttons ─────────────────────────────────────────────── */
+.tour-card-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tour-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  transition: all 0.15s ease;
+  letter-spacing: 0.01em;
+}
+
+.tour-btn--back {
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.55);
+}
+.tour-btn--back:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.tour-btn--next {
+  background: rgba(249, 115, 22, 0.9);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(249, 115, 22, 0.4);
+}
+.tour-btn--next:hover {
+  background: rgba(249, 115, 22, 1);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.5);
+}
+
+.tour-btn--done {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.4);
+}
+.tour-btn--done:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.5);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   WELCOME CHOICE MODAL
+   ═══════════════════════════════════════════════════════════════════ */
+
+.welcome-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: tourFadeIn 0.3s ease both;
+}
+
+@keyframes welcomeCardIn {
+  from { opacity: 0; transform: translateY(24px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0)    scale(1); }
+}
+
+.welcome-modal-card {
+  position: relative;
+  width: 100%;
+  max-width: 460px;
+  background: rgba(15, 23, 42, 0.97);
+  border: 1px solid rgba(249, 115, 22, 0.2);
+  border-radius: 20px;
+  padding: 28px 28px 24px;
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+    0 8px 32px rgba(0, 0, 0, 0.6),
+    0 0 60px rgba(249, 115, 22, 0.07);
+  animation: welcomeCardIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Close button top-right */
+.welcome-modal-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.welcome-modal-close:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* Header section */
+.welcome-modal-header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+/* Icon cluster */
+.welcome-icon-cluster {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  margin-bottom: 4px;
+}
+
+.welcome-icon-ring {
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, rgba(249,115,22,0.7), rgba(251,146,60,0.4), rgba(249,115,22,0.7));
+  animation: iconRingSpin 3s linear infinite;
+}
+
+.welcome-icon-inner {
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(249,115,22,0.9), rgba(234,88,12,1));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(249,115,22,0.5);
+}
+
+@keyframes iconRingSpin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.welcome-modal-title-block {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.welcome-modal-title {
+  font-size: 20px;
+  font-weight: 800;
+  color: #f8fafc;
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.welcome-role-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 99px;
+  border: 1px solid;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.welcome-modal-tagline {
+  font-size: 13px;
+  color: rgba(148, 163, 184, 0.85);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.welcome-modal-divider {
+  height: 1px;
+  background: linear-gradient(to right, rgba(255,255,255,0.08), transparent);
+  margin: 18px 0;
+}
+
+.welcome-modal-prompt {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255,255,255,0.35);
+  margin: 0 0 12px 0;
+}
+
+/* ── Choice cards ────────────────────────────────────────────────── */
+.welcome-choices-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.welcome-choice-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+.welcome-choice-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.welcome-choice-card:hover::before { opacity: 1; }
+.welcome-choice-card:hover {
+  transform: translateY(-2px);
+}
+
+.welcome-choice-card--primary {
+  border-color: rgba(249, 115, 22, 0.3);
+  background: rgba(249, 115, 22, 0.06);
+  box-shadow: 0 0 0 1px rgba(249,115,22,0.08) inset;
+}
+.welcome-choice-card--primary::before {
+  background: rgba(249, 115, 22, 0.04);
+}
+.welcome-choice-card--primary:hover {
+  border-color: rgba(249, 115, 22, 0.5);
+  box-shadow: 0 4px 16px rgba(249,115,22,0.15), 0 0 0 1px rgba(249,115,22,0.12) inset;
+}
+
+.welcome-choice-card--secondary:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+}
+
+.welcome-choice-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.welcome-choice-icon--tour {
+  background: linear-gradient(135deg, rgba(249,115,22,0.9), rgba(234,88,12,1));
+  box-shadow: 0 4px 10px rgba(249,115,22,0.4);
+}
+
+.welcome-choice-icon--explore {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.6);
+}
+
+.welcome-choice-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.welcome-choice-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #f8fafc;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.welcome-choice-recommended {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 99px;
+  background: rgba(249,115,22,0.15);
+  color: rgba(249,115,22,0.9);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.welcome-choice-desc {
+  font-size: 11px;
+  color: rgba(148, 163, 184, 0.7);
+  line-height: 1.4;
+}
+
+.welcome-choice-arrow {
+  flex-shrink: 0;
+  color: rgba(255,255,255,0.2);
+  transition: color 0.2s, transform 0.2s;
+}
+.welcome-choice-card:hover .welcome-choice-arrow {
+  color: rgba(255,255,255,0.6);
+  transform: translateX(3px);
+}
+
+/* ── Modal footer ──────────────────────────────────────────────── */
+.welcome-modal-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.welcome-skip-btn {
+  font-size: 11px;
+  color: rgba(255,255,255,0.3);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: color 0.15s;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: rgba(255,255,255,0.1);
+}
+.welcome-skip-btn:hover {
+  color: rgba(255,255,255,0.6);
+}
+
+.welcome-footer-hint {
+  font-size: 10px;
+  color: rgba(255,255,255,0.2);
+  text-align: center;
+  margin: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   FLOATING ? HELP FAB
+   ═══════════════════════════════════════════════════════════════════ */
+
+.help-fab {
+  position: fixed;
+  bottom: 28px;
+  right: 24px;
+  z-index: 9980;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(249,115,22,0.92), rgba(234,88,12,1));
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    0 4px 14px rgba(249,115,22,0.45),
+    0 2px 4px rgba(0,0,0,0.3),
+    0 0 0 0 rgba(249,115,22,0.4);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  animation: fabPop 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: 1.8s;
+  opacity: 0;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 900;
+}
+
+@keyframes fabPop {
+  from { opacity: 0; transform: scale(0.6); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.help-fab:hover {
+  transform: scale(1.1) translateY(-2px);
+  box-shadow:
+    0 8px 24px rgba(249,115,22,0.55),
+    0 4px 8px rgba(0,0,0,0.3);
+}
+
+.help-fab:active {
+  transform: scale(0.97);
+}
+
+/* Pulsing ring for new users — draws attention to the FAB */
+.help-fab--new-user {
+  animation: fabPop 0.4s cubic-bezier(0.22, 1, 0.36, 1) 1.8s both,
+             fabRingPulse 2s ease-in-out 2.5s 4;
+}
+
+@keyframes fabRingPulse {
+  0%   { box-shadow: 0 4px 14px rgba(249,115,22,0.45), 0 0 0 0   rgba(249,115,22,0.4); }
+  50%  { box-shadow: 0 4px 14px rgba(249,115,22,0.45), 0 0 0 10px rgba(249,115,22,0); }
+  100% { box-shadow: 0 4px 14px rgba(249,115,22,0.45), 0 0 0 0   rgba(249,115,22,0.4); }
+}
+
+/* Tooltip shown on FAB hover */
+.help-fab-tooltip {
+  position: absolute;
+  right: 58px;
+  bottom: 50%;
+  transform: translateY(50%);
+  white-space: nowrap;
+  background: rgba(15,23,42,0.96);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #f8fafc;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 8px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+.help-fab:hover .help-fab-tooltip {
+  opacity: 1;
+}
+
+/* ── Sidebar help button pulse ring (new users only) ────────────── */
+@keyframes sidebarHelpPulse {
+  0%   { box-shadow: 0 0 0 0   rgba(249, 115, 22, 0.6); }
+  70%  { box-shadow: 0 0 0 6px rgba(249, 115, 22, 0); }
+  100% { box-shadow: 0 0 0 0   rgba(249, 115, 22, 0); }
+}
+
+.help-sidebar-btn-new {
+  animation: sidebarHelpPulse 1.8s ease-out 2s 3;
+}
+
+/* ── "Explore Myself" nudge — gentle pulse on key element ─────────── */
+@keyframes nudgePulse {
+  0%   { box-shadow: 0 0 0 0   rgba(249,115,22,0.7), 0 0 0 0   rgba(249,115,22,0.3); }
+  40%  { box-shadow: 0 0 0 6px rgba(249,115,22,0.4), 0 0 0 12px rgba(249,115,22,0.15); }
+  80%  { box-shadow: 0 0 0 10px rgba(249,115,22,0),  0 0 0 20px rgba(249,115,22,0); }
+  100% { box-shadow: 0 0 0 0   rgba(249,115,22,0),   0 0 0 0   rgba(249,115,22,0); }
+}
+
+[data-tour-nudge="true"] {
+  outline: 2px solid rgba(249,115,22,0.8);
+  outline-offset: 4px;
+  border-radius: 10px;
+  animation: nudgePulse 1.1s ease-out 3;
+  transition: outline 0.3s;
+}
+
+/* ── Mobile — hide FAB when bottom nav is visible (< md) ────────── */
+@media (max-width: 767px) {
+  .help-fab {
+    display: none;
+  }
+}
+
