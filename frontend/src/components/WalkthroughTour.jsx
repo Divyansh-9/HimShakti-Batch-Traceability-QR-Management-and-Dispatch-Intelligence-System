@@ -1,332 +1,121 @@
 // src/components/WalkthroughTour.jsx
 // ── Guided spotlight tour engine ───────────────────────────────────
 // Pure React + CSS — no external libraries.
-// Reads role from user prop, picks the matching step set,
-// auto-navigates tabs, measures DOM targets, positions spotlight + card.
-import React, { useEffect, useRef, useCallback, useState } from 'react';
-import { X, ChevronLeft, ChevronRight, CheckCircle } from 'lucide-react';
+//
+// Content lives in config/walkthroughSteps.js. This file only does the hard
+// part: getting a spotlight onto an element that may not exist yet.
+//
+// Three things it does that a naive implementation does not:
+//
+//  1. Waits for the target instead of guessing. Switching tabs re-renders and
+//     may refetch, so a fixed timeout races the data. It polls for the element
+//     and only gives up after a deadline.
+//  2. Measures the card rather than assuming a height. A hardcoded estimate
+//     puts long steps off-screen when the card is positioned above a target.
+//  3. Degrades honestly. If the element genuinely is not there, the step is
+//     centred and says so, instead of showing a floating card pointing at
+//     nothing.
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { X, ChevronLeft, ChevronRight, CheckCircle, Lightbulb } from 'lucide-react';
 import { useWalkthrough } from '../context/WalkthroughContext';
+import { getStepsForRole } from '../config/walkthroughSteps';
 
-// ── Role-specific step definitions ────────────────────────────────
-// selector: data-tour="<id>" attribute value on the target element
-// tab: which dashboard tab to switch to first
-// cardSide: preferred card position relative to spotlight ('bottom'|'top'|'right'|'left')
-const STEP_SETS = {
-  'super-admin': [
-    {
-      id: 'overview',
-      tab: 'overview',
-      title: 'Your command centre',
-      description: 'The Overview gives you a live snapshot — total batches, active stock, dispatched shipments, and items needing urgent attention across all product lines.',
-      selector: 'kpi-grid',
-      cardSide: 'bottom',
-    },
-    {
-      id: 'batches',
-      tab: 'batches',
-      title: 'Every batch, one place',
-      description: 'Create, track, and manage all batches here. Search, sort by expiry, filter by status, or archive old records. You have full read-write access.',
-      selector: 'new-batch-btn',
-      cardSide: 'bottom',
-    },
-    {
-      id: 'fefo',
-      tab: 'fefo',
-      title: 'Ship the right box first',
-      description: 'FEFO (First Expired, First Out) sorts your inventory by expiry urgency. The top row is what needs to leave today — no guesswork.',
-      selector: 'fefo-table',
-      cardSide: 'top',
-    },
-    {
-      id: 'qr',
-      tab: 'qr',
-      title: 'Traceability at a scan',
-      description: 'Every batch gets a unique QR code. Scan from any phone to see the full consumer-facing trace page — farmer, origin, batch date, and more.',
-      selector: 'qr-grid',
-      cardSide: 'top',
-    },
-    {
-      id: 'ai',
-      tab: 'ai',
-      title: 'AI that thinks ahead',
-      description: 'Gemini 2.5 Flash analyses live inventory and gives you an exact dispatch recommendation, risk flags, and notes. Results are cached for 4 hours.',
-      selector: 'ai-run-btn',
-      cardSide: 'bottom',
-    },
-    {
-      id: 'admin',
-      tab: 'admin',
-      title: 'Super Admin holds the controls',
-      description: `Users, roles, access requests, and invite links all live here. You're the only one with full control over this panel.`,
-      selector: 'admin-tab',
-      cardSide: 'right',
-    },
-  ],
+const CARD_WIDTH   = 340;
+const PAD          = 18;   // gap between spotlight and card
+const SPOT_PADDING = 10;   // halo around the target
+const FALLBACK_CARD_HEIGHT = 220;
 
-  'admin': [
-    {
-      id: 'overview',
-      tab: 'overview',
-      title: 'Your operations at a glance',
-      description: 'The Overview gives you a live snapshot — total batches, stock health, dispatch count, and items that need your attention.',
-      selector: 'kpi-grid',
-      cardSide: 'bottom',
-    },
-    {
-      id: 'batches',
-      tab: 'batches',
-      title: 'Batch management hub',
-      description: 'Create, edit, and manage all batch records. Sort by expiry, filter by status, and dispatch directly from this table.',
-      selector: 'new-batch-btn',
-      cardSide: 'bottom',
-    },
-    {
-      id: 'fefo',
-      tab: 'fefo',
-      title: 'Priority dispatch queue',
-      description: 'FEFO ensures the soonest-to-expire batch ships first. Review this queue before every dispatch cycle.',
-      selector: 'fefo-table',
-      cardSide: 'top',
-    },
-    {
-      id: 'qr',
-      tab: 'qr',
-      title: 'QR traceability layer',
-      description: 'Auto-generated QR codes link every batch to a public trace page. Download and print them for labelling.',
-      selector: 'qr-grid',
-      cardSide: 'top',
-    },
-    {
-      id: 'ai',
-      tab: 'ai',
-      title: 'AI-powered dispatch audit',
-      description: 'Get instant Gemini AI recommendations on which batches to dispatch, with risk analysis and structured notes.',
-      selector: 'ai-run-btn',
-      cardSide: 'bottom',
-    },
-    {
-      id: 'admin',
-      tab: 'admin',
-      title: 'Admin panel',
-      description: 'Manage users, approve access requests, and send invite links. You can manage all roles below your own tier.',
-      selector: 'admin-tab',
-      cardSide: 'right',
-    },
-  ],
+// How long to wait for a tab's content to render before declaring the target
+// missing. Generous, because the tab may be fetching.
+const TARGET_TIMEOUT_MS  = 2500;
+const TARGET_POLL_MS     = 80;
 
-  'manager': [
-    {
-      id: 'overview',
-      tab: 'overview',
-      title: 'Your operations snapshot',
-      description: `Get an instant read on inventory health — total batches, what's active, dispatched counts, and anything that needs action.`,
-      selector: 'kpi-grid',
-      cardSide: 'bottom',
-    },
-    {
-      id: 'batches',
-      tab: 'batches',
-      title: 'Full batch visibility',
-      description: 'Browse all batch records, filter by status, and sort by expiry. You can create batches and initiate dispatches from here.',
-      selector: 'new-batch-btn',
-      cardSide: 'bottom',
-    },
-    {
-      id: 'fefo',
-      tab: 'fefo',
-      title: 'Dispatch priority queue',
-      description: 'The FEFO queue tells you exactly which batches should ship next. Review before approving any dispatch.',
-      selector: 'fefo-table',
-      cardSide: 'top',
-    },
-    {
-      id: 'qr',
-      tab: 'qr',
-      title: 'QR code centre',
-      description: 'Download and manage QR codes for all batches. Each code gives customers a full trace of their product.',
-      selector: 'qr-grid',
-      cardSide: 'top',
-    },
-    {
-      id: 'ai',
-      tab: 'ai',
-      title: 'AI dispatch intelligence',
-      description: 'Run the Gemini AI audit to get structured dispatch recommendations with risk flags. Great for weekly planning.',
-      selector: 'ai-run-btn',
-      cardSide: 'bottom',
-    },
-  ],
-
-  'factory-manager': [
-    {
-      id: 'overview',
-      tab: 'overview',
-      title: 'Your warehouse at a glance',
-      description: 'See total batches, active stock, and dispatch counts. The "Need Attention" card shows which batches are expiring soon.',
-      selector: 'kpi-grid',
-      cardSide: 'bottom',
-    },
-    {
-      id: 'batches',
-      tab: 'batches',
-      title: 'Create and track batches',
-      description: 'This is where you log new batches coming off the production line. Hit "New Batch" to get started — fill in product, farmer, weight, and expiry.',
-      selector: 'new-batch-btn',
-      cardSide: 'bottom',
-    },
-    {
-      id: 'fefo',
-      tab: 'fefo',
-      title: 'Expiry priority view',
-      description: 'FEFO ranks all your batches by how soon they expire. Keep an eye on the top rows — those need to ship first.',
-      selector: 'fefo-table',
-      cardSide: 'top',
-    },
-  ],
-
-  'quality-inspector': [
-    {
-      id: 'overview',
-      tab: 'overview',
-      title: 'Inventory health dashboard',
-      description: 'Monitor batch counts and see at a glance how many batches are in urgent, warning, or ready state across all product lines.',
-      selector: 'kpi-grid',
-      cardSide: 'bottom',
-    },
-    {
-      id: 'batches',
-      tab: 'batches',
-      title: 'Batch status at a glance',
-      description: 'Browse all active batch records. Filter by URGENT or WARNING to quickly find batches that need your quality review.',
-      selector: 'fefo-table',
-      cardSide: 'bottom',
-    },
-    {
-      id: 'fefo',
-      tab: 'fefo',
-      title: 'Expiry urgency tracker',
-      description: 'The FEFO queue shows expiry-sorted batches. Red = urgent action needed. Use this to prioritise your inspection schedule.',
-      selector: 'fefo-table',
-      cardSide: 'top',
-    },
-  ],
-
-  'dispatch-coordinator': [
-    {
-      id: 'overview',
-      tab: 'overview',
-      title: 'Dispatch operations hub',
-      description: 'Track dispatched shipments and see which batches are ready to go. The KPI cards give you an instant read on inventory state.',
-      selector: 'kpi-grid',
-      cardSide: 'bottom',
-    },
-    {
-      id: 'fefo',
-      tab: 'fefo',
-      title: 'Your dispatch queue',
-      description: 'FEFO is your primary workspace — it ranks batches by expiry urgency. Always dispatch from the top of this list.',
-      selector: 'fefo-table',
-      cardSide: 'top',
-    },
-    {
-      id: 'qr',
-      tab: 'qr',
-      title: 'QR codes for labelling',
-      description: 'Download the QR for each dispatched batch and attach it to the shipment. Customers can scan it to trace the product back to its source.',
-      selector: 'qr-grid',
-      cardSide: 'top',
-    },
-  ],
-};
-
-// Fallback for roles not in the map
-function getSteps(role) {
-  return STEP_SETS[role] || STEP_SETS['admin'];
+/**
+ * Resolve a data-tour element, polling until it appears or the deadline
+ * passes. Returns null rather than throwing so the caller can degrade.
+ */
+function waitForTarget(selectorId, cancelledRef) {
+  return new Promise(resolve => {
+    const start = performance.now();
+    (function poll() {
+      if (cancelledRef.current) return resolve(null);
+      const el = document.querySelector(`[data-tour="${selectorId}"]`);
+      if (el) return resolve(el);
+      if (performance.now() - start > TARGET_TIMEOUT_MS) return resolve(null);
+      setTimeout(poll, TARGET_POLL_MS);
+    })();
+  });
 }
 
-// ── Helper: find and measure a data-tour element ───────────────────
-function measureTarget(selectorId) {
-  const el = document.querySelector(`[data-tour="${selectorId}"]`);
-  if (!el) return null;
-  const rect = el.getBoundingClientRect();
-  return {
-    top:    rect.top    + window.scrollY,
-    left:   rect.left   + window.scrollX,
-    width:  rect.width,
-    height: rect.height,
-    el,
-  };
+/** Viewport-relative rect. The overlay is fixed, so no scroll offset is added. */
+function rectOf(el) {
+  const r = el.getBoundingClientRect();
+  return { top: r.top, left: r.left, width: r.width, height: r.height };
 }
 
 // ── Spotlight overlay ──────────────────────────────────────────────
-function Spotlight({ target, padding = 10 }) {
-  if (!target) return null;
+function Spotlight({ target }) {
+  if (!target) return <div className="tour-backdrop" aria-hidden="true" />;
   const { top, left, width, height } = target;
-  const t = top    - padding;
-  const l = left   - padding;
-  const w = width  + padding * 2;
-  const h = height + padding * 2;
-
   return (
     <>
-      {/* Dark overlay with a transparent hole cut out */}
       <div className="tour-backdrop" aria-hidden="true" />
-      {/* Glowing ring around the target */}
       <div
         className="tour-spotlight-ring"
-        style={{ top: t, left: l, width: w, height: h }}
+        style={{
+          position: 'fixed',
+          top:    top    - SPOT_PADDING,
+          left:   left   - SPOT_PADDING,
+          width:  width  + SPOT_PADDING * 2,
+          height: height + SPOT_PADDING * 2,
+        }}
         aria-hidden="true"
       />
     </>
   );
 }
 
-// ── Card positioning logic ─────────────────────────────────────────
-const CARD_WIDTH  = 320;
-const CARD_HEIGHT = 200; // approximate; actual is dynamic
-const PAD         = 18;
-
-function computeCardStyle(target, cardSide) {
-  if (!target) return { top: '50%', left: '50%', transform: 'translate(-50%,-50%)' };
-
+/**
+ * Place the card beside the target, flipping to the opposite side when the
+ * preferred side would push it off-screen.
+ */
+function computeCardStyle(target, cardHeight) {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
-  const { top, left, width, height } = target;
-  const PADDING = 10; // spotlight padding
+  const h  = cardHeight || FALLBACK_CARD_HEIGHT;
 
-  let style = {};
-
-  if (cardSide === 'bottom') {
-    style.top  = top + height + PADDING + PAD;
-    style.left = Math.min(Math.max(left, PAD), vw - CARD_WIDTH - PAD);
-  } else if (cardSide === 'top') {
-    style.top  = top - PADDING - CARD_HEIGHT - PAD;
-    style.left = Math.min(Math.max(left, PAD), vw - CARD_WIDTH - PAD);
-  } else if (cardSide === 'right') {
-    style.top  = Math.min(top, vh - CARD_HEIGHT - PAD);
-    style.left = left + width + PADDING + PAD;
-  } else {
-    // left
-    style.top  = Math.min(top, vh - CARD_HEIGHT - PAD);
-    style.left = left - CARD_WIDTH - PADDING - PAD;
+  if (!target) {
+    return { top: Math.max(PAD, (vh - h) / 2), left: Math.max(PAD, (vw - CARD_WIDTH) / 2) };
   }
 
-  // Clamp to viewport
-  style.top  = Math.max(PAD, Math.min(style.top,  vh - CARD_HEIGHT - PAD));
-  style.left = Math.max(PAD, Math.min(style.left, vw - CARD_WIDTH  - PAD));
+  const { top, left, height } = target;
+  const below = top + height + SPOT_PADDING + PAD;
+  const above = top - SPOT_PADDING - PAD - h;
 
-  return style;
+  // Prefer below; flip above when there is no room and above has more.
+  let cardTop = below;
+  if (below + h > vh - PAD && above > PAD) cardTop = above;
+
+  let cardLeft = left;
+  // If the target is wide, keep the card near its left edge; clamp both axes.
+  cardLeft = Math.max(PAD, Math.min(cardLeft, vw - CARD_WIDTH - PAD));
+  cardTop  = Math.max(PAD, Math.min(cardTop,  vh - h - PAD));
+
+  return { top: cardTop, left: cardLeft };
 }
 
 // ── Step dot indicator ─────────────────────────────────────────────
-function StepDots({ total, current }) {
+function StepDots({ total, current, onJump }) {
   return (
     <div className="tour-dots" role="tablist" aria-label="Tour progress">
       {Array.from({ length: total }).map((_, i) => (
-        <span
+        <button
           key={i}
           role="tab"
+          type="button"
           aria-selected={i === current}
+          aria-label={`Go to step ${i + 1}`}
+          onClick={() => onJump(i)}
           className={`tour-dot ${i === current ? 'tour-dot--active' : i < current ? 'tour-dot--done' : ''}`}
         />
       ))}
@@ -334,122 +123,152 @@ function StepDots({ total, current }) {
   );
 }
 
-// ── Main WalkthroughTour component ────────────────────────────────
-export default function WalkthroughTour({ userRole }) {
-  const {
-    isActive, stepIndex, stopTour, nextStep, prevStep, switchTab,
-  } = useWalkthrough();
+/**
+ * One step. Mounted with a key of the step index, so advancing the tour
+ * remounts this component and every piece of per-step state starts clean —
+ * no resetting four useStates inside an effect on each transition.
+ */
+function TourStep({ step, stepIndex, total, isLast, stopTour, nextStep, prevStep, goToStep, switchTab }) {
+  const [target,     setTarget]     = useState(null);
+  const [missing,    setMissing]    = useState(false);
+  const [cardStyle,  setCardStyle]  = useState({});
+  const [visible,    setVisible]    = useState(false);
 
-  const steps    = getSteps(userRole);
-  const total    = steps.length;
-  const step     = steps[stepIndex];
-  const isLast   = stepIndex === total - 1;
+  const cardRef      = useRef(null);
+  const cancelledRef = useRef(false);
+  // Mirrors `target` so the ResizeObserver callback can read the current rect
+  // without the observer being torn down and rebuilt every time it moves.
+  const targetRef    = useRef(null);
 
-  const [target,    setTarget]    = useState(null);
-  const [cardStyle, setCardStyle] = useState({});
-  const [visible,   setVisible]   = useState(false);
-  const measureTimerRef           = useRef(null);
+  const applyTarget = useCallback((rect) => {
+    targetRef.current = rect;
+    setTarget(rect);
+  }, []);
 
-  // ── Navigate tab + measure target when step changes ────────────
-  const remeasure = useCallback(() => {
-    if (!isActive || !step) return;
-    // Switch tab first
+  // ── Switch tab, wait for the target, measure it ─────────────────
+  useEffect(() => {
+    cancelledRef.current = false;
     switchTab(step.tab);
 
-    // Wait for tab content to render, then measure
-    clearTimeout(measureTimerRef.current);
-    measureTimerRef.current = setTimeout(() => {
-      const t = measureTarget(step.selector);
-      setTarget(t);
-      setCardStyle(computeCardStyle(t, step.cardSide));
-      setVisible(true);
-      // Scroll the target into view if needed
-      t?.el?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
-    }, 380);
-  }, [isActive, step, switchTab]);
+    waitForTarget(step.selector, cancelledRef).then(el => {
+      if (cancelledRef.current) return;
+      if (!el) { setMissing(true); setVisible(true); return; }
+      el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      // Let the smooth scroll settle before measuring, or the ring lands
+      // where the element used to be.
+      setTimeout(() => {
+        if (cancelledRef.current) return;
+        applyTarget(rectOf(el));
+        setVisible(true);
+      }, 260);
+    });
 
-  useEffect(() => {
-    if (!isActive) { setVisible(false); return; }
-    setVisible(false);
-    remeasure();
-    return () => clearTimeout(measureTimerRef.current);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isActive, stepIndex]);
+    return () => { cancelledRef.current = true; };
+  }, [step.selector, step.tab, switchTab, applyTarget]);
 
-  // Keyboard navigation
+  // ── Position the card against its real measured height ──────────
+  //
+  // A ResizeObserver rather than a layout effect: the card's height depends on
+  // how much copy the step carries, and the observer fires once on observe and
+  // again whenever that changes. Measuring in an effect body would mean
+  // positioning from a stale or guessed height on the first paint.
+  useLayoutEffect(() => {
+    const node = cardRef.current;
+    if (!visible || !node) return;
+
+    const ro = new ResizeObserver(() => {
+      setCardStyle(computeCardStyle(targetRef.current, node.offsetHeight));
+    });
+    ro.observe(node);
+    return () => ro.disconnect();
+  }, [visible, target]);
+
+  // ── Keep the spotlight glued to the target ──────────────────────
   useEffect(() => {
-    if (!isActive) return;
+    if (!visible || missing) return;
+    function reposition() {
+      const el = document.querySelector(`[data-tour="${step.selector}"]`);
+      if (!el) return;
+      const r = rectOf(el);
+      applyTarget(r);
+      setCardStyle(computeCardStyle(r, cardRef.current?.offsetHeight));
+    }
+    window.addEventListener('resize', reposition);
+    window.addEventListener('scroll', reposition, true);
+    return () => {
+      window.removeEventListener('resize', reposition);
+      window.removeEventListener('scroll', reposition, true);
+    };
+  }, [visible, missing, step.selector, applyTarget]);
+
+  // ── Keyboard navigation ─────────────────────────────────────────
+  useEffect(() => {
     function onKey(e) {
-      if (e.key === 'Escape')     stopTour();
-      if (e.key === 'ArrowRight') nextStep(total);
-      if (e.key === 'ArrowLeft')  prevStep();
+      if (e.key === 'Escape')     { e.preventDefault(); stopTour(); }
+      if (e.key === 'ArrowRight') { e.preventDefault(); nextStep(total); }
+      if (e.key === 'ArrowLeft')  { e.preventDefault(); prevStep(); }
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [isActive, stopTour, nextStep, prevStep, total]);
+  }, [stopTour, nextStep, prevStep, total]);
 
-  if (!isActive || !step) return null;
+  // Move focus to the card so screen readers announce each step and the
+  // arrow keys work without the user clicking first.
+  useEffect(() => {
+    if (visible) cardRef.current?.focus?.();
+  }, [visible]);
 
   return (
     <>
-      {/* Spotlight backdrop + ring */}
-      <Spotlight target={target} />
+      <Spotlight target={missing ? null : target} />
 
-      {/* Tour card */}
       <div
+        ref={cardRef}
+        tabIndex={-1}
         className={`tour-card ${visible ? 'tour-card--visible' : ''}`}
         style={{ ...cardStyle, position: 'fixed', zIndex: 9999, width: CARD_WIDTH }}
         role="dialog"
         aria-modal="false"
         aria-label={`Tour step ${stepIndex + 1} of ${total}: ${step.title}`}
       >
-        {/* Header row */}
         <div className="tour-card-header">
-          <span className="tour-card-step-label">
-            STEP {stepIndex + 1} OF {total}
-          </span>
-          <button
-            onClick={stopTour}
-            className="tour-card-close"
-            aria-label="Close tour"
-          >
+          <span className="tour-card-step-label">STEP {stepIndex + 1} OF {total}</span>
+          <button onClick={stopTour} className="tour-card-close" aria-label="Close tour">
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
 
-        {/* Title + description */}
         <h3 className="tour-card-title">{step.title}</h3>
-        <p className="tour-card-desc">{step.description}</p>
+        <p className="tour-card-desc">{step.body}</p>
 
-        {/* Footer: dots + nav buttons */}
+        {step.action && (
+          <p className="tour-card-action">
+            <Lightbulb className="w-3.5 h-3.5 flex-shrink-0" />
+            <span>{step.action}</span>
+          </p>
+        )}
+
+        {missing && (
+          <p className="tour-card-missing">
+            This part of the screen isn&apos;t on view right now — it may still be
+            loading, or be hidden for your role. The explanation above still applies.
+          </p>
+        )}
+
         <div className="tour-card-footer">
-          <StepDots total={total} current={stepIndex} />
+          <StepDots total={total} current={stepIndex} onJump={goToStep} />
           <div className="tour-card-nav">
             {stepIndex > 0 && (
-              <button
-                onClick={prevStep}
-                className="tour-btn tour-btn--back"
-                aria-label="Previous step"
-              >
+              <button onClick={prevStep} className="tour-btn tour-btn--back" aria-label="Previous step">
                 <ChevronLeft className="w-3.5 h-3.5" /> Back
               </button>
             )}
             {isLast ? (
-              <button
-                onClick={stopTour}
-                className="tour-btn tour-btn--done"
-                aria-label="Finish tour"
-                id="tour-done-btn"
-              >
+              <button onClick={stopTour} className="tour-btn tour-btn--done" aria-label="Finish tour" id="tour-done-btn">
                 <CheckCircle className="w-3.5 h-3.5" /> Done
               </button>
             ) : (
-              <button
-                onClick={() => nextStep(total)}
-                className="tour-btn tour-btn--next"
-                aria-label="Next step"
-                id="tour-next-btn"
-              >
+              <button onClick={() => nextStep(total)} className="tour-btn tour-btn--next" aria-label="Next step" id="tour-next-btn">
                 Next <ChevronRight className="w-3.5 h-3.5" />
               </button>
             )}
@@ -457,5 +276,37 @@ export default function WalkthroughTour({ userRole }) {
         </div>
       </div>
     </>
+  );
+}
+
+// ── Main WalkthroughTour component ────────────────────────────────
+export default function WalkthroughTour({ userRole, visibleTabIds }) {
+  const {
+    isActive, stepIndex, stopTour, nextStep, prevStep, goToStep, switchTab,
+  } = useWalkthrough();
+
+  const steps = getStepsForRole(userRole, visibleTabIds);
+  const total = steps.length;
+
+  if (!isActive || !total) return null;
+
+  // Clamp: the visible-tab filter can shorten a tour between renders.
+  const index = Math.min(stepIndex, total - 1);
+  const step  = steps[index];
+  if (!step) return null;
+
+  return (
+    <TourStep
+      key={index}
+      step={step}
+      stepIndex={index}
+      total={total}
+      isLast={index === total - 1}
+      stopTour={stopTour}
+      nextStep={nextStep}
+      prevStep={prevStep}
+      goToStep={goToStep}
+      switchTab={switchTab}
+    />
   );
 }

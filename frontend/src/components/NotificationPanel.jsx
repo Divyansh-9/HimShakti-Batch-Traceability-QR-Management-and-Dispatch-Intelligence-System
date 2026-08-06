@@ -107,6 +107,7 @@ export default function NotificationPanel({ className = '' }) {
       {/* ── Bell trigger ─── */}
       <button
         id="notif-bell-btn"
+        data-tour="notif-bell"
         onClick={() => setIsOpen(v => !v)}
         aria-label={unreadCount > 0 ? `${unreadCount} unread notifications` : 'Notifications'}
         aria-expanded={isOpen}

@@ -70,6 +70,11 @@ export function WalkthroughProvider({ children, userRole, isNewUser }) {
     setStepIndex(prev => Math.max(prev - 1, 0));
   }, []);
 
+  // Jump straight to a step from the progress dots.
+  const goToStep = useCallback((i) => {
+    setStepIndex(Math.max(0, i));
+  }, []);
+
   // "Explore Myself" — close modal, trigger brief nudge pulse on key element
   const startNudge = useCallback(() => {
     setShowWelcome(false);
@@ -100,7 +105,7 @@ export function WalkthroughProvider({ children, userRole, isNewUser }) {
   return (
     <WalkthroughContext.Provider value={{
       isActive, stepIndex, showWelcome, nudgeMode,
-      startTour, stopTour, nextStep, prevStep, skipTour, startNudge, openHelp,
+      startTour, stopTour, nextStep, prevStep, goToStep, skipTour, startNudge, openHelp,
       registerTabSwitcher, switchTab,
     }}>
       {children}

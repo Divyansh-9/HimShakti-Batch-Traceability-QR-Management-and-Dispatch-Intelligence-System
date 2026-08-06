@@ -97,4 +97,22 @@ function requireQualityInspector(req, res, next) {
   return res.status(403).json({ success: false, error: 'Quality Inspector access required to submit inspections' });
 }
 
-module.exports = { requireAdmin, requireAdminOrAbove, requireSuperAdmin, requireManagerOrAbove, requireQIOrAbove, requireQualityInspector, getTier };
+/**
+ * requireImporter — allows the roles that may create production records in
+ * bulk: factory-manager (the people who actually enter production data),
+ * manager, admin and super-admin.
+ *
+ * Deliberately excludes quality-inspector and dispatch-coordinator: both are
+ * Tier 3 like factory-manager, but neither creates batches, and a bulk writer
+ * is a much bigger lever than the single-batch form they already lack.
+ */
+function requireImporter(req, res, next) {
+  const { role } = req.user || {};
+  if (isSAUser(req.user) || ['admin', 'manager', 'factory-manager'].includes(role)) return next();
+  return res.status(403).json({
+    success: false,
+    error:   'Bulk import is restricted to factory managers and above',
+  });
+}
+
+module.exports = { requireAdmin, requireAdminOrAbove, requireSuperAdmin, requireManagerOrAbove, requireQIOrAbove, requireQualityInspector, requireImporter, getTier };

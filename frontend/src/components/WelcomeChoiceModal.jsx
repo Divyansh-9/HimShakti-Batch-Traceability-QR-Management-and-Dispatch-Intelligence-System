@@ -5,6 +5,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Compass, Map, X, Sparkles, ArrowRight } from 'lucide-react';
 import { useWalkthrough } from '../context/WalkthroughContext';
+import { getStepsForRole } from '../config/walkthroughSteps';
 
 // ── Role display helpers ──────────────────────────────────────────
 const ROLE_LABELS = {
@@ -25,26 +26,22 @@ const ROLE_COLORS = {
   'dispatch-coordinator': { bg: 'bg-green-500/15',  text: 'text-green-400',  border: 'border-green-500/25',  dot: 'bg-green-400' },
 };
 
-const ROLE_TOUR_COUNTS = {
-  'super-admin':          6,
-  'admin':                6,
-  'manager':              5,
-  'factory-manager':      3,
-  'quality-inspector':    3,
-  'dispatch-coordinator': 3,
-};
+// The step count is read from the tour definition itself rather than kept in a
+// second table here — a hardcoded count silently lies the moment a step is
+// added or removed.
 
-// Role-specific taglines shown in the modal
+// Role-specific taglines. Each names what that role actually does in the
+// system, including the tab that exists specifically for them.
 const ROLE_TAGLINE = {
-  'super-admin':          'Full platform access — users, batches, AI audit, and more.',
-  'admin':                'Manage batches, dispatch, QR codes, and user access.',
-  'manager':              'Oversee inventory, FEFO queue, and AI insights.',
-  'factory-manager':      'Create and track batch records from the factory floor.',
-  'quality-inspector':    'Monitor batch status, expiry urgency, and FEFO priority.',
-  'dispatch-coordinator': 'Manage dispatch order, FEFO queue, and QR traceability.',
+  'super-admin':          'Everything: batches, dispatch, imports, quality records, AI audit, and who gets access.',
+  'admin':                'Batches, dispatch, bulk imports, quality records, and user access.',
+  'manager':              'Oversee inventory, the FEFO queue, quality inspections, imports, and AI insights.',
+  'factory-manager':      'Log production batches, import a run in bulk, and keep the traceability chain intact.',
+  'quality-inspector':    'Submit and review quality inspections — the gate every batch has to pass.',
+  'dispatch-coordinator': 'Work the FEFO queue, record dispatches, and label shipments with their trace QR.',
 };
 
-export default function WelcomeChoiceModal({ user }) {
+export default function WelcomeChoiceModal({ user, visibleTabIds }) {
   const { startTour, startNudge, skipTour, showWelcome } = useWalkthrough();
   const backdropRef = useRef(null);
 
@@ -52,7 +49,7 @@ export default function WelcomeChoiceModal({ user }) {
   const name      = user?.name || user?.username || 'there';
   const roleLabel = ROLE_LABELS[role] || role;
   const colors    = ROLE_COLORS[role] || ROLE_COLORS['admin'];
-  const steps     = ROLE_TOUR_COUNTS[role] || 4;
+  const steps     = getStepsForRole(role, visibleTabIds).length;
   const tagline   = ROLE_TAGLINE[role] || '';
 
   // Close on backdrop click

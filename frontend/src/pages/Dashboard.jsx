@@ -17,13 +17,14 @@ import {
   LogOut, Download, AlertTriangle, CheckCircle, Clock, RefreshCw, Menu, Search, Leaf, Plus,
   ShieldCheck, Users, XCircle, Copy, ExternalLink, Zap, TrendingUp, Activity, Info,
   Eye, Archive, Pencil, RotateCcw, HelpCircle, ChevronLeft, ChevronRight, Settings,
-  ClipboardCheck, Star, CheckCircle2,
+  ClipboardCheck, Star, CheckCircle2, Upload,
 } from 'lucide-react';
 import { WalkthroughProvider, useWalkthrough } from '../context/WalkthroughContext';
 import WelcomeChoiceModal from '../components/WelcomeChoiceModal';
 import WalkthroughTour from '../components/WalkthroughTour';
 import SettingsPanel from '../components/SettingsPanel';
 import InspectionModal from '../components/InspectionModal';
+import ImportPanel from '../components/ImportPanel';
 import { useInspectionList, useMyInspections } from '../hooks/useInspections';
 
 
@@ -133,6 +134,21 @@ const TAB_META = {
     desc:        'Submit and review structured quality inspections for every batch. Checklist-driven verdicts with real-time manager notifications.',
     dot:         'bg-teal-500',
     mainTint:    'bg-teal-500/[0.015]',
+  },
+  import: {
+    wash:        'bg-violet-500/[0.03]',
+    border:      'border-violet-400/25',
+    accentBar:   'bg-violet-500',
+    accentText:  'text-violet-700',
+    accentLight: 'text-violet-300',
+    accentIcon:  'text-violet-400',
+    image:       '/warehouse-bg.png',
+    icon:        Upload,
+    eyebrow:     'Data Onboarding',
+    title:       'Bulk Import',
+    desc:        'Register a whole production run from a spreadsheet. Every row is validated and previewed before anything is written — and any import can be undone.',
+    dot:         'bg-violet-500',
+    mainTint:    'bg-violet-500/[0.015]',
   },
 };
 
@@ -2567,7 +2583,7 @@ function InspectionTab({ batches, onOpenInspection, userRole }) {
   const flaggedCount = allInspections.filter(i => i.status === 'FLAGGED').length;
 
   return (
-    <div className="px-4 sm:px-6 pb-6 space-y-6">
+    <div data-tour="inspection-panel" className="px-4 sm:px-6 pb-6 space-y-6">
       {/* Header row */}
       <div className="flex items-center justify-between">
         <div>
@@ -2692,6 +2708,7 @@ const NAV_TABS = [
   { id: 'qr',          label: 'QR Codes',      icon: QrCode },
   { id: 'ai',          label: 'AI Audit',      icon: Bot },
   { id: 'inspection',  label: 'Inspections',   icon: ClipboardCheck, qiOnly: true },
+  { id: 'import',      label: 'Import',        icon: Upload, importerOnly: true },
   { id: 'settings',    label: 'Settings',      icon: Settings },
   { id: 'admin',       label: 'Admin Panel',   icon: ShieldCheck, adminOnly: true },
 ];
@@ -2759,6 +2776,23 @@ function DashboardInner() {
   // Connect to WebSocket for real-time batch updates across all dashboard tabs
   useSocket();
 
+  // "?" opens Help & Walkthrough from anywhere — replaces the floating FAB
+  // that duplicated the sidebar entry. Ignored while typing so it never
+  // hijacks a question mark in a note or search box.
+  useEffect(() => {
+    function onKey(e) {
+      if (e.key !== '?' || e.ctrlKey || e.metaKey || e.altKey) return;
+      const t = e.target;
+      const typing = t?.isContentEditable ||
+        ['INPUT', 'TEXTAREA', 'SELECT'].includes(t?.tagName);
+      if (typing) return;
+      e.preventDefault();
+      openHelp();
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [openHelp]);
+
   // Navigate to a tab, optionally pre-set a filter (e.g. from Overview status pills)
   function handleTabSwitch(tabId, filter = 'all') {
     if (tabId === 'batches') setBatchesFilter(filter);
@@ -2772,6 +2806,8 @@ function DashboardInner() {
   const visibleTabs = NAV_TABS.filter(t => {
     if (t.adminOnly) return userIsSuperAdmin || user?.role === 'admin' || user?.role === 'manager';
     if (t.qiOnly)    return user?.role === 'quality-inspector' || user?.role === 'manager' || user?.role === 'admin' || userIsSuperAdmin;
+    // Mirrors requireImporter on the backend — factory-manager and above.
+    if (t.importerOnly) return userIsSuperAdmin || ['admin', 'manager', 'factory-manager'].includes(user?.role);
     return true;
   });
 
@@ -2809,8 +2845,9 @@ function DashboardInner() {
   return (
     <div className="h-screen overflow-hidden flex flex-col bg-background">
       {/* Welcome modal + Tour engine — rendered at root level */}
-      <WelcomeChoiceModal user={user} />
-      <WalkthroughTour userRole={user?.role} />
+      <WelcomeChoiceModal user={user} visibleTabIds={visibleTabs.map(t => t.id)} />
+      {/* visibleTabIds keeps the tour from spotlighting a tab this role never rendered */}
+      <WalkthroughTour userRole={user?.role} visibleTabIds={visibleTabs.map(t => t.id)} />
 
       <Navbar onMenuClick={() => setIsSidebarOpen(v => !v)} isSidebarOpen={isSidebarOpen} />
       <div className="flex flex-1 overflow-hidden" style={{ marginTop: '72px', height: 'calc(100vh - 72px)' }}>
@@ -2953,8 +2990,11 @@ function DashboardInner() {
               {!isSidebarCollapsed && (
                 <>
                   <span>Help &amp; Walkthrough</span>
-                  {!hasSeen && (
+                  {!hasSeen ? (
                     <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-brand/20 text-brand border border-brand/30 animate-pulse">NEW</span>
+                  ) : (
+                    /* Advertises the shortcut that replaced the floating "?" button */
+                    <kbd className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded border border-white/15 text-white/40">?</kbd>
                   )}
                 </>
               )}
@@ -2994,8 +3034,8 @@ function DashboardInner() {
 
         {/* Main — offset dynamically based on sidebar state */}
         <main
-          className={`flex-1 overflow-y-auto p-4 sm:p-6 pb-20 md:pb-6 transition-all duration-300 ease-in-out ${TAB_META[activeTab]?.mainTint || ''}`}
-          style={{ marginLeft: isSidebarCollapsed ? '4rem' : '14rem' }}
+          className={`flex-1 overflow-y-auto overflow-x-clip p-4 sm:p-6 pb-20 md:pb-6 transition-all duration-300 ease-in-out ${TAB_META[activeTab]?.mainTint || ''}`}
+          style={{ marginLeft: isSidebarCollapsed ? '4rem' : '14rem', scrollbarGutter: 'stable' }}
         >
           {/* Remove old header bar — each tab now has its own TabBanner */}
 
@@ -3062,6 +3102,14 @@ function DashboardInner() {
                     setShowInspectionModal(true);
                   }}
                 />
+              </>
+            )}
+            {activeTab === 'import' && (
+              <>
+                <TabBanner tabId="import" />
+                <ErrorBoundary>
+                  <ImportPanel />
+                </ErrorBoundary>
               </>
             )}
             {activeTab === 'settings' && (
@@ -3143,17 +3191,11 @@ function DashboardInner() {
         />
       )}
 
-      {/* Floating ? Help FAB — desktop only (hidden on mobile via CSS) */}
-      <button
-        id="help-fab-btn"
-        onClick={openHelp}
-        className={`help-fab ${hasSeen ? '' : 'help-fab--new-user'}`}
-        aria-label="Help & Walkthrough"
-        title="Help & Walkthrough"
-      >
-        <span className="help-fab-tooltip">Help &amp; Walkthrough</span>
-        ?
-      </button>
+      {/* The floating "?" button used to live here. It was removed: it fired the
+          same openHelp() as the sidebar's "Help & Walkthrough" entry, which
+          already carries the NEW badge for first-time users, so it was a second
+          control for one action — and it sat on top of the bottom-right of every
+          table. Press "?" anywhere instead (see the shortcut handler above). */}
     </div>
   );
 }

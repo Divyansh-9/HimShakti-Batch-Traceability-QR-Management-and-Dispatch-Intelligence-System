@@ -6,6 +6,73 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2.6.0] — 2026-08-06
+
+### 📥 Bulk Batch Import
+
+Register a whole production run from a spreadsheet instead of one form at a time. Every row is validated and previewed before anything is written, and any import can be undone.
+
+#### Added
+
+**Import wizard (Dashboard ▸ Import)**
+- Four-step flow: choose file → map columns → preview → import.
+- CSV is parsed **in the browser**. Nothing is uploaded until the preview is approved, and there is no multipart upload endpoint anywhere in the stack.
+- Header auto-matching — `Lot No`, `Qty`, `UOM`, `Packed On` and similar variants resolve to the right field without manual mapping.
+- Per-row preview labelling every row `will import` / `skip` / `error`, filterable, with a downloadable error report and a downloadable CSV template.
+- Live chunked progress, so a multi-thousand-row file reports as it goes.
+
+**Backend**
+- `ImportJob.model.js` — audit record per import run, carrying the rollback manifest.
+- `import.controller.js` — `validate` (dry run, writes nothing), `commit` (chunked), `rollback`, plus history and schema endpoints.
+- `import.routes.js` mounted at `/api/import`.
+- `requireImporter` RBAC gate — factory-manager and above. Quality inspectors and dispatch coordinators are excluded; neither creates batches.
+- `csvParser.js` (frontend) — dependency-free RFC 4180 parser handling quoted fields, embedded commas and newlines, CRLF/LF/CR, UTF-8 BOM, and delimiter detection.
+
+**Data handling**
+- Batch codes are pre-allocated as a contiguous block, one query per chunk, instead of one query per row.
+- Product resolution is fault-isolated per row, so a single catalogue contract violation reports as one bad row rather than failing the whole import with a 503.
+- Duplicate detection on **Source Lot Code + Product SKU + Pack Date**, applied both against the database and within the file. Re-running the same file is safe.
+- Unit spellings (`kgs`, `pcs`, `litres`), thousands separators, and both `DD/MM/YYYY` and `YYYY-MM-DD` dates are accepted.
+- Imported batches carry their provenance in `noteHistory`.
+
+**Undo**
+- Rollback soft-deletes the batches an import inserted — they move to the Archived tab with a `deleteNote` naming the import, and stay restorable. Nothing is hard-deleted.
+- Batches archived or dispatched by hand after an import keep their own state.
+
+### 🧭 Walkthrough rebuilt
+
+The guided tour was a table of contents — it named each tab without telling anyone how to do their job, and several roles were shown three steps covering a fraction of what they can reach.
+
+#### Added
+- `config/walkthroughSteps.js` — tour content split out of the engine, so copy can change without touching positioning.
+- Every step now carries a **"try it"** instruction alongside the description. That is the difference between naming a screen and teaching the task.
+- Steps are filtered against the tabs the signed-in role actually renders, so a tour can never spotlight something the user cannot open.
+- New tour anchors: the notification bell, the import wizard, and the inspections panel.
+- Progress dots are clickable — jump back to a step to re-read it.
+- `?` anywhere opens Help & Walkthrough (ignored while typing in a field).
+
+#### Fixed
+- **Quality inspectors were never shown the Inspections tab** — the one screen that exists for their role. Their tour also pointed a step at the FEFO table while sitting on the Batches tab, so it spotlighted nothing.
+- Factory managers were never shown QR codes or bulk import; dispatch coordinators were never told how to record a dispatch.
+- Unknown roles fell back to the **admin** tour, promising an Admin Panel they cannot open.
+- The tour waited a fixed 380 ms for a tab to render, then measured whatever was there. It now polls for the target and only gives up after a deadline.
+- Card position assumed a fixed 200 px height, pushing longer steps off-screen when positioned above a target. Height is now measured with a `ResizeObserver`.
+- A missing target produced a floating card pointing at nothing, silently. It now centres and says so.
+- Spotlight now tracks its target through scroll and resize.
+- Welcome modal step counts came from a hardcoded table that no longer matched the tours; they are read from the tour definition. Role taglines rewritten — the quality-inspector one never mentioned inspections.
+
+Step coverage per role: factory-manager 3 → 7, quality-inspector 3 → 6, dispatch-coordinator 3 → 5, manager 5 → 9, admin/super-admin 6 → 9.
+
+#### Removed
+- The floating **"?"** button. It fired the same action as the sidebar's Help & Walkthrough entry, which already carries the NEW badge for first-time users, and it sat on top of the bottom-right corner of every table. The `?` key shortcut replaces it.
+
+#### Changed
+- `Notification.model.js` — added the `batch_imported` type.
+- Dashboard `<main>` now uses `overflow-x-clip` with `scrollbar-gutter: stable`, removing a stray horizontal scrollbar caused by the KPI grid's decorative ambient glow (`inset: -40px`) registering as scrollable overflow.
+- Themed, thin scrollbars across the app, driven by the existing palette tokens.
+
+---
+
 ## [2.5.0] — 2026-08-05
 
 ### 🔔 Role-Based Notifications & Quality Inspection System

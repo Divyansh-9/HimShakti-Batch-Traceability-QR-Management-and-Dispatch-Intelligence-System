@@ -474,6 +474,10 @@
 /* Cards sit on flat color â€” blur has nothing to blur without this.
    Scoped to the grid container, not the cards themselves. */
 .card-grid-ambient { position: relative; }
+/* Bleeds 40px past the grid on every side. The parent scroll container must
+   clip the horizontal axis (see Dashboard <main>, overflow-x-clip) or this
+   decorative layer registers as scrollable overflow and produces a stray
+   horizontal scrollbar. */
 .card-grid-ambient::before {
   content: '';
   position: absolute;
@@ -1007,6 +1011,34 @@ nav[class*="fixed bottom-0"] {
   font-size: 12px;
   line-height: 1.6;
   color: rgba(148, 163, 184, 0.9);
+  margin: 0 0 12px 0;
+}
+
+/* "Try it" line — the concrete instruction that turns a description into
+   training. Visually separated so it reads as a task, not more prose. */
+.tour-card-action {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: rgba(249, 115, 22, 0.95);
+  background: rgba(249, 115, 22, 0.08);
+  border: 1px solid rgba(249, 115, 22, 0.20);
+  border-radius: 9px;
+  padding: 8px 10px;
+  margin: 0 0 14px 0;
+}
+
+/* Shown only when the step's target genuinely could not be found, so the
+   tour explains itself instead of pointing at nothing. */
+.tour-card-missing {
+  font-size: 11px;
+  line-height: 1.5;
+  color: rgba(148, 163, 184, 0.75);
+  background: rgba(148, 163, 184, 0.08);
+  border-radius: 8px;
+  padding: 7px 9px;
   margin: 0 0 14px 0;
 }
 
@@ -1026,6 +1058,8 @@ nav[class*="fixed bottom-0"] {
   gap: 5px;
 }
 
+/* Dots are <button>s so a user can jump back to a step they want to re-read.
+   The reset keeps them looking identical to the old decorative spans. */
 .tour-dot {
   width: 6px;
   height: 6px;
@@ -1033,6 +1067,16 @@ nav[class*="fixed bottom-0"] {
   background: rgba(255, 255, 255, 0.18);
   transition: all 0.25s ease;
   display: inline-block;
+  padding: 0;
+  border: none;
+  cursor: pointer;
+  appearance: none;
+}
+
+.tour-dot:hover { background: rgba(255, 255, 255, 0.4); }
+.tour-dot:focus-visible {
+  outline: 2px solid rgba(249, 115, 22, 0.8);
+  outline-offset: 2px;
 }
 
 .tour-dot--active {
@@ -1399,89 +1443,7 @@ nav[class*="fixed bottom-0"] {
   margin: 0;
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-   FLOATING ? HELP FAB
-   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
-
-.help-fab {
-  position: fixed;
-  bottom: 28px;
-  right: 24px;
-  z-index: 9980;
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, rgba(249,115,22,0.92), rgba(234,88,12,1));
-  border: none;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow:
-    0 4px 14px rgba(249,115,22,0.45),
-    0 2px 4px rgba(0,0,0,0.3),
-    0 0 0 0 rgba(249,115,22,0.4);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-  animation: fabPop 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
-  animation-delay: 1.8s;
-  opacity: 0;
-  color: #fff;
-  font-size: 16px;
-  font-weight: 900;
-}
-
-@keyframes fabPop {
-  from { opacity: 0; transform: scale(0.6); }
-  to   { opacity: 1; transform: scale(1); }
-}
-
-.help-fab:hover {
-  transform: scale(1.1) translateY(-2px);
-  box-shadow:
-    0 8px 24px rgba(249,115,22,0.55),
-    0 4px 8px rgba(0,0,0,0.3);
-}
-
-.help-fab:active {
-  transform: scale(0.97);
-}
-
-/* Pulsing ring for new users â€” draws attention to the FAB */
-.help-fab--new-user {
-  animation: fabPop 0.4s cubic-bezier(0.22, 1, 0.36, 1) 1.8s both,
-             fabRingPulse 2s ease-in-out 2.5s 4;
-}
-
-@keyframes fabRingPulse {
-  0%   { box-shadow: 0 4px 14px rgba(249,115,22,0.45), 0 0 0 0   rgba(249,115,22,0.4); }
-  50%  { box-shadow: 0 4px 14px rgba(249,115,22,0.45), 0 0 0 10px rgba(249,115,22,0); }
-  100% { box-shadow: 0 4px 14px rgba(249,115,22,0.45), 0 0 0 0   rgba(249,115,22,0.4); }
-}
-
-/* Tooltip shown on FAB hover */
-.help-fab-tooltip {
-  position: absolute;
-  right: 58px;
-  bottom: 50%;
-  transform: translateY(50%);
-  white-space: nowrap;
-  background: rgba(15,23,42,0.96);
-  border: 1px solid rgba(255,255,255,0.1);
-  color: #f8fafc;
-  font-size: 11px;
-  font-weight: 600;
-  padding: 5px 10px;
-  border-radius: 8px;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.2s;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-}
-.help-fab:hover .help-fab-tooltip {
-  opacity: 1;
-}
-
-/* â”€â”€ Sidebar help button pulse ring (new users only) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Sidebar help button pulse ring (new users only) ────────────────── */
 @keyframes sidebarHelpPulse {
   0%   { box-shadow: 0 0 0 0   rgba(249, 115, 22, 0.6); }
   70%  { box-shadow: 0 0 0 6px rgba(249, 115, 22, 0); }
@@ -1492,7 +1454,7 @@ nav[class*="fixed bottom-0"] {
   animation: sidebarHelpPulse 1.8s ease-out 2s 3;
 }
 
-/* â”€â”€ "Explore Myself" nudge â€” gentle pulse on key element â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── "Explore Myself" nudge — gentle pulse on key element ───────────── */
 @keyframes nudgePulse {
   0%   { box-shadow: 0 0 0 0   rgba(249,115,22,0.7), 0 0 0 0   rgba(249,115,22,0.3); }
   40%  { box-shadow: 0 0 0 6px rgba(249,115,22,0.4), 0 0 0 12px rgba(249,115,22,0.15); }
@@ -1508,10 +1470,41 @@ nav[class*="fixed bottom-0"] {
   transition: outline 0.3s;
 }
 
-/* â”€â”€ Mobile â€” hide FAB when bottom nav is visible (< md) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
-@media (max-width: 767px) {
-  .help-fab {
-    display: none;
-  }
+/* ── Scrollbars ───────────────────────────────────────────────────────
+   Themed, thin, and quiet. The default OS scrollbar reads as a grey slab
+   against the dark surfaces, so both the dashboard scroll region and the
+   in-card horizontal table wrappers get a token-driven treatment.
+   Firefox uses scrollbar-width/color; Chromium and Safari use ::-webkit-. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-color) transparent;
 }
 
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background-color: var(--border-color);
+  border-radius: 999px;
+  /* Transparent border + background-clip keeps the thumb visually thin
+     while leaving a comfortable pointer target. */
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--text-muted);
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  ::-webkit-scrollbar-thumb {
+    transition: background-color 150ms ease;
+  }
+}

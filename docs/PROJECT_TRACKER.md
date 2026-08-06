@@ -3,6 +3,7 @@
 > Living document. Updated after every development session.
 > Organized by: **Epic → Story → Task** (Jira-style).
 > Status key: `✅ Done` · `🔄 In Progress` · `⏳ Planned` · `❌ Blocked` · `🚫 Descoped`
+> **Last updated:** 2026-08-06 · v2.6.0
 
 ---
 
@@ -171,6 +172,121 @@
 
 ---
 
+## EPIC-05 · Bulk Batch Import
+
+> **Goal:** Enable factory managers to register an entire production run from a CSV spreadsheet with preview, validation, and atomic rollback.
+> **Released:** v2.6.0 — 2026-08-06 | **Status:** ✅ Done
+
+---
+
+### STORY-05-01 · Backend Import Pipeline ✅
+
+| Task ID | Task | Status | Priority | Files Affected |
+|---|---|---|---|---|
+| T-100 | `ImportJob.model.js` — audit record per import run with rollback manifest | ✅ | 🔴 | `backend/src/models/ImportJob.model.js` |
+| T-101 | `import.controller.js` — validate (dry-run), commit (chunked), rollback, history, schema | ✅ | 🔴 | `backend/src/controllers/import.controller.js` |
+| T-102 | `import.routes.js` mounted at `/api/import` | ✅ | 🔴 | `backend/src/routes/import.routes.js` |
+| T-103 | `requireImporter` RBAC gate — factory-manager and above only | ✅ | 🔴 | `backend/src/middleware/requireAdmin.js` |
+| T-104 | Contiguous batch-code pre-allocation per chunk (one query per chunk, not per row) | ✅ | 🟠 | `backend/src/controllers/import.controller.js` |
+| T-105 | Duplicate detection on Source Lot + SKU + Pack Date (DB + in-file) | ✅ | 🟠 | `backend/src/controllers/import.controller.js` |
+| T-106 | Rollback soft-deletes inserted batches; dispatched/archived rows keep own state | ✅ | 🟠 | `backend/src/controllers/import.controller.js` |
+| T-107 | `batch_imported` notification type added to `Notification.model.js` | ✅ | 🟡 | `backend/src/models/Notification.model.js` |
+
+---
+
+### STORY-05-02 · Frontend Import Wizard ✅
+
+| Task ID | Task | Status | Priority | Files Affected |
+|---|---|---|---|---|
+| T-108 | `csvParser.js` — dependency-free RFC 4180 parser (quoted fields, BOM, delimiter detect) | ✅ | 🔴 | `frontend/src/utils/csvParser.js` |
+| T-109 | `useImport.js` — TanStack Query hooks for validate/commit/rollback | ✅ | 🔴 | `frontend/src/hooks/useImport.js` |
+| T-110 | `ImportPanel.jsx` — 4-step wizard: choose → map → preview → commit | ✅ | 🔴 | `frontend/src/components/ImportPanel.jsx` |
+| T-111 | Per-row preview: `will import` / `skip` / `error` labels, filterable, downloadable error CSV | ✅ | 🟠 | `frontend/src/components/ImportPanel.jsx` |
+| T-112 | Chunked live progress bar during commit | ✅ | 🟠 | `frontend/src/components/ImportPanel.jsx` |
+| T-113 | Header auto-matching for common field name variants | ✅ | 🟡 | `frontend/src/utils/csvParser.js` |
+| T-114 | Downloadable CSV template link | ✅ | 🟡 | `frontend/src/components/ImportPanel.jsx` |
+
+---
+
+---
+
+## EPIC-06 · Guided Walkthrough — Full Rebuild
+
+> **Goal:** Replace the static tab-listing tour with a role-aware, task-oriented guided experience that teaches workflows rather than naming screens.
+> **Released:** v2.6.0 — 2026-08-06 | **Status:** ✅ Done
+
+---
+
+### STORY-06-01 · Walkthrough Engine Refactor ✅
+
+| Task ID | Task | Status | Priority | Files Affected |
+|---|---|---|---|---|
+| T-120 | Extract tour content to `config/walkthroughSteps.js` (separate engine from copy) | ✅ | 🔴 | `frontend/src/config/walkthroughSteps.js` |
+| T-121 | Filter steps against tabs the signed-in role actually renders | ✅ | 🔴 | `frontend/src/context/WalkthroughContext.jsx` |
+| T-122 | Poll for target DOM node instead of fixed 380 ms delay | ✅ | 🔴 | `frontend/src/components/WalkthroughTour.jsx` |
+| T-123 | `ResizeObserver` for tour card height — prevent off-screen positioning | ✅ | 🟠 | `frontend/src/components/WalkthroughTour.jsx` |
+| T-124 | Spotlight tracks target through scroll and resize | ✅ | 🟠 | `frontend/src/components/WalkthroughTour.jsx` |
+| T-125 | Missing target centres card with descriptive message (no silent floating) | ✅ | 🟠 | `frontend/src/components/WalkthroughTour.jsx` |
+| T-126 | Progress dots are clickable — jump to any step | ✅ | 🟡 | `frontend/src/components/WalkthroughTour.jsx` |
+| T-127 | `?` keyboard shortcut opens Help anywhere (ignores active inputs) | ✅ | 🟡 | `frontend/src/context/WalkthroughContext.jsx` |
+| T-128 | Remove floating `?` FAB — sidebar Help entry + `?` key replaces it | ✅ | 🟡 | `frontend/src/pages/Dashboard.jsx` |
+
+---
+
+### STORY-06-02 · Role Coverage Improvements ✅
+
+| Task ID | Task | Status | Priority | Files Affected |
+|---|---|---|---|---|
+| T-129 | Quality inspector tour: added Inspections tab steps (previously never shown) | ✅ | 🔴 | `frontend/src/config/walkthroughSteps.js` |
+| T-130 | Factory manager tour: added QR Codes + Import Wizard steps (3 → 7 steps) | ✅ | 🟠 | `frontend/src/config/walkthroughSteps.js` |
+| T-131 | Dispatch coordinator tour: added dispatch recording steps (3 → 5 steps) | ✅ | 🟠 | `frontend/src/config/walkthroughSteps.js` |
+| T-132 | Manager tour: added Inspection log + Notification bell steps (5 → 9 steps) | ✅ | 🟠 | `frontend/src/config/walkthroughSteps.js` |
+| T-133 | Admin/Super-admin tour: added Import + Notifications steps (6 → 9 steps) | ✅ | 🟠 | `frontend/src/config/walkthroughSteps.js` |
+| T-134 | WelcomeChoiceModal step counts read from tour definition (removed hardcoded table) | ✅ | 🟡 | `frontend/src/components/WelcomeChoiceModal.jsx` |
+| T-135 | QA inspector role tagline updated to mention inspections | ✅ | 🟡 | `frontend/src/components/WelcomeChoiceModal.jsx` |
+
+---
+
+---
+
+## EPIC-04 · Code Quality & Architecture
+
+> **Goal:** Eliminate anti-patterns, close security gaps, and maintain a clean codebase.
+> **Status:** 🔄 In Progress
+
+---
+
+### STORY-04-01 · Auth Bug Fixes ✅
+
+| Task ID | Task | Status | Priority | Files Affected |
+|---|---|---|---|---|
+| T-080 | Fix Manager direct-action bug in User Roster (was bypassing read-only guard) | ✅ | 🔴 | `frontend/src/pages/Dashboard.jsx` |
+| T-081 | Fix login redirect loop: SettingsContext `/auth/me` 401 → client.js hard reload loop | ✅ | 🔴 | `frontend/src/context/SettingsContext.jsx` |
+| T-082 | Fix login history silent failure: JWT missing `_id` → `req.user._id` was undefined | ✅ | 🔴 | `backend/src/controllers/auth.controller.js`, `backend/src/controllers/googleAuth.controller.js` |
+
+---
+
+### STORY-04-02 · UI/UX Polish ✅
+
+| Task ID | Task | Status | Priority | Files Affected |
+|---|---|---|---|---|
+| T-083 | `overflow-x-clip` + `scrollbar-gutter: stable` on Dashboard `<main>` | ✅ | 🟡 | `frontend/src/pages/Dashboard.jsx` |
+| T-084 | Themed thin scrollbars driven by palette tokens | ✅ | 🟡 | `frontend/src/index.css` |
+
+---
+
+### STORY-04-03 · Open Technical Debt ⏳
+
+| Task ID | Task | Status | Priority | Notes |
+|---|---|---|---|---|
+| T-090 | Clean up old `theme` localStorage key (now superseded by `hs_prefs`) | ⏳ | 🟡 | `useTheme.js` proxies correctly but stale key may linger |
+| T-091 | Verify `ua-parser-js` is in production `dependencies` not `devDependencies` | ⏳ | 🟠 | `backend/package.json` |
+| T-092 | Vercel 10s timeout guard for long-running Gemini AI calls | ⏳ | 🟠 | Existing known constraint from README |
+
+---
+
+---
+
 ## EPIC-03 · Production Deployment
 
 > **Goal:** Keep Firebase (frontend) and Vercel (backend) always in sync with the latest stable build.
@@ -187,11 +303,11 @@
 
 ---
 
-### STORY-03-02 · Settings Centre Production Deploy ⏳
+### STORY-03-02 · Settings Centre + Phase 3 Production Deploy ⏳
 
 | Task ID | Task | Status | Priority | Notes |
 |---|---|---|---|---|
-| T-072 | `npm run build` — verify clean Vite output | ⏳ | 🔴 | After Phase 2 complete |
+| T-072 | `npm run build` — verify clean Vite output | ⏳ | 🔴 | After Phase 3 + Import complete |
 | T-073 | `firebase deploy --only hosting` | ⏳ | 🔴 | |
 | T-074 | `git push` backend changes | ⏳ | 🔴 | |
 | T-075 | Smoke-test on production URL after deploy | ⏳ | 🟠 | |
@@ -240,14 +356,24 @@
 | `backend/src/models/User.model.js` | User schema — roles, preferences, soft-delete fields |
 | `backend/src/models/LoginEvent.model.js` | Login history — 30-day TTL index |
 | `backend/src/models/AccessRequest.model.js` | Pending access requests |
+| `backend/src/models/Notification.model.js` | Role-based notifications — 7-day TTL, read/unread state |
+| `backend/src/models/Inspection.model.js` | Quality inspection records — verdict, rating, 8-item checklist, 30-day TTL |
+| `backend/src/models/ImportJob.model.js` | Bulk import audit record with rollback manifest |
 | `backend/src/controllers/auth.controller.js` | Auth + RBAC + self-service profile/settings/password/history |
 | `backend/src/controllers/googleAuth.controller.js` | Google OAuth token verification + login event hook |
+| `backend/src/controllers/notifications.controller.js` | REST endpoints for notification fetch, mark-read, clear |
+| `backend/src/controllers/inspection.controller.js` | Append-only inspection CRUD; fires T-063 notification on submit |
+| `backend/src/controllers/import.controller.js` | Validate (dry-run), commit (chunked), rollback, history |
 | `backend/src/middleware/auth.js` | JWT `protect` guard + `generateToken` |
-| `backend/src/middleware/requireAdmin.js` | Tiered role guards (requireSuperAdmin, requireAdminOrAbove, etc.) |
+| `backend/src/middleware/requireAdmin.js` | Tiered role guards (requireSuperAdmin → requireQualityInspector) |
 | `backend/src/routes/auth.routes.js` | All /auth/* route definitions |
+| `backend/src/routes/notifications.routes.js` | /api/notifications routes |
+| `backend/src/routes/inspection.routes.js` | /api/inspections routes |
+| `backend/src/routes/import.routes.js` | /api/import routes |
 | `backend/src/services/loginHistory.service.js` | Non-blocking UA parse + geo lookup + LoginEvent write |
 | `backend/src/services/emailService.js` | OTP + invite emails via nodemailer |
-| `backend/server.js` | Express entry point + Socket.io init |
+| `backend/src/services/notificationService.js` | `notify()` + `notifyRoles()` fire-and-forget helpers |
+| `backend/server.js` | Express entry point + Socket.io init + role-room routing |
 
 ### Frontend
 
@@ -257,17 +383,27 @@
 | `frontend/src/App.jsx` | Route definitions |
 | `frontend/src/api/client.js` | Central fetch wrapper — 401 global handler |
 | `frontend/src/context/SettingsContext.jsx` | Theme/palette/accent state + DB sync |
+| `frontend/src/context/WalkthroughContext.jsx` | Tour state + role-filtered step list |
+| `frontend/src/config/walkthroughSteps.js` | Tour content separated from engine (copy ≠ positioning) |
 | `frontend/src/hooks/useAuth.js` | Login/logout + role checks (reads hs_token / hs_user) |
 | `frontend/src/hooks/useTheme.js` | Thin proxy over SettingsContext (legacy compatibility) |
 | `frontend/src/hooks/useSettingsMutation.js` | TanStack mutation for saving preferences |
+| `frontend/src/hooks/useNotifications.js` | Socket singleton + optimistic updates + DB merge |
+| `frontend/src/hooks/useInspections.js` | TanStack hooks for list/my/byBatch/submit inspections |
+| `frontend/src/hooks/useImport.js` | TanStack hooks for validate/commit/rollback import jobs |
+| `frontend/src/utils/csvParser.js` | Dependency-free RFC 4180 CSV parser (BOM, quoted fields, auto-detect delimiter) |
 | `frontend/src/components/Navbar.jsx` | Top navigation bar |
 | `frontend/src/components/ThemePicker.jsx` | 3-option theme popover (Light/Dark/System) |
-| `frontend/src/components/ThemeToggle.jsx` | Legacy binary toggle (kept; replaced by ThemePicker) |
+| `frontend/src/components/NotificationPanel.jsx` | Bell icon + live notification dropdown |
 | `frontend/src/components/SettingsPanel.jsx` | Full settings UI — Profile, Customisation, Security, Notifications |
+| `frontend/src/components/InspectionModal.jsx` | 5-step QA inspection form (batch picker, checklist, rating, verdict, findings) |
+| `frontend/src/components/ImportPanel.jsx` | 4-step bulk import wizard (choose, map, preview, commit) |
+| `frontend/src/components/WalkthroughTour.jsx` | Tour card engine with spotlight, polling, ResizeObserver |
+| `frontend/src/components/WelcomeChoiceModal.jsx` | First-time role selection modal |
 | `frontend/src/components/ProtectedRoute.jsx` | JWT expiry guard for /dashboard |
-| `frontend/src/pages/Dashboard.jsx` | Main dashboard — all tabs including Settings |
+| `frontend/src/pages/Dashboard.jsx` | Main dashboard — all tabs including Inspection and Import |
 | `frontend/src/pages/Login.jsx` | Login, request access, forgot password, Google OAuth |
-| `frontend/src/index.css` | Design tokens — light/dark/system + 8 palette CSS vars + animations |
+| `frontend/src/index.css` | Design tokens — light/dark/system + 25 palette CSS vars + animations |
 
 ### Config & Infra
 
@@ -278,6 +414,10 @@
 | `vercel.json` | Vercel routing + serverless function config |
 | `firebase.json` | Firebase Hosting SPA rewrite rules |
 | `.firebaserc` | Firebase project alias |
+| `docs/PROJECT_TRACKER.md` | This file — Jira-style Epic/Story/Task tracker |
+| `docs/RBAC.md` | Permission matrix for all roles |
+| `docs/DATABASE.md` | MongoDB schema documentation |
+| `docs/USER_GUIDE.md` | End-user documentation |
 
 ---
 
@@ -287,6 +427,11 @@
 
 | Date | Decision | Why |
 |---|---|---|
+| 2026-08-06 | CSV parsed in browser; no multipart upload endpoint | Eliminates file upload attack surface; preview is free (nothing written until user approves) |
+| 2026-08-06 | ImportJob stores rollback manifest (list of `_id`s inserted) | Enables one-call atomic rollback without scanning the whole batch collection |
+| 2026-08-06 | Walkthrought steps extracted to `walkthroughSteps.js` config | Copy changes should not require touching tour positioning engine |
+| 2026-08-06 | Inspection model is append-only (no update/delete) | Audit integrity — re-inspection creates a new record; `isLatest` flag surfaced current state |
+| 2026-08-06 | Inspection separate collection (not embedded in Batch) | Correct domain separation; separate TTL; efficient `isLatest` index without bloating Batch docs |
 | 2026-08-05 | Separate `LoginEvent` collection (not array inside `User`) | Correct MongoDB TTL pattern; no manual splice/cap; scales independently |
 | 2026-08-05 | `SettingsContext` query uses `skipAuthRedirect: true` | Prevents 401 → hard reload loop when SettingsProvider wraps the whole app including /login |
 | 2026-08-05 | Include `_id` in JWT payload | Required so `req.user._id` resolves in self-service endpoints without a DB lookup per request |
@@ -296,4 +441,4 @@
 
 ---
 
-*Last updated: 2026-08-05 · Update this file at the end of every development session.*
+*Last updated: 2026-08-06 · v2.6.0 · Update this file at the end of every development session.*

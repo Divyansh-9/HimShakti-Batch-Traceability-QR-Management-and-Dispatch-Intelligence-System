@@ -18,6 +18,7 @@ const qrRoutes       = require('./src/routes/qr.routes');
 const aiRoutes            = require('./src/routes/ai.routes');
 const notificationRoutes  = require('./src/routes/notifications.routes');
 const inspectionRoutes    = require('./src/routes/inspection.routes');
+const importRoutes        = require('./src/routes/import.routes');
 
 const app    = express();
 const server = http.createServer(app);
@@ -111,6 +112,7 @@ app.use('/api/dispatch', dispatchRoutes);
 app.use('/api/ai',            aiRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/inspections',   inspectionRoutes);
+app.use('/api/import',        importRoutes);
 
 app.use(errorHandler);
 

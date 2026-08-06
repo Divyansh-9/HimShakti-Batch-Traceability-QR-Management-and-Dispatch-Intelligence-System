@@ -30,6 +30,7 @@ const notificationSchema = new mongoose.Schema({
     type: String,
     enum: [
       'batch_created',
+      'batch_imported',
       'batch_dispatched',
       'inspection_completed',
       'admin_action',

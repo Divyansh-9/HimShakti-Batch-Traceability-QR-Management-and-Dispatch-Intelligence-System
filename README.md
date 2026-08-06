@@ -3,6 +3,7 @@
 # 🌿 HimShakti — Batch Traceability & Dispatch Intelligence System
 
 <p align="center">
+  <img src="https://img.shields.io/badge/Version-2.6.0-6366f1?style=for-the-badge" />
   <img src="https://img.shields.io/badge/Status-Live%20%26%20Deployed-22c55e?style=for-the-badge&logo=checkmarx&logoColor=white" />
   <img src="https://img.shields.io/badge/React-18%20%2B%20Vite-61DAFB?style=for-the-badge&logo=react&logoColor=black" />
   <img src="https://img.shields.io/badge/Node.js-Express%205-339933?style=for-the-badge&logo=node.js&logoColor=white" />
@@ -105,6 +106,9 @@ The backend originally deployed to **Render (free tier)**. During integration te
 - [What is this?](#-what-is-this)
 - [Feature Highlights](#-feature-highlights)
 - [Batch Management Workflow](#-batch-management-workflow-v200)
+- [Quality Inspection System](#-quality-inspection-system-v250)
+- [Bulk Import Wizard](#-bulk-import-wizard-v260)
+- [Settings Centre](#-settings-centre-v240)
 - [Quick Start](#-quick-start)
 - [Environment Variables](#-environment-variables)
 - [Dashboard Features](#-dashboard-features)
@@ -123,7 +127,7 @@ The backend originally deployed to **Render (free tier)**. During integration te
 
 ## 🌱 What is this?
 
-**HimShakti Batch Traceability System** is a full-stack operations platform built for a Himalayan food processing company. It tracks every production batch from farmer intake → processing → QR code labelling → FEFO dispatch — all in one intelligent dashboard.
+**HimShakti Batch Traceability System** is a full-stack operations platform built for a Himalayan food processing company. It tracks every production batch from farmer intake → processing → QR code labelling → quality inspection → FEFO dispatch — all in one intelligent dashboard.
 
 Key capabilities:
 
@@ -133,8 +137,12 @@ Key capabilities:
 | 📦 **QR Code generation** | Auto-generated QR per batch linking to a public trace page |
 | 🚚 **FEFO dispatch queue** | Expiry-based priority scoring with urgency visualization |
 | 🤖 **AI Audit advisory** | Gemini 2.5 Flash analyses all batches and gives structured recommendations |
-| 👥 **Role-based access** | Admin, Manager, Factory Mgr, QA Inspector, Dispatch Coordinator |
+| 🔔 **Real-time notifications** | Role-targeted Socket.IO push for batch, dispatch, inspection, and admin events |
+| 🔬 **Quality inspections** | QA Inspector role submits structured 8-point checklist reports with verdict + rating |
+| 📥 **Bulk import** | Upload a CSV, preview every row, commit or roll back — no manual batch entry |
+| 👥 **Role-based access** | 6 roles: Super Admin, Admin, Manager, Factory Manager, QA Inspector, Dispatch Coordinator |
 | 📡 **Real-time updates** | Socket.IO pushes live batch changes to all connected dashboards |
+| 🎨 **Personalised UI** | 25 palettes, 4 fonts, 3 density modes, Light/Dark/System theme — all cross-device synced |
 
 ---
 
@@ -210,6 +218,64 @@ Key capabilities:
 
 </details>
 
+<details>
+<summary><b>🔔 Notifications — Real-Time Role-Based Alerts</b></summary>
+
+- Navbar **bell icon** with animated unread badge (pulse on new arrival)
+- **NotificationPanel** dropdown with type icons, timestamps, batch reference links
+- Socket.IO `role:X` room routing — each user only receives events relevant to their role
+- Event triggers: batch created → manager/factory-manager; dispatch → manager; inspection → manager/admin; admin actions → super-admin
+- Mark one / all read; clear-read action
+- REST persistence with **7-day TTL auto-expiry** (MongoDB)
+- Settings panel → Notifications tab shows live Active/Pending status per event type
+
+</details>
+
+<details>
+<summary><b>🔬 Inspections Centre — Quality Inspector Workflow</b></summary>
+
+- Dedicated **Inspections tab** visible only to QA Inspector + Manager + Admin
+- **InspectionModal**: 5-step form
+  1. Batch picker with search
+  2. 8-item structured checklist (pass/fail toggles + per-item notes)
+  3. 1–5 star rating with hover labels
+  4. Verdict selector (PASSED / FAILED / FLAGGED) with suggested verdict derived from checklist
+  5. Free-text findings + recommendation
+- Inspection records are **append-only** (audit integrity — re-inspection creates a new record)
+- `isLatest` flag for efficient current-state display; full history available
+- **30-day TTL** auto-expiry on inspection collection
+- Manager/admin see all inspections; QI sees their own
+- Completion fires notification to manager + admin roles
+
+</details>
+
+<details>
+<summary><b>📥 Bulk Import Wizard — CSV Batch Registration</b></summary>
+
+- 4-step flow: **Choose file → Map columns → Preview rows → Commit**
+- **Browser-side CSV parsing** — RFC 4180 compliant, handles BOM, quoted fields, auto-detects delimiter
+- Header auto-matching: `Lot No`, `Qty`, `UOM`, `Packed On` etc. resolve without manual mapping
+- **Per-row preview** labelled `will import` / `skip` / `error` with filter + downloadable error CSV
+- Downloadable CSV template
+- Live chunked progress bar during commit (multi-thousand row files work)
+- **Duplicate detection**: Source Lot + SKU + Pack Date — safe to re-run same file
+- **Atomic rollback**: one click soft-deletes everything the import inserted; dispatched/archived rows keep own state
+- RBAC gate: factory-manager and above only
+
+</details>
+
+<details>
+<summary><b>⚙️ Settings Centre — Full Personalisation</b></summary>
+
+- **Profile tab**: Edit name, phone number, view role/status
+- **Customisation tab**: 25 handcrafted palettes, 17 accent swatches, 4 Google Fonts, 3 density modes
+- **Security tab**: Change password, view login history (device, browser, location, time)
+- **Notifications tab**: Live status of every notification event type
+- **ThemePicker**: Light / Dark / System (follows OS preference) in every navbar — replaces old binary toggle
+- All preferences persisted to backend (`User.preferences`) — cross-device sync
+
+</details>
+
 ---
 
 ## 🗂️ Batch Management Workflow (v2.0.0)
@@ -252,6 +318,99 @@ Admin can restore at any time via "Restore Batch"
 | Dispatch | `admin`, `manager`, `dispatch-coordinator` |
 
 > 📖 Full documentation: [`docs/BATCH_MANAGEMENT.md`](docs/BATCH_MANAGEMENT.md)
+
+---
+
+## 🔬 Quality Inspection System (v2.5.0)
+
+The `quality-inspector` role has a dedicated **Inspections Centre** tab with a purpose-built 5-step form.
+
+### Inspection Workflow
+
+```
+Select batch → Fill checklist → Rate quality → Choose verdict → Submit
+```
+
+### Inspection Model
+
+| Field | Type | Purpose |
+|---|---|---|
+| `batchId` | ObjectId ref | Links to the inspected batch |
+| `status` | `PASSED` \| `FAILED` \| `FLAGGED` | Verdict |
+| `rating` | 1–5 | Overall quality score |
+| `checklist` | Array (8 items) | Structured pass/fail + notes per criterion |
+| `findings` | String | Free-text observations (max 1000 chars) |
+| `recommendation` | String | Next step suggestion |
+| `inspectedBy` | Object | Inspector ID, name, username |
+| `isLatest` | Boolean | `true` on most recent inspection per batch |
+| `createdAt` | Date (30d TTL) | Auto-expires after 30 days |
+
+### Default Checklist Items
+1. Packaging integrity
+2. Label accuracy & legibility
+3. Expiry date visible & correct
+4. Weight / quantity correct
+5. No visible contamination
+6. Colour & texture acceptable
+7. Odour within acceptable range
+8. Storage conditions met
+
+### RBAC
+
+| Action | Roles |
+|---|---|
+| Submit inspection | `quality-inspector`, `admin` |
+| View all inspections | `manager`, `admin`, `super-admin` |
+| View own inspections | `quality-inspector` |
+
+---
+
+## 📥 Bulk Import Wizard (v2.6.0)
+
+Upload a production run spreadsheet and register dozens or hundreds of batches in one operation.
+
+### How it works
+
+```
+Choose CSV → Auto-map headers → Preview every row → Commit (chunked) → Done
+```
+
+### Accepted CSV Columns
+
+| Column | Aliases accepted |
+|---|---|
+| Source Lot Code | `Lot No`, `Lot`, `Source Lot`, `Lot Code` |
+| Product SKU | `SKU`, `Product Code`, `Item Code` |
+| Pack Date | `Packed On`, `Date Packed`, `Production Date` |
+| Quantity | `Qty`, `Quantity`, `Amount` |
+| Unit | `UOM`, `Unit`, `Units` |
+| Expiry Date | `Expiry`, `Best Before`, `Use By` |
+| Farmer Name | `Farmer`, `Source Farmer` |
+| Village | `Village`, `Location`, `Farm Location` |
+
+### Rollback
+
+```
+Admin Panel → Import History → click the job → Rollback
+```
+
+Rollback soft-deletes every batch the import inserted. Batches already dispatched or archived by hand keep their own state and are excluded from rollback.
+
+---
+
+## ⚙️ Settings Centre (v2.4.0)
+
+All preferences are saved to `User.preferences` in MongoDB and synced cross-device on next login.
+
+| Section | Options |
+|---|---|
+| **Theme** | Light · Dark · System (OS preference) — available in every navbar |
+| **Palettes** | 25 handcrafted colour palettes (light + dark variants) |
+| **Accent** | 17 accent swatches + Auto (matches palette brand colour) |
+| **Font** | Inter · DM Sans · Outfit · Manrope (via Google Fonts) |
+| **Density** | Compact · Normal · Cozy |
+| **Profile** | Edit name, phone number |
+| **Security** | Change password · View last 10 login events (device, browser, city, country) |
 
 ---
 
@@ -389,20 +548,42 @@ Authorization: Bearer <token>
 | 3 | `POST` | `/auth/request-access` | — | Submit access request |
 | 4 | `GET` | `/auth/users` | ✅ Admin | List all users + stats |
 | 5 | `PATCH` | `/auth/users/:id/toggle` | ✅ Admin | Enable/disable user |
-| 6 | `GET` | `/auth/requests` | ✅ Admin | List access requests |
-| 7 | `POST` | `/auth/requests/:id/approve` | ✅ Admin | Approve + generate invite link |
-| 8 | `POST` | `/auth/requests/:id/reject` | ✅ Admin | Reject with optional note |
-| 9 | `GET` | `/api/products` | — | List all products |
-| 10 | `GET` | `/api/products/:id` | — | Single product |
-| 11 | `POST` | `/api/batches` | ✅ | Create batch (auto-generates QR + expiry) |
-| 12 | `GET` | `/api/batches` | — | List batches (paginated, filterable) |
-| 13 | `GET` | `/api/batches/:id` | — | Single batch with live days-to-expiry |
-| 14 | `GET` | `/api/batches/:id/qr` | — | Lightweight QR image only (base64 PNG) |
-| 15 | `PATCH` | `/api/batches/:id/dispatch` | ✅ | Record dispatch event |
-| 16 | `GET` | `/api/dispatch/fefo` | — | FEFO priority queue (sorted by priority score) |
-| 17 | `GET` | `/trace/:batchCode` | — | Public QR trace page (consumer-facing) |
-| 18 | `GET` | `/api/qr/:batchCode/image` | — | QR PNG by batch code |
-| 19 | `POST` | `/api/ai/dispatch-audit` | ✅ | Gemini AI advisory (4hr cached) |
+| 6 | `DELETE` | `/auth/users/:id` | ✅ Admin | Soft-delete user |
+| 7 | `PATCH` | `/auth/users/:id/restore` | ✅ Admin | Restore deleted user |
+| 8 | `GET` | `/auth/requests` | ✅ Admin | List access requests |
+| 9 | `POST` | `/auth/requests/:id/approve` | ✅ Admin | Approve + generate invite link |
+| 10 | `POST` | `/auth/requests/:id/reject` | ✅ Admin | Reject with optional note |
+| 11 | `GET` | `/auth/me` | ✅ | Fetch own profile + preferences |
+| 12 | `PATCH` | `/auth/me` | ✅ | Update own name / phone |
+| 13 | `PATCH` | `/auth/me/settings` | ✅ | Save theme/font/density preferences |
+| 14 | `POST` | `/auth/me/change-password` | ✅ | Change password (bcrypt-guarded) |
+| 15 | `GET` | `/auth/me/login-history` | ✅ | Last 10 login events |
+| 16 | `GET` | `/api/products` | — | List all products |
+| 17 | `GET` | `/api/products/:id` | — | Single product |
+| 18 | `POST` | `/api/batches` | ✅ | Create batch (auto-generates QR + expiry) |
+| 19 | `GET` | `/api/batches` | — | List batches (paginated, filterable) |
+| 20 | `GET` | `/api/batches/:id` | — | Single batch with live days-to-expiry |
+| 21 | `GET` | `/api/batches/:id/qr` | — | Lightweight QR image only (base64 PNG) |
+| 22 | `PATCH` | `/api/batches/:id/dispatch` | ✅ | Record dispatch event |
+| 23 | `GET` | `/api/dispatch/fefo` | — | FEFO priority queue (sorted by priority score) |
+| 24 | `GET` | `/trace/:batchCode` | — | Public QR trace page (consumer-facing) |
+| 25 | `GET` | `/api/qr/:batchCode/image` | — | QR PNG by batch code |
+| 26 | `POST` | `/api/ai/dispatch-audit` | ✅ | Gemini AI advisory (4hr cached) |
+| 27 | `GET` | `/api/notifications` | ✅ | List notifications (newest-first, paginated) |
+| 28 | `GET` | `/api/notifications/unread` | ✅ | Unread count only |
+| 29 | `PATCH` | `/api/notifications/:id/read` | ✅ | Mark single notification read |
+| 30 | `PATCH` | `/api/notifications/read-all` | ✅ | Mark all notifications read |
+| 31 | `DELETE` | `/api/notifications/clear` | ✅ | Delete all read notifications |
+| 32 | `POST` | `/api/inspections` | ✅ QI/Admin | Submit quality inspection |
+| 33 | `GET` | `/api/inspections` | ✅ Manager+ | All latest inspections (one per batch) |
+| 34 | `GET` | `/api/inspections/my` | ✅ | Own inspection submissions |
+| 35 | `GET` | `/api/inspections/batch/:batchId` | ✅ | Full inspection history for a batch |
+| 36 | `GET` | `/api/inspections/:id` | ✅ | Single inspection detail |
+| 37 | `POST` | `/api/import/validate` | ✅ Factory Mgr+ | Dry-run CSV rows (writes nothing) |
+| 38 | `POST` | `/api/import/commit` | ✅ Factory Mgr+ | Commit validated rows (chunked) |
+| 39 | `POST` | `/api/import/:jobId/rollback` | ✅ Factory Mgr+ | Soft-delete all batches from an import |
+| 40 | `GET` | `/api/import/history` | ✅ Factory Mgr+ | Past import jobs |
+| 41 | `GET` | `/api/import/schema` | ✅ | Accepted column names + CSV template |
 
 ### Response Format
 
