@@ -19,6 +19,7 @@ const aiRoutes            = require('./src/routes/ai.routes');
 const notificationRoutes  = require('./src/routes/notifications.routes');
 const inspectionRoutes    = require('./src/routes/inspection.routes');
 const importRoutes        = require('./src/routes/import.routes');
+const messageRoutes       = require('./src/routes/messages.routes');
 
 const app    = express();
 const server = http.createServer(app);
@@ -113,6 +114,7 @@ app.use('/api/ai',            aiRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/inspections',   inspectionRoutes);
 app.use('/api/import',        importRoutes);
+app.use('/api/messages',      messageRoutes);
 
 app.use(errorHandler);
 

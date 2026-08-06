@@ -31,6 +31,9 @@ router.post('/requests/:id/resend',   protect, requireAdminOrAbove, ctrl.resendI
 router.delete('/requests/:id',        protect, requireAdminOrAbove, ctrl.removeRequest);
 
 // Users — note: /users/deleted MUST come before /users/:id
+// Team directory — declared before /users/:id-style routes for the same reason
+// the others are: Express must not read the literal as an ObjectId.
+router.get( '/directory',             protect, requireManagerOrAbove, ctrl.getDirectory);
 router.get( '/users',                 protect, requireManagerOrAbove, ctrl.listUsers);     // manager gets read-only
 router.get( '/users/deleted',         protect, requireSuperAdmin,     ctrl.listDeletedUsers); // Recycle Bin
 router.patch('/users/:id/toggle',     protect, requireAdminOrAbove,   ctrl.toggleUserStatus);

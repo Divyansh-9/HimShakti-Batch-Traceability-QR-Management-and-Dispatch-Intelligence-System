@@ -18,7 +18,11 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=DM+Sans:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&family=Manrope:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   </head>
-  <body class="bg-gray-50 text-gray-900 antialiased">
+  <!-- No colour utilities here. The body was pinned to bg-gray-50, which is
+       near-white in every theme, and it showed through the transparent
+       scrollbar track as a bright strip down the side of dark pages.
+       Body colours now come from the theme tokens in index.css. -->
+  <body class="antialiased">
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
     <script type="text/javascript">

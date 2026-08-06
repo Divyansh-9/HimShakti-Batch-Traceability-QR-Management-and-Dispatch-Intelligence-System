@@ -201,7 +201,7 @@ export default function About() {
       <Navbar />
 
       {/* overflow-x-hidden prevents any negative-margin or transform bleed on Android Chrome */}
-      <main className="flex-grow w-full overflow-x-hidden">
+      <main id="main-content" className="flex-grow w-full overflow-x-hidden">
 
         {/* ══════════════════════════════════════════
             HERO — Full bleed image with parallax feel

@@ -419,6 +419,13 @@ export default function SettingsPanel() {
                     <ReadonlyField label="Email (read-only)"  value={dbUser?.email || user?.email} />
                     <ReadonlyField label="Role (read-only)"   value={displayRole} />
                   </div>
+                  {/* Say plainly where this data goes. A number people did not
+                      know was shared is worse than a blank field. */}
+                  <p className="text-xs text-text-muted leading-relaxed">
+                    Your name, email and mobile number appear in the team directory,
+                    which managers and above can view. Leave the number blank to keep
+                    it out — nobody else can fill it in for you.
+                  </p>
                 </div>
                 <div className="mt-5 pt-4 border-t border-border flex justify-end">
                   <button type="submit" disabled={isSaving}

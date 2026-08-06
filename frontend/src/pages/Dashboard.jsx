@@ -17,7 +17,7 @@ import {
   LogOut, Download, AlertTriangle, CheckCircle, Clock, RefreshCw, Menu, Search, Leaf, Plus,
   ShieldCheck, Users, XCircle, Copy, ExternalLink, Zap, TrendingUp, Activity, Info,
   Eye, Archive, Pencil, RotateCcw, HelpCircle, ChevronLeft, ChevronRight, Settings,
-  ClipboardCheck, Star, CheckCircle2, Upload,
+  ClipboardCheck, Star, CheckCircle2, Upload, Users2, MoreHorizontal,
 } from 'lucide-react';
 import { WalkthroughProvider, useWalkthrough } from '../context/WalkthroughContext';
 import WelcomeChoiceModal from '../components/WelcomeChoiceModal';
@@ -25,6 +25,7 @@ import WalkthroughTour from '../components/WalkthroughTour';
 import SettingsPanel from '../components/SettingsPanel';
 import InspectionModal from '../components/InspectionModal';
 import ImportPanel from '../components/ImportPanel';
+import TeamPanel from '../components/TeamPanel';
 import { useInspectionList, useMyInspections } from '../hooks/useInspections';
 
 
@@ -135,6 +136,24 @@ const TAB_META = {
     dot:         'bg-teal-500',
     mainTint:    'bg-teal-500/[0.015]',
   },
+  team: {
+    wash:        'bg-sky-500/[0.03]',
+    border:      'border-sky-400/25',
+    accentBar:   'bg-sky-500',
+    accentText:  'text-sky-700',
+    accentLight: 'text-sky-300',
+    accentIcon:  'text-sky-400',
+    image:       '/about-hero.png',
+    icon:        Users2,
+    eyebrow:     'People & Coordination',
+    title:       'Team',
+    desc:        'Your role channel for shift handover, and the contact directory for reaching anyone quickly.',
+    dot:         'bg-sky-500',
+    mainTint:    'bg-sky-500/[0.015]',
+    // Workspace tab: the conversation needs the vertical space more than a
+    // photograph does.
+    compact:     true,
+  },
   import: {
     wash:        'bg-violet-500/[0.03]',
     border:      'border-violet-400/25',
@@ -153,9 +172,36 @@ const TAB_META = {
 };
 
 // ── Full-bleed tab hero banner ──────────────────────────────────────
+//
+// Two variants. The photographic hero suits tabs you *read* — Overview,
+// Batches, FEFO — where it sets context before a wall of data.
+//
+// It is wrong for a tab you *work in*. On the Team tab it cost 176px above a
+// conversation, which is the one place vertical space is the scarce resource,
+// and the photograph carried no information. Those tabs get `compact: true`
+// and a slim header instead: same accent, same words, a fifth of the height.
 function TabBanner({ tabId, action }) {
   const m = TAB_META[tabId];
   if (!m) return null;
+
+  if (m.compact) {
+    return (
+      <div className="-mx-4 -mt-4 sm:-mx-6 sm:-mt-6 mb-5 px-6 sm:px-8 py-4 relative border-b border-border bg-surface-2/40">
+        <div className={`absolute left-0 top-0 bottom-0 w-1 ${m.accentBar}`} />
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className={`w-1.5 h-1.5 rounded-full ${m.accentBar}`} />
+              <span className={`text-[10px] font-black uppercase tracking-widest ${m.accentIcon}`}>{m.eyebrow}</span>
+            </div>
+            <h2 className="text-lg font-extrabold text-text-primary leading-tight mt-0.5">{m.title}</h2>
+          </div>
+          {action && <div className="hidden sm:block flex-shrink-0">{action}</div>}
+        </div>
+      </div>
+    );
+  }
+
   return (
     // Negative margins break out of main's p-4/p-6 padding — true full-bleed
     <div className="tab-banner -mx-4 -mt-4 sm:-mx-6 sm:-mt-6 mb-6 relative overflow-hidden" style={{ height: 176 }}>
@@ -186,7 +232,10 @@ function TabBanner({ tabId, action }) {
             <h2 className="text-2xl font-extrabold text-white leading-tight drop-shadow-md">{m.title}</h2>
             <p className="text-sm text-white/65 mt-0.5 max-w-md leading-relaxed drop-shadow-sm hidden sm:block">{m.desc}</p>
           </div>
-          {action && <div className="flex-shrink-0 ml-6 mb-0.5">{action}</div>}
+          {/* Hidden on phones: every tab that passes a banner action also has
+              the same control in its toolbar a few rows below, so on a narrow
+              screen it read as two competing primary buttons. */}
+          {action && <div className="hidden sm:block flex-shrink-0 ml-6 mb-0.5">{action}</div>}
         </div>
       </div>
     </div>
@@ -418,7 +467,7 @@ function OverviewTab({ batches, loading, onTabSwitch }) {
                   const rowCls = { URGENT: 'batch-row-urgent', WARNING: 'batch-row-warning', READY: 'batch-row-ready' }[b.status] || 'batch-row-default';
                   return (
                     <tr key={b._id} className={`batch-row ${rowCls} transition-colors`}>
-                      <td className="px-6 py-4 text-sm font-mono font-medium text-brand">{b.batchCode}</td>
+                      <td className="px-6 py-4 text-sm font-mono font-medium text-brand whitespace-nowrap">{b.batchCode}</td>
                       <td className="px-6 py-4 text-sm text-text-muted">{b.productName}</td>
                       <td className="px-6 py-4"><StatusBadge status={b.status} /></td>
                       <td className="px-6 py-4 text-sm text-text-muted">{b.daysUntilExpiry ?? '—'} days</td>
@@ -623,7 +672,7 @@ function BatchesTab({ batches, loading, onNewBatch, onDownloadQR, onDispatch, on
                       <td className="px-4 py-4">
                         <div className="flex items-center gap-2">
                           <Archive className="w-3 h-3 text-rose-400 flex-shrink-0" />
-                          <span className="text-sm font-mono font-medium text-text-muted">{b.batchCode}</span>
+                          <span className="text-sm font-mono font-medium text-text-muted whitespace-nowrap">{b.batchCode}</span>
                         </div>
                       </td>
                       <td className="px-4 py-4 text-sm text-text-muted">{b.productName}</td>
@@ -665,7 +714,90 @@ function BatchesTab({ batches, loading, onNewBatch, onDownloadQR, onDispatch, on
           )}
         </div>
       ) : (
-        <table className="min-w-full divide-y divide-border">
+        <>
+        {/* ── Phones: stacked cards ──────────────────────────────────────
+            A seven-column table cannot work at 375px. It was 777px wide
+            inside a 341px card whose overflow is hidden, so three columns
+            were simply unreachable — not scrollable, clipped.
+
+            Cards carry the same fields with the hierarchy a phone needs, and
+            the row actions are always visible here because `group-hover`
+            reveals nothing on a touch screen. */}
+        <div className="md:hidden divide-y divide-border">
+          {loading
+            ? [...Array(4)].map((_, i) => (
+                <div key={i} className="p-4 space-y-2">
+                  <div className="skeleton-shimmer h-4 w-32 rounded" />
+                  <div className="skeleton-shimmer h-3 w-48 rounded" />
+                </div>
+              ))
+            : filtered.length === 0
+              ? (
+                <div className="px-6 py-14 text-center">
+                  <div className="w-12 h-12 bg-surface-2 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <Package className="w-6 h-6 text-text-muted opacity-40" />
+                  </div>
+                  <p className="text-text-muted text-sm font-medium">
+                    {query ? `No batches match "${query}"` : `No ${statusFilter === 'all' ? '' : statusFilter.toLowerCase() + ' '}batches`}
+                  </p>
+                  {(query || statusFilter !== 'all') && (
+                    <button onClick={() => { setQuery(''); setStatusFilter('all'); }}
+                      className="text-xs text-brand hover:text-brand-hover font-medium mt-2">Clear filters</button>
+                  )}
+                </div>
+              )
+              : filtered.map(b => (
+                <div key={b._id} className="p-4 active:bg-surface-2/60 transition-colors"
+                     onClick={() => handleOpenDrawer(b)}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-mono font-semibold text-brand whitespace-nowrap">{b.batchCode}</p>
+                      <p className="text-sm text-text-primary mt-0.5 leading-snug">{b.productName}</p>
+                    </div>
+                    <StatusBadge status={b.status} />
+                  </div>
+
+                  <div className="mt-2.5 flex items-center gap-3 flex-wrap">
+                    <span className="text-xs text-text-muted tabular-nums">
+                      {b.daysUntilExpiry === null || b.daysUntilExpiry === undefined
+                        ? '—'
+                        : b.daysUntilExpiry < 0
+                          ? `expired ${Math.abs(b.daysUntilExpiry)} day${Math.abs(b.daysUntilExpiry) === 1 ? '' : 's'} ago`
+                          : `${b.daysUntilExpiry} day${b.daysUntilExpiry === 1 ? '' : 's'} left`}
+                    </span>
+                    {b.daysUntilExpiry !== null && b.daysUntilExpiry <= 30 && (
+                      <div className="h-1 w-20 bg-surface-2 rounded-full overflow-hidden">
+                        <div className={`h-full rounded-full ${b.daysUntilExpiry <= 7 ? 'bg-red-500' : 'bg-amber-500'}`}
+                             style={{ width: `${Math.min(100, (b.daysUntilExpiry / 30) * 100)}%` }} />
+                      </div>
+                    )}
+                  </div>
+
+                  <p className="text-xs text-text-muted mt-1 truncate">{b.farmerName}, {b.village}</p>
+
+                  <div className="mt-3 flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                    <button onClick={() => handleOpenDrawer(b)}
+                      className="press flex-1 inline-flex items-center justify-center gap-1.5 py-2 rounded-lg border border-border text-xs font-semibold text-text-primary">
+                      <Eye className="w-3.5 h-3.5" /> Details
+                    </button>
+                    <button onClick={() => onDownloadQR(b._id, b.batchCode)} aria-label="Download QR"
+                      className="press w-10 py-2 grid place-items-center rounded-lg border border-border text-text-muted">
+                      <Download className="w-3.5 h-3.5" />
+                    </button>
+                    {b.status !== 'DISPATCHED' && (
+                      <button onClick={() => onDispatch(b)} aria-label="Mark dispatched"
+                        className="press w-10 py-2 grid place-items-center rounded-lg border border-blue-400/25 text-blue-400">
+                        <Truck className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))
+          }
+        </div>
+
+        {/* ── md and up: the table ── */}
+        <table className="hidden md:table min-w-full divide-y divide-border">
           <thead className="bg-surface-2">
             <tr>
               {['Batch Code', 'Product', 'Status', 'Expiry', 'Farmer / Village', 'Scans', 'Actions'].map(h => (
@@ -704,7 +836,7 @@ function BatchesTab({ batches, loading, onNewBatch, onDownloadQR, onDispatch, on
                   onMouseEnter={() => handleViewScans(b._id)}
                   onClick={() => handleOpenDrawer(b)}
                 >
-                  <td className="px-4 py-4 text-sm font-mono font-medium text-brand">{b.batchCode}</td>
+                  <td className="px-4 py-4 text-sm font-mono font-medium text-brand whitespace-nowrap">{b.batchCode}</td>
                   <td className="px-4 py-4 text-sm text-text-muted">{b.productName}</td>
                   <td className="px-4 py-4"><StatusBadge status={b.status} /></td>
                   <td className="px-4 py-4">
@@ -750,6 +882,7 @@ function BatchesTab({ batches, loading, onNewBatch, onDownloadQR, onDispatch, on
             }
           </tbody>
         </table>
+        </>
       )}
 
       {/* Row count footer — only shown in non-archived view */}
@@ -865,7 +998,7 @@ function FEFOTab() {
                                   'text-text-muted font-bold'
                     }${idx === 0 && b.status === 'URGENT' ? ' urgent-pulse' : ''}`}>#{idx + 1}</span>
                   </td>
-                  <td className="px-5 py-4 text-sm font-mono font-medium text-brand">{b.batchCode}</td>
+                  <td className="px-5 py-4 text-sm font-mono font-medium text-brand whitespace-nowrap">{b.batchCode}</td>
                   <td className="px-5 py-4 text-sm text-text-muted">{b.productName}</td>
                   <td className="px-5 py-4"><StatusBadge status={b.status} /></td>
                   <td className="px-5 py-4 text-sm font-semibold text-text-primary">{b.daysUntilExpiry ?? '—'}</td>
@@ -2701,6 +2834,24 @@ function InspectionTab({ batches, onOpenInspection, userRole }) {
   );
 }
 
+/**
+ * Short labels for the mobile bar. At roughly 70px per slot, anything longer
+ * than about eight characters truncates — "QR Codes" wrapped onto two lines
+ * and collided with its neighbours.
+ */
+const MOBILE_TAB_LABEL = {
+  overview:   'Home',
+  batches:    'Batches',
+  fefo:       'FEFO',
+  qr:         'QR',
+  ai:         'AI',
+  inspection: 'Quality',
+  import:     'Import',
+  team:       'Team',
+  settings:   'Settings',
+  admin:      'Admin',
+};
+
 const NAV_TABS = [
   { id: 'overview',    label: 'Overview',      icon: LayoutDashboard },
   { id: 'batches',     label: 'Batches',       icon: Package },
@@ -2709,6 +2860,7 @@ const NAV_TABS = [
   { id: 'ai',          label: 'AI Audit',      icon: Bot },
   { id: 'inspection',  label: 'Inspections',   icon: ClipboardCheck, qiOnly: true },
   { id: 'import',      label: 'Import',        icon: Upload, importerOnly: true },
+  { id: 'team',        label: 'Team',          icon: Users2 },
   { id: 'settings',    label: 'Settings',      icon: Settings },
   { id: 'admin',       label: 'Admin Panel',   icon: ShieldCheck, adminOnly: true },
 ];
@@ -2813,6 +2965,12 @@ function DashboardInner() {
 
 
 
+  // Four primary destinations plus More. Which four is role-dependent, since
+  // visibleTabs is already filtered by tier — a dispatch coordinator's first
+  // four are not an admin's.
+  const mobilePrimaryTabs = visibleTabs.slice(0, 4);
+  const moreIsActive = !mobilePrimaryTabs.some(t => t.id === activeTab);
+
   async function handleCreateBatch(payload) {
     await createBatch(payload);
   }
@@ -2843,14 +3001,16 @@ function DashboardInner() {
   }
 
   return (
-    <div className="h-screen overflow-hidden flex flex-col bg-background">
+    // 100dvh, not 100vh: mobile Safari counts the collapsing URL bar in vh, so
+    // a 100vh shell jumps by ~60px the first time the user scrolls.
+    <div className="h-[100dvh] overflow-hidden flex flex-col bg-background">
       {/* Welcome modal + Tour engine — rendered at root level */}
       <WelcomeChoiceModal user={user} visibleTabIds={visibleTabs.map(t => t.id)} />
       {/* visibleTabIds keeps the tour from spotlighting a tab this role never rendered */}
       <WalkthroughTour userRole={user?.role} visibleTabIds={visibleTabs.map(t => t.id)} />
 
       <Navbar onMenuClick={() => setIsSidebarOpen(v => !v)} isSidebarOpen={isSidebarOpen} />
-      <div className="flex flex-1 overflow-hidden" style={{ marginTop: '72px', height: 'calc(100vh - 72px)' }}>
+      <div className="flex flex-1 overflow-hidden" style={{ marginTop: '72px', height: 'calc(100dvh - 72px)' }}>
         {/* Mobile overlay */}
         {isSidebarOpen && (
           <div className="fixed inset-0 bg-black/50 z-20 md:hidden" onClick={() => setIsSidebarOpen(false)} />
@@ -2973,7 +3133,7 @@ function DashboardInner() {
             {/* Help & Walkthrough */}
             <button
               id="sidebar-help-btn"
-              onClick={openHelp}
+              onClick={() => { setIsSidebarOpen(false); openHelp(); }}
               title={isSidebarCollapsed ? 'Help & Walkthrough' : ''}
               className={`relative group w-full flex items-center gap-3 rounded-xl text-sm font-medium
                 transition-all duration-200 mb-1
@@ -3034,8 +3194,14 @@ function DashboardInner() {
 
         {/* Main — offset dynamically based on sidebar state */}
         <main
-          className={`flex-1 overflow-y-auto overflow-x-clip p-4 sm:p-6 pb-20 md:pb-6 transition-all duration-300 ease-in-out ${TAB_META[activeTab]?.mainTint || ''}`}
-          style={{ marginLeft: isSidebarCollapsed ? '4rem' : '14rem', scrollbarGutter: 'stable' }}
+          id="main-content"
+          // The sidebar offset must not apply below md. The sidebar is
+          // translated off-screen there, so an inline marginLeft reserved
+          // 224px of a 375px viewport for a panel that wasn't visible —
+          // leaving 151px of usable width. Carried as a custom property and
+          // applied only from md up.
+          className={`flex-1 overflow-y-auto overflow-x-clip p-4 sm:p-6 pb-24 md:pb-6 transition-all duration-300 ease-in-out ml-0 md:ml-[var(--sidebar-w)] ${TAB_META[activeTab]?.mainTint || ''}`}
+          style={{ '--sidebar-w': isSidebarCollapsed ? '4rem' : '14rem', scrollbarGutter: 'stable' }}
         >
           {/* Remove old header bar — each tab now has its own TabBanner */}
 
@@ -3112,6 +3278,16 @@ function DashboardInner() {
                 </ErrorBoundary>
               </>
             )}
+            {activeTab === 'team' && (
+              <>
+                <TabBanner tabId="team" />
+                <ErrorBoundary>
+                  {/* Directory is manager+ server-side; this mirrors the gate so
+                      the sub-tab is not offered to roles that would get a 403. */}
+                  <TeamPanel canSeeDirectory={userIsSuperAdmin || ['admin', 'manager'].includes(user?.role)} />
+                </ErrorBoundary>
+              </>
+            )}
             {activeTab === 'settings' && (
               <SettingsPanel />
             )}
@@ -3125,9 +3301,13 @@ function DashboardInner() {
         </main>
 
         {/* Mobile Bottom Navigation — only visible on small screens */}
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around border-t"
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 flex items-stretch border-t"
           style={{ height: 60, background: 'rgba(10,15,32,0.97)', borderTopColor: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' }}>
-          {visibleTabs.map(tab => {
+          {/* Only the first four fit on a 375px screen. Nine items at the old
+              min-width needed 468px, so they overflowed and the labels
+              collided. Everything else lives behind More, which opens the
+              sidebar drawer that already exists. */}
+          {mobilePrimaryTabs.map(tab => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
             const meta = TAB_META[tab.id];
@@ -3135,8 +3315,8 @@ function DashboardInner() {
               <button
                 key={tab.id}
                 onClick={() => { setActiveTab(tab.id); setIsSidebarOpen(false); }}
-                className={`flex flex-col items-center justify-center gap-0.5 px-2 py-1.5 rounded-xl transition-all duration-200 min-w-[52px] ${
-                  isActive ? 'opacity-100' : 'opacity-40 hover:opacity-65'
+                className={`flex-1 min-w-0 flex flex-col items-center justify-center gap-0.5 px-1 py-1.5 transition-all duration-200 ${
+                  isActive ? 'opacity-100' : 'opacity-45 hover:opacity-70'
                 }`}
               >
                 <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-200 ${
@@ -3148,14 +3328,36 @@ function DashboardInner() {
                     isActive ? `${meta?.accentLight || 'text-white'}` : 'text-white/60'
                   }`} />
                 </div>
-                <span className={`text-[9px] font-bold uppercase tracking-wide leading-none ${
+                <span className={`w-full truncate text-center text-[9px] font-bold uppercase tracking-wide leading-none ${
                   isActive ? 'text-white' : 'text-white/40'
                 }`}>
-                  {tab.label === 'FEFO Queue' ? 'FEFO' : tab.label === 'AI Audit' ? 'AI' : tab.label === 'Admin Panel' ? 'Admin' : tab.label}
+                  {MOBILE_TAB_LABEL[tab.id] || tab.label}
                 </span>
               </button>
             );
           })}
+
+          {/* More — opens the existing sidebar drawer rather than a second
+              navigation surface that would have to be kept in sync. */}
+          <button
+            onClick={() => setIsSidebarOpen(true)}
+            aria-label="More sections"
+            aria-expanded={isSidebarOpen}
+            className={`flex-1 min-w-0 flex flex-col items-center justify-center gap-0.5 px-1 py-1.5 transition-all duration-200 ${
+              moreIsActive ? 'opacity-100' : 'opacity-45 hover:opacity-70'
+            }`}
+          >
+            <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-200 ${
+              moreIsActive ? 'bg-white/14 shadow-inner' : 'bg-transparent'
+            }`}>
+              <MoreHorizontal className={`w-4 h-4 ${moreIsActive ? 'text-white' : 'text-white/60'}`} />
+            </div>
+            <span className={`w-full truncate text-center text-[9px] font-bold uppercase tracking-wide leading-none ${
+              moreIsActive ? 'text-white' : 'text-white/40'
+            }`}>
+              More
+            </span>
+          </button>
         </nav>
       </div>
 

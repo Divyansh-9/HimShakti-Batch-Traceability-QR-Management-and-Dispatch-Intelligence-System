@@ -21,6 +21,21 @@ import { useWalkthrough } from '../context/WalkthroughContext';
 import { getStepsForRole } from '../config/walkthroughSteps';
 
 const CARD_WIDTH   = 340;
+const MOBILE_BREAKPOINT = 768;
+
+/** Phones get a bottom sheet; there is no room to park a card beside a target. */
+function useIsMobile() {
+  const [is, setIs] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth < MOBILE_BREAKPOINT
+  );
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`);
+    const on = e => setIs(e.matches);
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
+  return is;
+}
 const PAD          = 18;   // gap between spotlight and card
 const SPOT_PADDING = 10;   // halo around the target
 const FALLBACK_CARD_HEIGHT = 220;
@@ -129,6 +144,7 @@ function StepDots({ total, current, onJump }) {
  * no resetting four useStates inside an effect on each transition.
  */
 function TourStep({ step, stepIndex, total, isLast, stopTour, nextStep, prevStep, goToStep, switchTab }) {
+  const isMobile = useIsMobile();
   const [target,     setTarget]     = useState(null);
   const [missing,    setMissing]    = useState(false);
   const [cardStyle,  setCardStyle]  = useState({});
@@ -153,7 +169,9 @@ function TourStep({ step, stepIndex, total, isLast, stopTour, nextStep, prevStep
     waitForTarget(step.selector, cancelledRef).then(el => {
       if (cancelledRef.current) return;
       if (!el) { setMissing(true); setVisible(true); return; }
-      el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      // On mobile the sheet covers the lower half, so centre the target in
+      // what is left rather than merely bringing it just into view.
+      el.scrollIntoView({ behavior: 'smooth', block: isMobile ? 'center' : 'nearest' });
       // Let the smooth scroll settle before measuring, or the ring lands
       // where the element used to be.
       setTimeout(() => {
@@ -164,7 +182,7 @@ function TourStep({ step, stepIndex, total, isLast, stopTour, nextStep, prevStep
     });
 
     return () => { cancelledRef.current = true; };
-  }, [step.selector, step.tab, switchTab, applyTarget]);
+  }, [step.selector, step.tab, switchTab, applyTarget, isMobile]);
 
   // ── Position the card against its real measured height ──────────
   //
@@ -176,12 +194,13 @@ function TourStep({ step, stepIndex, total, isLast, stopTour, nextStep, prevStep
     const node = cardRef.current;
     if (!visible || !node) return;
 
+    if (isMobile) return;   // sheet is positioned by CSS, not measured
     const ro = new ResizeObserver(() => {
       setCardStyle(computeCardStyle(targetRef.current, node.offsetHeight));
     });
     ro.observe(node);
     return () => ro.disconnect();
-  }, [visible, target]);
+  }, [visible, target, isMobile]);
 
   // ── Keep the spotlight glued to the target ──────────────────────
   useEffect(() => {
@@ -225,8 +244,8 @@ function TourStep({ step, stepIndex, total, isLast, stopTour, nextStep, prevStep
       <div
         ref={cardRef}
         tabIndex={-1}
-        className={`tour-card ${visible ? 'tour-card--visible' : ''}`}
-        style={{ ...cardStyle, position: 'fixed', zIndex: 9999, width: CARD_WIDTH }}
+        className={`tour-card ${isMobile ? 'tour-card--sheet' : ''} ${visible ? 'tour-card--visible' : ''}`}
+        style={isMobile ? undefined : { ...cardStyle, position: 'fixed', zIndex: 9999, width: CARD_WIDTH }}
         role="dialog"
         aria-modal="false"
         aria-label={`Tour step ${stepIndex + 1} of ${total}: ${step.title}`}
@@ -256,7 +275,14 @@ function TourStep({ step, stepIndex, total, isLast, stopTour, nextStep, prevStep
         )}
 
         <div className="tour-card-footer">
-          <StepDots total={total} current={stepIndex} onJump={goToStep} />
+          {/* Nine dots plus Back and Next do not fit a phone footer — they
+              compress into slivers. A counter says the same thing in the
+              space available. */}
+          {isMobile
+            ? <span className="text-[11px] font-semibold text-text-muted tabular-nums flex-shrink-0">
+                {stepIndex + 1} / {total}
+              </span>
+            : <StepDots total={total} current={stepIndex} onJump={goToStep} />}
           <div className="tour-card-nav">
             {stepIndex > 0 && (
               <button onClick={prevStep} className="tour-btn tour-btn--back" aria-label="Previous step">

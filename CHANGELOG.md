@@ -6,6 +6,118 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2.7.6] — 2026-08-06
+
+### Walkthrough works on a phone
+
+#### Fixed
+- **The sidebar drawer stayed open behind the tour.** On mobile the only route to Help & Walkthrough is the drawer, and starting a tour never closed it — so every spotlight highlighted content sitting underneath an open drawer and its backdrop. The trigger now closes the drawer before opening help.
+- **The tour card was a fixed 340px box positioned beside its target.** On a phone there is no beside: the card overlapped the very thing it was pointing at and consumed most of the screen. Below `md` it is now a bottom sheet pinned above the tab bar, full width minus a gutter, capped at `52dvh` with its own scroll so a long step can never push Back and Next off-screen.
+- **Targets were scrolled with `block: 'nearest'`**, which on mobile left them behind the sheet. They now centre in the space above it.
+- **Progress dots compressed into slivers.** Nine dots plus Back and Next do not fit a phone footer. Mobile shows a `1 / 9` counter instead, and the dots no longer shrink on desktop either.
+
+---
+
+## [2.7.5] — 2026-08-06
+
+### Batch list is usable on a phone
+
+#### Fixed
+- **Three columns of the batch table were unreachable on mobile.** The table had no scroll wrapper: it rendered 777px wide inside a 341px card whose `overflow` is `hidden` on both axes, so Expiry, Farmer/Village, Scans and Actions were clipped with no way to reach them. Below `md` the table is replaced by a stacked card list carrying every field; the table itself now renders from `md` up.
+- **Row actions were hover-only.** View, Download QR and Dispatch lived behind `opacity-0 group-hover:opacity-100`, which never reveals on a touch screen — the actions were unreachable on mobile even where the column was visible. The card list shows them permanently.
+- **"1 days left".** Day counts are now pluralised, and a past-due batch reads "expired 3 days ago" rather than a negative number.
+
+---
+
+## [2.7.4] — 2026-08-06
+
+### Mobile layout fixed
+
+#### Fixed
+- **The dashboard reserved sidebar width on phones.** `<main>` carried `marginLeft: 14rem` as an inline style, which has no breakpoint, so it applied below `md` where the sidebar is translated off-screen. On a 375px viewport that left 151px of usable width and a wide empty band down the left. The offset is now a `--sidebar-w` custom property applied only from `md` up. Measured after: `marginLeft: 0px`, main width 375px, horizontal overflow 0.
+- **The bottom bar rendered every visible tab.** Nine items at a 52px minimum needed 468px in a 375px bar, so they overflowed and the labels collided. It now shows four role-appropriate destinations plus **More**, which opens the sidebar drawer that already exists rather than introducing a second navigation surface to keep in sync.
+- **Batch codes wrapped on their hyphens** — `HS-2026-06-022` broke across four lines in a narrow column. Now `whitespace-nowrap` in all four table renderings.
+- **Duplicate primary action on phones.** Tabs that pass a banner action also carry the same control in their toolbar; on a narrow screen these read as two competing buttons. The banner action is now hidden below `sm`.
+
+---
+
+## [2.7.3] — 2026-08-06
+
+### Chat redesigned around messaging-app mechanics
+
+The thread was built on Slack's model — sender name and role on their own row above the bubble, timestamp on its own row below it. Four vertical zones per message group, which is what made it read as dated. Rebuilt on the mechanics messaging apps use.
+
+#### Changed
+- **Timestamp moved inside the bubble**, floated right so the final line of text wraps around it instead of claiming a row. This is the single biggest density gain.
+- **Sender name moved inside the bubble**, tinted per person via a stable hash of the author id, with the role as muted text beside it. An earlier pass tinted by role, which is useless in a role channel — everyone there shares the role, so every name came out the same colour.
+- **Tighter bubble geometry.** 10px radius with one squared corner, and a tail pseudo-element on the first message of each group. The previous `rounded-2xl` read as 2015-era chat.
+- **Conversation canvas.** The message list is now its own surface — a tonal wash plus a faint dot grid, distinct from the panel holding it. A doodle wallpaper would be wrong for an operations tool; the texture does the same job in the right register. Painted on the non-scrolling wrapper, never the scroll container.
+- **Own avatar removed.** You know who you are, and dropping it returns the gutter to the bubble.
+- Max bubble width tightened to 68%, so long messages form a readable column instead of spanning the pane.
+
+---
+
+## [2.7.2] — 2026-08-06
+
+### Material and motion pass
+
+Applied a high-end visual-design audit to the Team surface, taking the parts that suit a dense operations dashboard and deliberately skipping the parts written for marketing pages.
+
+#### Added
+- **Motion vocabulary.** `--ease-out-quint` and `--ease-spring` tokens with `--dur-fast/base/slow`, replacing Tailwind's default easing on interactive surfaces. Decelerating curves read as mass; the default does not.
+- **Double-bezel panels.** `.bezel` / `.bezel-core` — an outer tray carrying the hairline and a inner plate carrying the content, with the inner radius computed as outer minus tray padding so the curves are genuinely concentric. Applied to the Team panel.
+- **Haptic press.** `.press` scales to `0.97` on `:active`. Transform only, so it never triggers layout.
+- **Nested send control.** The composer's send button is now a pill containing its own icon well, which translates and scales on hover instead of swapping colour.
+- **Focus discipline.** One `:focus-visible` rule across buttons, links, inputs and `[tabindex]`. Previously a handful of controls had rings and most inherited nothing.
+
+#### Fixed
+- **A deleted-only channel reserved a full-height pane.** Height keyed off row count, so a channel whose entire history was one soft-deleted tombstone opened a 620px scroll region to show one line of grey italic. It now keys off readable messages.
+
+#### Not applied, deliberately
+The audit's `py-24`–`py-40` macro-whitespace, its ban on Lucide icons, and its detached floating navbar are written for marketing sites. On a batch table the first yields roughly three visible rows; the second is a ~200-site icon migration to a library not in `package.json`; the third breaks a shell laid out against a fixed 72px header. Density and a working layout are the product here.
+
+---
+
+## [2.7.1] — 2026-08-06
+
+### Design and accessibility pass
+
+Audit against a design-quality checklist, applied to the existing stack. No framework or styling changes.
+
+#### Fixed
+- **Mobile viewport jump.** The dashboard shell used `h-screen` and `calc(100vh - 72px)`. Mobile Safari counts the collapsing URL bar in `vh`, so the layout shifted by roughly 60px on first scroll. Both now use `dvh`.
+- **Proportional figures in data tables.** Digits have unequal widths in the body font, so columns of days-to-expiry and quantities never lined up. All table cells now use `font-variant-numeric: tabular-nums`, with a `.data-figures` utility for figures outside tables.
+- **Unmatched URLs rendered a blank page.** Added a `*` catch-all route and a `NotFound` page with the attempted path, a back button and a route home.
+- **No keyboard skip link.** Tabbing into any page meant walking the entire navigation first. Added a skip-to-content link — first tab stop, hidden until focused — anchored to the `<main>` landmark on every page.
+- **Animations ignored motion preferences.** Card stagger, tab fades and the walkthrough pulse all ran regardless. Now suppressed under `prefers-reduced-motion: reduce`, using near-zero durations rather than `none` so fill-mode still applies and nothing sticks at `opacity: 0`.
+- **Light scrollbar strip beside every dark page.** `<body>` carried `bg-gray-50 text-gray-900`, pinning the document surface to near-white in all themes. The scrollbar track is transparent, so that white showed through as a bright band down the right edge of Home and About. Body colours now come from `--bg-primary` / `--text-primary`.
+- **Native browser chrome rendered light on dark pages.** `color-scheme` was never declared, so scrollbars, `<select>` popups, date pickers and autofill styling were painted by the OS in light mode regardless of theme — the same cause as the mismatched dropdown in the team directory. Now set to `light` on `:root` and `dark` under `[data-theme="dark"]`.
+
+### 🔒 Security — user read paths over-shared
+
+`GET /auth/users` filtered with a denylist (`.select('-passwordHash')`), so every field added to the schema afterwards shipped by default. Managers and above received 27 fields per user, including `resetToken`, `otpCode`, `otpExpiry`, `otpAttempts` and `googleEmail`.
+
+`resetToken` is not an identifier. It is the signed JWT that `resetPassword()` accepts as the sole credential alongside a new password — no OTP, no current password. Any manager polling the roster could capture an in-flight reset token for **any** account, including admin and Super Admin, and complete the reset themselves. The field is only populated during a 5-minute window after the victim enters their OTP, so this was a race rather than an unconditional takeover, but manager tier should never have been able to win it.
+
+- All multi-user read paths now use explicit allowlists: `USER_PUBLIC_FIELDS`, `USER_DELETED_FIELDS`, `USER_DIRECTORY_FIELDS`. Roster response went from 27 fields to 14.
+- `GET /auth/me` and `PATCH /auth/me` were on the same denylist pattern and returned `resetTokenExpiry` and the OTP counters to the account owner. Both now use allowlists.
+- `PATCH /auth/me` gained validation: name cannot be blanked, phone is bounded and format-checked (blank still allowed, so a number can be withdrawn).
+
+### 💬 Messaging — record threads and role channels
+
+- `Message.model.js` — one collection, two scopes. **Record threads** attach to a batch or inspection and are permanent; **role channels** carry shift-handover chatter and expire after 90 days. A single TTL index serves both, because Mongo skips documents whose `expiresAt` is null.
+- **Discussion tab** in the batch detail drawer. Any signed-in user can post; the thread sits beside the batch it concerns and stays in the record. Distinct from Notes, which is the batch's own traceability text and role-gated.
+- **Role channels** — one per role. Super Admin sees all five, matching the existing `role:admin` socket join. Everyone else sees exactly their own, so a manager cannot read what quality inspectors say about them.
+- Edits are author-only and preserve the previous text in `editHistory`. **Admins cannot reword someone else's message** — an audit trail an administrator can rewrite is not an audit trail. Admins may soft-delete for moderation; the row survives with the body withheld.
+- REST-first: 15-second polling while a thread is mounted, paused in background tabs, with sockets only invalidating. Works with the socket layer switched off, which is the situation on serverless.
+- **No global channel**, deliberately. It duplicates the tools the team already has and pulls operational decisions out of the audit trail.
+
+### 👥 Team directory
+
+- `GET /auth/directory` (manager and above) — name, email, phone, role, grouped by role, searchable with regex metacharacters escaped.
+- Its own projection, narrower than the Admin Panel's: a contact card needs a way to reach someone, not the promotion audit trail.
+- New **Team** tab holding both channels and the directory. The directory sub-tab is hidden below manager and the panel handles a 403 regardless.
+- Phone numbers are self-managed in Settings. Settings now states plainly that name, email and number appear in the directory, and that leaving the number blank keeps it out.
 ## [2.6.0] — 2026-08-06
 
 ### 📥 Bulk Batch Import

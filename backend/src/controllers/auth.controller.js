@@ -9,6 +9,39 @@ const { sendApprovalEmail, sendRejectionEmail, sendOtpEmail, sendPasswordResetOt
 const { appendLoginEvent } = require('../services/loginHistory.service');
 const { notify, notifyRoles } = require('../services/notificationService');
 
+/**
+ * Fields any multi-user read path is allowed to return.
+ *
+ * This is an allowlist on purpose. The previous `.select('-passwordHash')`
+ * was a denylist, so every field added to the schema afterwards shipped to
+ * the client by default — which is how `resetToken` ended up in the roster
+ * that managers can read. That field is not an identifier: it is the signed
+ * JWT that resetPassword() accepts as the sole credential, so anyone able to
+ * list users could finish somebody else's password reset.
+ *
+ * Add to this list deliberately. Never widen it with a negation.
+ */
+const USER_PUBLIC_FIELDS = [
+  '_id', 'username', 'name', 'email', 'phone', 'role',
+  'isActive', 'isSuperAdmin', 'emailVerified',
+  'createdAt', 'updatedAt',
+  // Role-change audit trail — shown in the Admin Panel
+  'promotedBy', 'promotedAt', 'previousRole',
+].join(' ');
+
+/** Soft-delete metadata, needed only by the Super Admin's recycle bin. */
+const USER_DELETED_FIELDS = `${USER_PUBLIC_FIELDS} isDeleted deletedBy deletedAt deleteNote`;
+
+/**
+ * Team directory projection — narrower still than USER_PUBLIC_FIELDS.
+ *
+ * A contact card needs a name, a way to reach the person and their role. It
+ * does not need the promotion audit trail or account-verification state, so
+ * those stay in the Admin Panel where they are actually used. Directory access
+ * is broader than admin access, so the field set is smaller, not the same.
+ */
+const USER_DIRECTORY_FIELDS = '_id username name email phone role isActive isSuperAdmin createdAt';
+
 function getFrontendUrl() {
   const envUrl = process.env.FRONTEND_URL;
   if (!envUrl || envUrl.includes('localhost') || envUrl.includes('127.0.0.1')) {
@@ -440,7 +473,7 @@ async function listUsers(req, res, next) {
     // Exclude soft-deleted users from the normal roster.
     // Deleted users are only visible in the Super Admin's Recycle Bin (/users/deleted).
     const usersRaw = await User.find({ isDeleted: { $ne: true } })
-      .select('-passwordHash')
+      .select(USER_PUBLIC_FIELDS)
       .sort({ createdAt: -1 });
 
     const users = usersRaw.map(u => {
@@ -964,10 +997,58 @@ async function deleteUser(req, res, next) {
 // GET /auth/users/deleted  [super-admin only]
 // Returns all soft-deleted users for the Recycle Bin panel.
 // ─────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────
+// GET /auth/directory  [manager and above]
+// Team contact directory — who to call, grouped by role.
+//
+// Separate from /auth/users on purpose. That endpoint serves the Admin Panel
+// and carries account-management state; this one is a phone book and returns
+// strictly less. Keeping them apart means widening the directory later cannot
+// accidentally widen what the Admin Panel exposes, or the reverse.
+// ─────────────────────────────────────────────────────────────────
+async function getDirectory(req, res, next) {
+  try {
+    const { search = '', role = '' } = req.query;
+
+    const filter = { isDeleted: { $ne: true } };
+    if (role) filter.role = role;
+    if (search.trim()) {
+      // Escape regex metacharacters — a user typing "a+b" should not blow up
+      // or turn into an expensive pattern.
+      const safe = search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const rx = new RegExp(safe, 'i');
+      filter.$or = [{ name: rx }, { username: rx }, { email: rx }, { phone: rx }];
+    }
+
+    const usersRaw = await User.find(filter)
+      .select(USER_DIRECTORY_FIELDS)
+      .sort({ name: 1 });
+
+    const contacts = usersRaw.map(u => {
+      const obj = u.toObject();
+      obj.isSuperAdmin = !!u.isSuperAdmin
+        || u.email?.toLowerCase() === 'divyanshuniyal185@gmail.com'
+        || u.username?.toLowerCase() === 'divyansh';
+      return obj;
+    });
+
+    const byRole = contacts.reduce((acc, c) => {
+      (acc[c.role] = acc[c.role] || []).push(c);
+      return acc;
+    }, {});
+
+    return res.json({
+      success: true,
+      count: contacts.length,
+      data: { contacts, byRole },
+    });
+  } catch (err) { next(err); }
+}
+
 async function listDeletedUsers(req, res, next) {
   try {
     const deleted = await User.find({ isDeleted: true })
-      .select('-passwordHash')
+      .select(USER_DELETED_FIELDS)
       .sort({ deletedAt: -1 });
     return res.json({ success: true, count: deleted.length, data: deleted });
   } catch (err) {
@@ -1005,7 +1086,11 @@ async function restoreUser(req, res, next) {
 // GET /auth/me
 async function getMe(req, res, next) {
   try {
-    const user = await User.findById(req.user._id).select('-passwordHash -otpCode -resetToken');
+    // Own record: the public fields plus the settings only the owner needs.
+    // Still an allowlist — the previous denylist let otpExpiry/otpAttempts and
+    // resetTokenExpiry through.
+    const user = await User.findById(req.user._id)
+      .select(`${USER_PUBLIC_FIELDS} preferences googleEmail googleLinkedAt`);
     if (!user) return res.status(404).json({ success: false, error: 'User not found' });
     return res.json({ success: true, data: user });
   } catch (err) { next(err); }
@@ -1016,10 +1101,31 @@ async function updateProfile(req, res, next) {
   try {
     const { name, phone } = req.body;
     const updates = {};
-    if (name !== undefined) updates.name = name;
-    if (phone !== undefined) updates.phone = phone;
-    
-    const user = await User.findByIdAndUpdate(req.user._id, updates, { new: true }).select('-passwordHash');
+
+    if (name !== undefined) {
+      const trimmed = String(name).trim();
+      if (!trimmed) return res.status(400).json({ success: false, error: 'Name cannot be empty' });
+      updates.name = trimmed;
+    }
+
+    if (phone !== undefined) {
+      // Kept permissive on format — international numbers, extensions and
+      // spacing vary too much to police — but bounded, and blank is allowed
+      // so somebody can remove a number they no longer want in the directory.
+      const trimmed = String(phone).trim();
+      if (trimmed && !/^[+\d][\d\s()-]{5,24}$/.test(trimmed)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Phone number may only contain digits, spaces, brackets, hyphens and a leading +',
+        });
+      }
+      updates.phone = trimmed;
+    }
+
+    // Only the account owner reaches this route, and it is still an allowlist:
+    // the previous denylist returned resetToken and the OTP counters.
+    const user = await User.findByIdAndUpdate(req.user._id, updates, { new: true })
+      .select(`${USER_PUBLIC_FIELDS} preferences googleEmail googleLinkedAt`);
     return res.json({ success: true, data: user });
   } catch (err) { next(err); }
 }
@@ -1068,7 +1174,7 @@ module.exports = {
   listUsers, toggleUserStatus, linkGoogle,
   forgotPassword, verifyResetOtp, resetPassword,
   // New RBAC management
-  changeRole, deleteUser, listDeletedUsers, restoreUser,
+  changeRole, deleteUser, listDeletedUsers, restoreUser, getDirectory,
   getMe, updateProfile, updateSettings, changePassword, getLoginHistory,
 };
 

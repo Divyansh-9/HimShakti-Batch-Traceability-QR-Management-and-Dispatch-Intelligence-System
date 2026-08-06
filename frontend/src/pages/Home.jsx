@@ -60,7 +60,7 @@ export default function Home() {
       <Navbar />
       <Hero />
 
-      <main className="flex-grow w-full">
+      <main id="main-content" className="flex-grow w-full">
 
         {/* ── How It Works ── */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">

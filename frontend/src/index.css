@@ -1056,7 +1056,11 @@ nav[class*="fixed bottom-0"] {
   display: flex;
   align-items: center;
   gap: 5px;
+  min-width: 0;
 }
+/* Without this the dots are squeezed into tall ellipses once a tour has
+   more than a handful of steps and the footer runs out of room. */
+.tour-dot { flex: 0 0 auto; }
 
 /* Dots are <button>s so a user can jump back to a step they want to re-read.
    The reset keeps them looking identical to the old decorative spans. */
@@ -1507,4 +1511,228 @@ nav[class*="fixed bottom-0"] {
   ::-webkit-scrollbar-thumb {
     transition: background-color 150ms ease;
   }
+}
+
+/* ── Data figures ─────────────────────────────────────────────────────
+   Proportional digits make columns of numbers ragged — "11" is narrower
+   than "88", so days-to-expiry and quantities never line up down a table.
+   Tabular figures fix the alignment and are the single cheapest thing that
+   makes a data-heavy dashboard look deliberate rather than defaulted. */
+table td,
+table th,
+.data-figures {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* ── Motion preferences ───────────────────────────────────────────────
+   Every animation here is decorative — staggered card entry, tab fades,
+   the walkthrough nudge pulse. None of it carries meaning, so all of it
+   should stop for anyone who has asked their OS to reduce motion.
+   Kept to a near-zero duration rather than `none` so animation-fill-mode
+   still applies and elements do not get stuck at opacity: 0. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── Skip link ────────────────────────────────────────────────────────
+   Off-screen until it takes focus, then it lands in the top-left as the
+   first stop of a keyboard traversal. */
+.skip-to-content {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 100;
+  transform: translateY(-120%);
+  padding: 0.6rem 1rem;
+  border-radius: 0 0 0.6rem 0;
+  background: var(--brand-primary);
+  color: #fff;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  transition: transform 160ms ease;
+}
+.skip-to-content:focus {
+  transform: translateY(0);
+  outline: 2px solid #fff;
+  outline-offset: -4px;
+}
+
+/* ── Document surface ─────────────────────────────────────────────────
+   The body is what shows through the scrollbar gutter and in the
+   overscroll area at the top and bottom of a page, so it has to follow
+   the theme. Pinning it to a light utility class produced a white strip
+   beside every dark page.
+
+   color-scheme is the other half: it tells the browser to render its own
+   chrome — scrollbars, <select> popups, date pickers, autofill styling —
+   in the matching mode. Without it those stay light on a dark page no
+   matter what the CSS says, because they are painted by the OS. */
+:root {
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+html {
+  background-color: var(--bg-primary);
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+/* ── Motion tokens ────────────────────────────────────────────────────
+   One easing vocabulary instead of Tailwind's default ease on everything.
+   `--ease-out-quint` is the heavy, decelerating curve that makes a surface
+   feel like it has mass; `--ease-spring` overshoots slightly for controls
+   that should feel physical when pressed. */
+:root {
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring:    cubic-bezier(0.34, 1.56, 0.64, 1);
+  --dur-fast:   140ms;
+  --dur-base:   240ms;
+  --dur-slow:   420ms;
+}
+
+.motion-quint  { transition-timing-function: var(--ease-out-quint); }
+.motion-spring { transition-timing-function: var(--ease-spring); }
+
+/* ── Focus discipline ─────────────────────────────────────────────────
+   Keyboard users had no consistent indicator — some controls carried a
+   ring, most inherited nothing. One rule, applied only to :focus-visible
+   so pointer users never see it. */
+:where(button, a, input, textarea, select, [tabindex]):focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+  border-radius: 0.5rem;
+}
+
+/* ── Haptic press ─────────────────────────────────────────────────────
+   A control that does not move when pressed reads as a picture of a
+   button. Scale is GPU-cheap and never triggers layout. */
+.press {
+  transition: transform var(--dur-fast) var(--ease-out-quint);
+}
+.press:active {
+  transform: scale(0.97);
+}
+
+/* ── Double bezel ─────────────────────────────────────────────────────
+   Outer tray + inner plate, with concentric radii, so a panel reads as
+   machined hardware rather than a rectangle drawn on the page. The inner
+   radius is the outer minus the tray padding — anything else makes the
+   curves visibly non-concentric. */
+.bezel {
+  padding: 6px;
+  border-radius: 1.5rem;
+  background: color-mix(in oklab, var(--bg-surface) 60%, transparent);
+  border: 1px solid var(--border-color);
+}
+.bezel-core {
+  border-radius: calc(1.5rem - 6px);
+  background: var(--bg-surface);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06);
+  overflow: hidden;
+}
+:root:not([data-theme="dark"]) .bezel-core {
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.9),
+              0 1px 2px rgb(0 0 0 / 0.04);
+}
+
+/* ── Conversation canvas ──────────────────────────────────────────────
+   The message list needs to read as a distinct surface from the panel
+   holding it, the way a chat wallpaper does. A doodle pattern would be
+   wrong for an operations tool, so this is a tonal wash plus a very faint
+   dot grid — same job, right register.
+
+   The texture lives on the non-scrolling wrapper, never on the scroll
+   container, so it is painted once instead of repainting every frame. */
+.chat-canvas {
+  position: relative;
+  background-color: color-mix(in oklab, var(--bg-primary) 55%, var(--bg-surface));
+}
+.chat-canvas::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(currentColor 1px, transparent 1px);
+  background-size: 22px 22px;
+  color: var(--text-muted);
+  opacity: 0.045;
+}
+
+/* ── Bubbles ──────────────────────────────────────────────────────────
+   Small radius with one squared corner where the tail attaches. The tail
+   is a pseudo-element rather than an SVG so it inherits the bubble colour
+   and costs nothing. */
+.bubble {
+  position: relative;
+  border-radius: 10px;
+  max-width: 100%;
+}
+.bubble-in  { border-top-left-radius: 3px; }
+.bubble-out { border-top-right-radius: 3px; }
+
+.bubble-in.bubble-tail::before,
+.bubble-out.bubble-tail::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  width: 8px;
+  height: 10px;
+}
+.bubble-in.bubble-tail::before {
+  left: -7px;
+  background: var(--bubble-bg);
+  clip-path: polygon(100% 0, 100% 100%, 0 0);
+}
+.bubble-out.bubble-tail::before {
+  right: -7px;
+  background: var(--brand-primary);
+  clip-path: polygon(0 0, 0 100%, 100% 0);
+}
+
+/* Timestamp sits inside the bubble. Floating it right lets the final line
+   of text wrap around it instead of claiming a whole row of its own —
+   the density trick that makes a thread feel tight rather than airy. */
+.bubble-time {
+  float: right;
+  margin-left: 10px;
+  margin-top: 6px;
+  font-size: 10px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+}
+
+/* Incoming bubble fill. A token so the tail pseudo-element can inherit the
+   exact colour without duplicating the value in two places. */
+:root                     { --bubble-bg: #ffffff; }
+:root[data-theme="dark"]  { --bubble-bg: #1d2a4d; }
+
+/* ── Tour card: phone sheet ───────────────────────────────────────────
+   A 340px card positioned beside its target cannot work on a phone —
+   there is no beside. Below md it becomes a bottom sheet pinned above
+   the mobile tab bar, full width minus a gutter, with its own scroll so
+   a long step never pushes the buttons off-screen. */
+.tour-card--sheet {
+  position: fixed !important;
+  left: 12px;
+  right: 12px;
+  bottom: calc(60px + env(safe-area-inset-bottom, 0px) + 12px);
+  width: auto !important;
+  max-height: 52dvh;
+  overflow-y: auto;
+  z-index: 9999;
 }

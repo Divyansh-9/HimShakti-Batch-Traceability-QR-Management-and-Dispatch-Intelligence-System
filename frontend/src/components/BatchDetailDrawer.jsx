@@ -28,8 +28,11 @@ import {
   AlertTriangle, RotateCcw, Scan, Monitor,
   Smartphone, ExternalLink, Copy, Archive, History,
   CheckCircle, RefreshCw, Eye, Download, Zap,
-  MapPin, User, ChevronRight, Box, FlaskConical, ShieldAlert
+  MapPin, User, ChevronRight, Box, FlaskConical, ShieldAlert,
+  MessagesSquare,
 } from 'lucide-react';
+import MessageThread from './MessageThread';
+import { useRecordThread, useMessageActions } from '../hooks/useMessages';
 
 // ── Role gates ───────────────────────────────────────────────────────
 const CAN_EDIT_NOTE   = ['admin', 'manager', 'factory-manager'];
@@ -737,6 +740,37 @@ function HistoryTab({ batch, scanData }) {
 // ══════════════════════════════════════════════════════════════
 // MAIN DRAWER
 // ══════════════════════════════════════════════════════════════
+/**
+ * Discussion thread for this batch.
+ *
+ * Distinct from the Notes tab: notes are the batch's own traceability text and
+ * only certain roles may change them. This is a conversation any signed-in
+ * user can add to, and it is permanent — the reason a decision was taken
+ * should outlive the shift that took it.
+ *
+ * Mounted only while the tab is open, so polling stops when it is not.
+ */
+function DiscussionTab({ batchId }) {
+  const { messages, isLoading, post } = useRecordThread('batch', batchId, true);
+  const { edit, remove } = useMessageActions(['messages', 'record', 'batch', batchId]);
+
+  return (
+    <div className="h-full flex flex-col min-h-0">
+      <MessageThread
+        messages={messages}
+        isLoading={isLoading}
+        sending={post.isPending}
+        onSend={(body) => post.mutateAsync(body)}
+        onEdit={(id, body) => edit.mutateAsync({ id, body })}
+        onDelete={(id) => remove.mutateAsync(id)}
+        placeholder="Why was this batch handled the way it was?"
+        emptyTitle="No discussion yet"
+        emptyHint="Anything decided about this batch belongs here — it stays on the record permanently."
+      />
+    </div>
+  );
+}
+
 export default function BatchDetailDrawer({ batch, onClose, onRefresh, onArchived, onDispatch, onDownloadQR }) {
   const { getUser }  = useAuth();
   const user         = getUser();
@@ -787,6 +821,7 @@ export default function BatchDetailDrawer({ batch, onClose, onRefresh, onArchive
     { id: 'overview', label: 'Overview', icon: Eye },
     { id: 'notes',    label: 'Notes',    icon: Pencil, dot: (batch.noteHistory?.length || 0) > 0 },
     { id: 'history',  label: 'History',  icon: History },
+    { id: 'discuss',  label: 'Discussion', icon: MessagesSquare },
   ];
 
   return (
@@ -897,6 +932,9 @@ export default function BatchDetailDrawer({ batch, onClose, onRefresh, onArchive
           )}
           {activeTab === 'history' && (
             <HistoryTab batch={batch} scanData={scanData} />
+          )}
+          {activeTab === 'discuss' && (
+            <DiscussionTab batchId={batch._id} />
           )}
         </div>
 
