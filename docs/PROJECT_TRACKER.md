@@ -418,6 +418,7 @@
 | `docs/RBAC.md` | Permission matrix for all roles |
 | `docs/DATABASE.md` | MongoDB schema documentation |
 | `docs/USER_GUIDE.md` | End-user documentation |
+| `docs/DEPLOYMENT.md` | Deploy runbook + symptom → cause table for runtime deploy failures |
 
 ---
 
@@ -427,6 +428,12 @@
 
 | Date | Decision | Why |
 |---|---|---|
+| 2026-08-06 | Vercel entry is `backend/api/index.js`, a re-export of `server.js` | The legacy v2 `builds`/`routes` schema silently ignores the `functions` block, so `maxDuration`/`memory` could not be raised. The convention-based `api/` entry keeps one app serving process, Vercel and Firebase targets |
+| 2026-08-06 | Mongo connect fails fast (8s) with `bufferCommands: false` | A hang is worse than an error on serverless: it outlives the invocation budget, so the platform kills the request and the caller sees an opaque crash page instead of a diagnosable 503 |
+| 2026-08-06 | `connectDB()` caches the in-flight promise, not just `readyState` | `readyState >= 1` is true while *connecting*, so concurrent cold-start requests raced past the gate and queried a socket that was not up |
+| 2026-08-06 | `/health` declared before the DB gate | A health check that needs the database cannot report "API up, database unreachable" — the one answer needed when diagnosing a deploy |
+| 2026-08-06 | Socket.io not initialised under serverless | No long-lived process to hold a WebSocket; the listener was allocated, never used, never closed. Every emit site already guards with `if (io)` |
+| 2026-08-06 | Internal error text withheld from clients in production | The fallback forwarded `err.message` verbatim, leaking driver text, hostnames and connection-string fragments |
 | 2026-08-06 | CSV parsed in browser; no multipart upload endpoint | Eliminates file upload attack surface; preview is free (nothing written until user approves) |
 | 2026-08-06 | ImportJob stores rollback manifest (list of `_id`s inserted) | Enables one-call atomic rollback without scanning the whole batch collection |
 | 2026-08-06 | Walkthrought steps extracted to `walkthroughSteps.js` config | Copy changes should not require touching tour positioning engine |
@@ -441,4 +448,4 @@
 
 ---
 
-*Last updated: 2026-08-06 · v2.6.0 · Update this file at the end of every development session.*
+*Last updated: 2026-08-06 · v2.7.7 · Update this file at the end of every development session.*

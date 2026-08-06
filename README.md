@@ -48,6 +48,15 @@
 | **Backend API** | [him-shakti-batch-traceability-qr-ma.vercel.app](https://him-shakti-batch-traceability-qr-ma.vercel.app) | Vercel Serverless |
 | **Health Check** | [/health](https://him-shakti-batch-traceability-qr-ma.vercel.app/health) | Vercel Serverless |
 
+> **Deploying or debugging a deploy?** → **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** covers the
+> Vercel entry point, the three `vercel.json` files and which one applies, the required Atlas
+> network-access step, and a symptom → cause table.
+>
+> `/health` is declared **before** the database gate, so it answers even when Mongo is
+> unreachable — it reports `database` and `dbConfigured` separately from process liveness.
+> That distinction is the fastest way to tell "the API is down" from "the API is up but
+> cannot reach its database."
+
 ---
 
 ### 🏗️ Tech Stack Summary
@@ -94,8 +103,8 @@ The backend originally deployed to **Render (free tier)**. During integration te
 |---|---|---|
 | **MongoDB Atlas M0 — 512 MB storage cap** | Free cluster allows max 512 MB data. Sufficient for demo scale (hundreds of batches + QR images). | Upgrade to M2 ($9/mo) for production scale. |
 | **MongoDB Atlas M0 — 100 connection limit** | Shared cluster caps simultaneous connections. | Use connection pooling (already configured via Mongoose). |
-| **Vercel Serverless — 10-second function timeout** | Hobby plan functions timeout after 10s. Gemini AI audit calls are cached (4hr) to avoid repeated slow calls. | Cache is the primary mitigation; upgrade to Pro ($20/mo) for 60s timeout. |
-| **Vercel Serverless — No persistent Socket.IO** | Serverless functions are stateless; Socket.IO real-time requires a separate managed Socket layer in production. | For demo purposes, Socket.IO events are emitted per-request. In production, use Vercel + Ably/Pusher. |
+| **Vercel Serverless — function timeout** | Any request that outlives the limit is killed by the platform mid-flight, and the caller gets an opaque `FUNCTION_INVOCATION_FAILED` page rather than an error. `maxDuration` is set to 30s in `backend/vercel.json`, and the Mongo connect aborts at 8s so a database problem surfaces as a readable 503 instead of a crash. Gemini AI audits are cached (4hr) to avoid repeated slow calls. | Configured, not merely mitigated — see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). |
+| **Vercel Serverless — No persistent Socket.IO** | Serverless functions are stateless, so there is no long-lived process to hold a WebSocket open. Socket.IO is therefore **not initialised at all** under Vercel — every emit site guards with `if (io)` and the API degrades to REST-only. The frontend polls (React Query, 15s) so no view depends on sockets. | Real-time is a dev/demo affordance. For live sockets in production, run the backend as a process, or add Ably/Pusher. |
 | **Firebase Hosting — 10 GB/month egress** | Free Spark plan allows 10 GB/month data transfer. | Sufficient for demo; upgrade to Blaze (pay-as-you-go) for production. |
 | **Gemini API — free tier rate limits** | Google AI Studio free tier: 15 RPM, 1,500 RPD. The 4-hour in-memory cache on the backend prevents hitting this limit under normal usage. | Cache is the primary mitigation. |
 

@@ -1,0 +1,12 @@
+# Keep the deployed upload to what the API actually needs at runtime.
+# Note: Vercel traces dependencies from api/index.js, so the Firebase
+# entry (index.js) and its firebase-admin/firebase-functions tree are
+# already left out of the function bundle — it is unreachable from the
+# Vercel entry. It stays in the upload so `main` in package.json keeps
+# resolving; only genuinely local artefacts are excluded here.
+
+node_modules
+.env
+.env.*
+*.log
+.gcloudignore

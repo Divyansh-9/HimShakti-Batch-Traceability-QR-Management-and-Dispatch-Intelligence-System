@@ -6,6 +6,32 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2.7.7] — 2026-08-06
+
+### Backend deploy no longer crashes on Vercel
+
+Every request to the deployed API returned Vercel's `FUNCTION_INVOCATION_FAILED` crash page. The cause was not a broken route — the app imports and runs cleanly with zero environment variables set. It was that a request which could not reach MongoDB **hung instead of failing**, and the platform killed the invocation before Express ever wrote a response.
+
+#### Fixed
+- **The database connect had no timeout budget.** `mongoose.connect()` ran with driver defaults, so an unreachable cluster — an Atlas IP allowlist that does not include Vercel's egress ranges being the usual reason — blocked for the full 30s server-selection window. That is longer than the function's limit, so the invocation was terminated and the caller got an opaque platform crash page rather than an error. Connection now fails fast (`serverSelectionTimeoutMS` 8s, `bufferCommands: false`) and surfaces as a real `503`. Reproduced against an unroutable host: previously hung past 12s, now answers in 8.0s.
+- **Concurrent cold-start requests raced the connection.** `connectDB()` returned early on `readyState >= 1`, but readyState `2` means *connecting* — so a second request sailed past the gate and issued queries against a socket that was not up, which mongoose then buffered until the invocation expired. The in-flight connect promise is now cached and shared, and cleared on failure or disconnect so one transient error cannot poison a warm container.
+- **`/health` was declared after the database gate**, so the one endpoint you need when diagnosing a bad deploy failed for exactly the reason you were trying to diagnose. It now sits ahead of the gate and reports `database` readyState and `dbConfigured` separately from process liveness.
+- **The error handler could throw.** `Object.values(err.errors)` ran on any error named `ValidationError`, but only mongoose's carries an `errors` map — express-rate-limit raises one that does not. An exception inside the terminal error handler has nothing behind it in Express, so it destroyed the response and took the invocation with it. All branches are now defensive.
+- **`X-Forwarded-For` was rejected on every request.** Without `trust proxy`, express-rate-limit logged `ERR_ERL_UNEXPECTED_X_FORWARDED_FOR` and bucketed all traffic behind the platform proxy into a single rate-limit key — one noisy visitor could exhaust the quota for everyone. Set to `1` (trust exactly one hop) rather than `true`, which would let a client spoof its own address.
+- **Unknown paths returned platform HTML** instead of the `{ success, error }` envelope every client expects. Added a JSON 404.
+- **A failed boot connect rejected silently** in process mode — the process stayed alive having never called `listen()`. It now logs and exits non-zero.
+
+#### Changed
+- **Vercel entry moved to `backend/api/index.js`** (a thin re-export of `server.js`) and `backend/vercel.json` migrated off the deprecated v2 `builds`/`routes` schema to `rewrites` + `functions`. The legacy schema silently ignores the `functions` block, so `maxDuration` and `memory` could not be raised off their defaults. Now 30s / 1024 MB. `server.js` still works unchanged as a process, a Firebase Function, and a Vercel Function.
+- **Socket.io and the `http.Server` are no longer created on serverless.** There is no long-lived process to hold a WebSocket open there, so the listener was allocated, never used, and never closed. Every emit site already guards with `if (io)`, so the API degrades to REST-only — which is the documented production guarantee anyway.
+- **Internal error messages are no longer returned to clients in production.** The fallback branch forwarded `err.message` verbatim, which leaks driver text, hostnames and connection-string fragments; a missing `MONGODB_URI` echoed the mongoose internals straight to the browser. Deliberate 4xx messages still pass through; unexpected 5xx are logged server-side and returned as a generic string.
+
+#### Added
+- `docs/DEPLOYMENT.md` — deploy runbook and a symptom-to-cause table for the failure modes above, including the Atlas allowlist step that no code change can substitute for.
+- `.gitignore` now denies `.env.*` wholesale with `!.env.example` re-included, plus key material and `.vercel/`, so a new env variant cannot be committed by accident. `backend/.vercelignore` added.
+
+---
+
 ## [2.7.6] — 2026-08-06
 
 ### Walkthrough works on a phone

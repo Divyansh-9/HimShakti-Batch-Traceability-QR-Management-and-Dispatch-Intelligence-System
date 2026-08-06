@@ -9,9 +9,17 @@ tbi-guide/
 ~$*
 
 # ─── Environment & Secrets ──────────────────────────────────────
+# Broad by default, with .env.example explicitly re-included, so a new
+# variant (.env.staging, backend/.env.local) can never be committed by
+# accident. Secrets belong in the Vercel/Firebase dashboards.
 .env
-.env.local
-.env.production
+.env.*
+!.env.example
+*.pem
+*.key
+serviceAccountKey.json
+firebase-adminsdk*.json
+.runtimeconfig.json
 
 # ─── Node / npm ─────────────────────────────────────────────────
 node_modules/
@@ -22,6 +30,11 @@ yarn-error.log
 dist/
 build/
 .vite/
+
+# ─── Deploy Tooling ─────────────────────────────────────────────
+.vercel/
+.firebase/
+.netlify/
 
 # ─── OS & IDE ───────────────────────────────────────────────────
 .DS_Store
