@@ -31,7 +31,7 @@ async function createBatch(req, res, next) {
     const { expiryDate, daysUntilExpiry, dataSource, shelfLifeSource } = calculateExpiry(product, parsed);
 
     const batchCode = await generateBatchCode();
-    const { dataUrl: qrCodeDataUrl, absoluteUrl: qrAbsoluteUrl } = await generateBatchQR(batchCode);
+    const { dataUrl: qrCodeDataUrl, absoluteUrl: qrAbsoluteUrl, traceToken } = await generateBatchQR(batchCode);
 
     const status        = getBatchStatus(daysUntilExpiry);
     const priorityScore = calculatePriorityScore(daysUntilExpiry, product.riskLevel);
@@ -59,6 +59,7 @@ async function createBatch(req, res, next) {
       priorityScore,
       qrCodeDataUrl,
       qrAbsoluteUrl,
+      traceToken,
       traceabilityNote,
       createdBy: req.user?.name || req.user?.username || 'manager'
     });

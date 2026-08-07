@@ -4,8 +4,7 @@
 import { useParams } from 'react-router-dom';
 import { useTrace } from '../hooks/useTrace';
 
-const GREEN  = '#1a4731'; // matches qrGenerator.js QR colour
-const ACCENT = '#2d6a4f';
+const GREEN = '#1a4731'; // matches qrGenerator.js QR colour
 
 const STATUS_COLORS = {
   URGENT:     { bg: '#fef2f2', text: '#dc2626', border: '#fecaca', label: '⚠ Expiring Soon' },
@@ -20,10 +19,18 @@ function fmt(dateStr) {
 }
 
 export default function TracePage() {
-  const { batchCode }     = useParams();
-  const { trace, loading, error } = useTrace(batchCode);
+  // One component serves both public routes. `token` is present when the
+  // visitor scanned a QR; `batchCode` when they followed a legacy label.
+  const { batchCode, token } = useParams();
+  const { trace, loading, error } = useTrace(token || batchCode, token ? 'token' : 'batchCode');
 
   const statusCfg = trace?.status ? (STATUS_COLORS[trace.status] || STATUS_COLORS.READY) : null;
+  // The reduced payload omits farmer/village/lot. Render what arrived
+  // rather than showing empty rows the server deliberately withheld.
+  const isFull    = trace?.detailLevel === 'full';
+  // Shown by the API only when the verdict passed.
+  const quality   = trace?.qualityCheck;
+  const headerRef = trace?.batchCode || batchCode || '—';
 
   return (
     <div style={{ minHeight: '100vh', background: '#ffffff', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
@@ -36,7 +43,7 @@ export default function TracePage() {
           <p style={{ color: 'white', fontSize: '14px', fontWeight: 500 }}>Batch Traceability</p>
         </div>
         <div style={{ background: 'rgba(255,255,255,0.15)', borderRadius: 8, padding: '6px 10px' }}>
-          <p style={{ color: 'white', fontSize: '11px', fontFamily: 'monospace' }}>{batchCode}</p>
+          <p style={{ color: 'white', fontSize: '11px', fontFamily: 'monospace' }}>{headerRef}</p>
         </div>
       </div>
 
@@ -56,7 +63,9 @@ export default function TracePage() {
             <p style={{ fontSize: 40, marginBottom: 16 }}>❌</p>
             <p style={{ fontWeight: 700, color: '#111', fontSize: 18, marginBottom: 8 }}>Batch Not Found</p>
             <p style={{ color: '#6b7280', fontSize: 14 }}>
-              The batch code <strong>{batchCode}</strong> could not be found in our system.
+              {token
+                ? 'This QR code could not be matched to a batch. It may be damaged or not issued by HimShakti.'
+                : <>The batch code <strong>{batchCode}</strong> could not be found in our system.</>}
             </p>
           </div>
         )}
@@ -87,6 +96,26 @@ export default function TracePage() {
               <p style={{ fontSize: 26, fontWeight: 800, color: statusCfg?.text || GREEN }}>{fmt(trace.expiryDate)}</p>
             </div>
 
+            {/* Quality check — shown only when an inspector passed this
+                batch. The API withholds FAILED and FLAGGED verdicts from
+                the public response entirely, so absence here means "not
+                inspected, or not passed", never "failed". */}
+            {quality && (
+              <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 12,
+                padding: '14px 18px', marginBottom: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <span style={{ color: '#15803d', fontWeight: 700, fontSize: 14 }}>✓ Quality Checked</span>
+                  <span style={{ color: '#15803d', fontSize: 13, letterSpacing: '0.05em' }}>
+                    {'★'.repeat(quality.rating)}{'☆'.repeat(Math.max(0, 5 - quality.rating))}
+                  </span>
+                </div>
+                <p style={{ fontSize: 12, color: '#166534' }}>
+                  Inspected {fmt(quality.inspectedAt)}
+                  {quality.inspectorName ? ` by ${quality.inspectorName}` : ''}
+                </p>
+              </div>
+            )}
+
             {/* Traceability Card */}
             <div style={{ border: `1px solid #e5e7eb`, borderRadius: 12, overflow: 'hidden', marginBottom: 16 }}>
               <div style={{ background: GREEN, padding: '10px 16px' }}>
@@ -95,12 +124,28 @@ export default function TracePage() {
                 </p>
               </div>
               <div style={{ padding: '16px 20px', background: '#fff' }}>
-                <Row label="Farmer" value={trace.farmerName} />
-                <Row label="Village" value={trace.village} />
+                {isFull && <Row label="Farmer" value={trace.farmerName} />}
+                {isFull && <Row label="Village" value={trace.village} />}
                 <Row label="Packed On" value={fmt(trace.packDate)} />
                 <Row label="Batch Code" value={trace.batchCode} mono />
+                {isFull && trace.quantityProduced != null && (
+                  <Row label="Batch Size" value={`${trace.quantityProduced} ${trace.unit || ''}`.trim()} />
+                )}
               </div>
             </div>
+
+            {/* Reduced-detail notice. Without this the page silently shows
+                less than the same product's QR would, and a consumer has
+                no way to tell the difference from missing data. */}
+            {!isFull && (
+              <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 10,
+                padding: '12px 16px', marginBottom: 16 }}>
+                <p style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>
+                  Scan the QR code on the package to see full farm-to-table details,
+                  including the farmer and village this batch came from.
+                </p>
+              </div>
+            )}
 
             {/* Scan history */}
             {trace.scans?.length > 0 && (

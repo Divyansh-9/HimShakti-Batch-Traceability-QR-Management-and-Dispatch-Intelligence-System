@@ -514,7 +514,7 @@ async function commitImport(req, res, next) {
           calculateExpiry(product, value.packDate);
 
         const batchCode = codes[i];
-        const { dataUrl: qrCodeDataUrl, absoluteUrl: qrAbsoluteUrl } = await generateBatchQR(batchCode);
+        const { dataUrl: qrCodeDataUrl, absoluteUrl: qrAbsoluteUrl, traceToken } = await generateBatchQR(batchCode);
 
         docs.push({
           productId:   product._id,
@@ -535,6 +535,7 @@ async function commitImport(req, res, next) {
           priorityScore: calculatePriorityScore(daysUntilExpiry, product.riskLevel),
           qrCodeDataUrl,
           qrAbsoluteUrl,
+          traceToken,
           traceabilityNote: product.predictedExpiryTemplate
             ? product.predictedExpiryTemplate.replace('{days}', Math.round(daysUntilExpiry))
             : `Best before ${expiryDate.toDateString()}`,

@@ -575,7 +575,8 @@ Authorization: Bearer <token>
 | 21 | `GET` | `/api/batches/:id/qr` | — | Lightweight QR image only (base64 PNG) |
 | 22 | `PATCH` | `/api/batches/:id/dispatch` | ✅ | Record dispatch event |
 | 23 | `GET` | `/api/dispatch/fefo` | — | FEFO priority queue (sorted by priority score) |
-| 24 | `GET` | `/trace/:batchCode` | — | Public QR trace page (consumer-facing) |
+| 24 | `GET` | `/trace/t/:token` | — | Public QR trace — **full** record. What the QR encodes |
+| 24b | `GET` | `/trace/:batchCode` | — | Public QR trace — **reduced** record. Legacy printed labels only |
 | 25 | `GET` | `/api/qr/:batchCode/image` | — | QR PNG by batch code |
 | 26 | `POST` | `/api/ai/dispatch-audit` | ✅ | Gemini AI advisory (4hr cached) |
 | 27 | `GET` | `/api/notifications` | ✅ | List notifications (newest-first, paginated) |
@@ -627,7 +628,7 @@ Error responses:
 │  ┌───────────────────────┐       ┌───────────────────────────────┐  │
 │  │   Factory Dashboard   │       │   Public QR Trace Page        │  │
 │  │   React 18 + Vite     │       │   (Consumer / B2B Buyer)      │  │
-│  │   localhost:5173      │       │   /trace/:batchCode           │  │
+│  │   localhost:5173      │       │   /trace/t/:token             │  │
 │  └──────────┬────────────┘       └──────────────┬────────────────┘  │
 └─────────────┼────────────────────────────────────┼──────────────────┘
               │ REST + Socket.IO                    │ REST
@@ -752,7 +753,14 @@ POST /api/batches  ─────► MongoDB insert
   status:           "URGENT",         // Enum: READY | WARNING | URGENT | DISPATCHED | EXPIRED
   priorityScore:    542,              // FEFO sort key — higher = dispatch sooner
   qrCodeDataUrl:    "data:image/png;base64,...",  // 300x300 PNG
-  qrAbsoluteUrl:    "https://him-shakti-batch-traceability-qr-ma.vercel.app/trace/HS-2026-06-001",
+  qrAbsoluteUrl:    "https://him-shakti-batch-traceability-qr-ma.vercel.app/trace/t/oYDYx5n8Ww3i-GlAcKu4J1",
+  traceToken:       "oYDYx5n8Ww3i-GlAcKu4J1",  // HMAC of batchCode — keeps the sequential code out of the public URL
+  qualityCheck: {                     // Snapshotted from Inspection (which has a 30-day TTL)
+    status:         "PASSED",         // Enum: PASSED | FAILED | FLAGGED | null
+    rating:         4,                // 1–5
+    inspectedAt:    Date,
+    inspectorName:  "Priya Rawat"
+  },
   dispatchDate:     null,             // Set when dispatched
   buyerName:        null,             // Set when dispatched
   traceabilityNote: "Batch of Wild Berry Mix sourced from Ramesh Thakur...",

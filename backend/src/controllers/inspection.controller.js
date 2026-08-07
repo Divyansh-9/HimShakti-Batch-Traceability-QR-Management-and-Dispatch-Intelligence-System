@@ -67,6 +67,29 @@ async function createInspection(req, res, next) {
       isLatest: true,
     }], { session });
 
+    // Snapshot the verdict onto the batch, inside the same transaction.
+    //
+    // Inspection documents carry a 30-day TTL, so the batch would
+    // otherwise lose all evidence of having been inspected exactly one
+    // month later — while the product itself is still on a shelf with a
+    // scannable QR on it. This mirrors the denormalization the batch
+    // already does for productName and farmerName: the record keeps what
+    // was true at the time, independent of collections that expire.
+    await Batch.updateOne(
+      { _id: batch._id },
+      {
+        $set: {
+          qualityCheck: {
+            status,
+            rating:        Number(rating),
+            inspectedAt:   new Date(),
+            inspectorName: req.user.name || req.user.username,
+          },
+        },
+      },
+      { session }
+    );
+
     await session.commitTransaction();
     session.endSession();
 

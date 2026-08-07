@@ -6,6 +6,36 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2.8.0] — 2026-08-07
+
+### The public trace flow stops leaking the production record
+
+Three changes to the QR scan path, all on the same seam: the endpoint was written as a convenience read and then left facing the open internet.
+
+#### Fixed
+- **The trace endpoint performed a database write on an unauthenticated GET.** It called `findByIdAndUpdate` to persist the recomputed status, which made a public read non-idempotent and handed anonymous callers a write amplifier on a guessable URL. It was also redundant — status is recomputed on every read path, so the stored value is decorative. Removed.
+- **`source` was read straight from `req.query`**, so any caller could label their own scan `QA` and corrupt the scan record. It is now derived from which route resolved: a token scan came off a real printed label, a legacy scan did not.
+
+#### Added
+- **QR codes now encode an opaque trace token, not the batch code.** Batch codes are `HS-YYYY-MM-NNN` — sequential and trivially enumerable — and the trace endpoint is unauthenticated by design, so anyone could walk the sequence and harvest the whole production record: farmer names, villages, volumes, yields, lot codes. The QR now points at `/trace/t/<token>`, a 132-bit HMAC derived from the batch code under `TRACE_TOKEN_SECRET`.
+
+  The token is derived rather than random so existing batches can be backfilled by recomputation, and the backfill is idempotent. It is still stored and indexed, because HMAC cannot be inverted — resolving a scan is a lookup, not a decode.
+
+  **Already-printed labels keep working.** `/trace/:batchCode` still resolves, but returns only what is already visible on the physical package — product, expiry, freshness, batch code. Farmer, village, lot code, quantity and yield require the token. Enumeration remains possible and now returns almost nothing worth having. The reduced response carries `detailLevel: 'limited'`, and the page says so rather than silently showing less.
+
+- **Consumers scanning a QR now see the quality verdict** — inspector, date, and rating — when the batch passed inspection. `FAILED` and `FLAGGED` verdicts are withheld from the public response entirely: such a batch should never have reached a consumer, and publishing an internal QA judgement about product already in distribution, with no context and no right of reply, is not a thing a public page should do. The verdict stays on the record for staff and auditors.
+
+- **`Batch.qualityCheck`** — the verdict is snapshotted onto the batch when the inspection is filed, inside the same transaction. `Inspection` documents carry a 30-day TTL, so reading through to that collection would make a batch's quality history vanish exactly one month after it was verified — while the product is still on a shelf with a scannable QR on it. Same reasoning as the existing `productName`/`farmerName` denormalization: the batch keeps what was true at production time.
+
+- **`src/scripts/backfillTraceTokens.js`** — idempotent migration that derives tokens, regenerates stored QR images, and recovers `qualityCheck` from surviving inspections. Supports `--dry-run`. Run against 28 existing batches: 28 tokens, 1 recoverable verdict (the rest had already expired under the TTL and cannot be recovered).
+
+- **`TRACE_TOKEN_SECRET`** in `.env.example`. Optional — falls back to `JWT_SECRET` so existing deployments keep working — but set separately in production, because rotating `JWT_SECRET` would otherwise invalidate every QR already printed on a crate.
+
+#### Changed
+- `useTrace` derives `loading` from whether state matches the requested identifier instead of flipping it via `setState` in the effect body, and cancels in-flight requests. Switching identifiers can no longer briefly render the previous batch's data as though it were the new one.
+
+---
+
 ## [2.7.7] — 2026-08-06
 
 ### Backend deploy no longer crashes on Vercel

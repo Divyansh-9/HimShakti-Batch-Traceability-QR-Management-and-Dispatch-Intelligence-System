@@ -75,6 +75,28 @@ const BatchSchema = new mongoose.Schema({
   qrCodeDataUrl: { type: String, required: true },
   qrAbsoluteUrl: { type: String, required: true },
 
+  // ── Public trace token ────────────────────────────────────────────
+  // Opaque identifier the QR encodes, so the public trace URL does not
+  // expose the sequential batch code. Derived (HMAC), not random — see
+  // utils/traceToken.js. Sparse because batches created before this
+  // field existed are backfilled by script, not at read time.
+  traceToken: { type: String, default: null, index: true, sparse: true },
+
+  // ── Quality check snapshot ────────────────────────────────────────
+  // Denormalized from the latest Inspection at the moment it is filed.
+  // Inspection documents carry a 30-day TTL, so reading through to the
+  // Inspection collection would make a batch's quality history silently
+  // vanish a month after it was verified — exactly when a consumer
+  // scanning a shelf-stable product is most likely to look. Snapshotting
+  // follows the same reasoning as productName/farmerName above: a batch
+  // must keep showing what was true at production time.
+  qualityCheck: {
+    status:       { type: String, enum: ['PASSED', 'FAILED', 'FLAGGED', null], default: null },
+    rating:       { type: Number, min: 1, max: 5, default: null },
+    inspectedAt:  { type: Date, default: null },
+    inspectorName:{ type: String, default: null },
+  },
+
   // Dispatch Info
   dispatchDate: { type: Date, default: null },
   buyerName:    { type: String, default: null, trim: true },

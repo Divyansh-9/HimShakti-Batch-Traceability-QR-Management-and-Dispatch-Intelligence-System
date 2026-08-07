@@ -25,7 +25,11 @@ function App() {
         <Route path="/login"     element={<Login />} />
         <Route path="/showcase"  element={<ComponentShowcase />} />
 
-        {/* Public QR trace page — no auth required */}
+        {/* Public QR trace pages — no auth required.
+            /trace/t/:token  → scanned QR, full provenance record
+            /trace/:batchCode → legacy label or hand-typed code, reduced record
+            The token route is declared first so "t" is never matched as a batch code. */}
+        <Route path="/trace/t/:token"   element={<TracePage />} />
         <Route path="/trace/:batchCode" element={<TracePage />} />
 
         {/* Invite page — new user sets their password via invite link */}

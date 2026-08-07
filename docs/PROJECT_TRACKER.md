@@ -3,7 +3,7 @@
 > Living document. Updated after every development session.
 > Organized by: **Epic → Story → Task** (Jira-style).
 > Status key: `✅ Done` · `🔄 In Progress` · `⏳ Planned` · `❌ Blocked` · `🚫 Descoped`
-> **Last updated:** 2026-08-06 · v2.6.0
+> **Last updated:** 2026-08-07 · v2.8.0
 
 ---
 
@@ -428,6 +428,12 @@
 
 | Date | Decision | Why |
 |---|---|---|
+| 2026-08-07 | QR encodes an HMAC trace token, not the batch code | Batch codes are sequential and the trace endpoint is unauthenticated by design; a readable code let anyone walk the sequence and harvest the whole production record |
+| 2026-08-07 | Token derived (HMAC), not random | Deterministic, so existing batches backfill by recomputation and the migration is idempotent. Still stored and indexed because HMAC cannot be inverted |
+| 2026-08-07 | Legacy `/trace/:batchCode` kept, at reduced detail | Labels already printed on physical stock must keep resolving. Returning only what is on the package makes enumeration pointless without breaking them |
+| 2026-08-07 | FAILED/FLAGGED verdicts withheld from public trace | Such a batch should not be in consumer hands; publishing an internal QA judgement about distributed product, with no context or right of reply, is not a public-page decision |
+| 2026-08-07 | `qualityCheck` snapshotted onto Batch | Inspections carry a 30-day TTL, so a batch would lose all evidence of inspection one month later — while still on a shelf with a scannable QR |
+| 2026-08-07 | No status writeback on the public trace GET | An unauthenticated read must not write. Status is recomputed on every read path, so the persisted value was decorative |
 | 2026-08-06 | Vercel entry is `backend/api/index.js`, a re-export of `server.js` | The legacy v2 `builds`/`routes` schema silently ignores the `functions` block, so `maxDuration`/`memory` could not be raised. The convention-based `api/` entry keeps one app serving process, Vercel and Firebase targets |
 | 2026-08-06 | Mongo connect fails fast (8s) with `bufferCommands: false` | A hang is worse than an error on serverless: it outlives the invocation budget, so the platform kills the request and the caller sees an opaque crash page instead of a diagnosable 503 |
 | 2026-08-06 | `connectDB()` caches the in-flight promise, not just `readyState` | `readyState >= 1` is true while *connecting*, so concurrent cold-start requests raced past the gate and queried a socket that was not up |
@@ -448,4 +454,4 @@
 
 ---
 
-*Last updated: 2026-08-06 · v2.7.7 · Update this file at the end of every development session.*
+*Last updated: 2026-08-07 · v2.8.0 · Update this file at the end of every development session.*
