@@ -37,8 +37,13 @@ exceed 61 — see [Lint budget](./docs/TESTING.md#lint-budget).
 ## House rules
 
 These are the ones that are easy to get wrong and expensive to get
-wrong. The full architectural context is in
-[`CLAUDE.md`](./CLAUDE.md).
+wrong. Deeper context lives in
+[`docs/DATABASE.md`](./docs/DATABASE.md) (schema and the reasoning
+behind each denormalization), [`docs/RBAC.md`](./docs/RBAC.md)
+(permission matrix and session validity),
+[`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md) (the serverless
+constraints that explain several of these rules) and
+[`SECURITY.md`](./SECURITY.md).
 
 **Backend is CommonJS, frontend is ESM.** Do not mix.
 
