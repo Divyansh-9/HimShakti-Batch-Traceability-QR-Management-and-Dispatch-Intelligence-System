@@ -2,8 +2,22 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// In-memory cache (FR-4.2)
+const store = require('./sharedStore');
+
+// In-memory cache (FR-4.2).
+//
+// Kept as the fallback tier. On serverless it is nearly useless on its
+// own — the variable dies with the container, so the 4-hour TTL rarely
+// survives long enough to be read and most requests pay for a fresh
+// Gemini call. When a shared store is configured the report is cached
+// there too, and the TTL finally means what it says.
 let aiCache = { report: null, generatedAt: null };
+
+const CACHE_KEY = 'ai:dispatch-audit';
+
+function cacheTTLms() {
+  return parseInt(process.env.GEMINI_CACHE_TTL_HOURS || '4', 10) * 60 * 60 * 1000;
+}
 
 /**
  * The AI is instructed to return ONLY valid JSON — no Markdown prose.
@@ -13,10 +27,21 @@ let aiCache = { report: null, generatedAt: null };
  * @returns {{ report: object, fromCache: boolean, generatedAt: Date }}
  */
 async function runDispatchAudit(batches) {
-  const cacheTTL = parseInt(process.env.GEMINI_CACHE_TTL_HOURS || '4') * 60 * 60 * 1000;
+  const cacheTTL = cacheTTLms();
 
+  // Process-local first — free, and correct when it hits.
   if (aiCache.report && (Date.now() - aiCache.generatedAt) < cacheTTL) {
     return { report: aiCache.report, fromCache: true, cachedAt: new Date(aiCache.generatedAt), provider: aiCache.provider || 'gemini' };
+  }
+
+  // Then the shared store, which survives the container. Returns null
+  // when unconfigured or unreachable, in which case we simply generate.
+  const shared = await store.getJSON(CACHE_KEY);
+  if (shared?.report && (Date.now() - shared.generatedAt) < cacheTTL) {
+    // Re-seed the local tier so repeat calls on this container skip the
+    // network round trip entirely.
+    aiCache = shared;
+    return { report: shared.report, fromCache: true, cachedAt: new Date(shared.generatedAt), provider: shared.provider || 'gemini' };
   }
 
   const batchSummary = batches.map(b => ({
@@ -130,11 +155,21 @@ Rules:
   }
 
   aiCache = { report, generatedAt: Date.now(), provider };
+
+  // Not awaited: the caller already has their report, and a slow or
+  // unreachable cache must never delay or fail the response.
+  store.setJSON(CACHE_KEY, aiCache, cacheTTLms() / 1000)
+    .catch(err => console.error('[AI] shared cache write failed:', err.message));
+
   return { report, fromCache: false, generatedAt: new Date(), provider };
 }
 
 function clearAICache() {
   aiCache = { report: null, generatedAt: null };
+  // Clear the shared copy too, or a "regenerate" on one container is
+  // undone by the next container reading the stale entry back.
+  store.command(['DEL', CACHE_KEY])
+    .catch(err => console.error('[AI] shared cache clear failed:', err.message));
 }
 
 module.exports = { runDispatchAudit, clearAICache };

@@ -1,0 +1,114 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - run: npm ci
+        working-directory: backend
+
+      # No database required. These cover the pure logic whose failure
+      # mode is silent: expiry tiers, FEFO priority, the RBAC matrix, and
+      # the TTL discriminator that decides which messages are permanent
+      # audit evidence.
+      - run: npm test
+        working-directory: backend
+
+  frontend:
+    name: Frontend tests and build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+        working-directory: frontend
+
+      - run: npm test
+        working-directory: frontend
+
+      # A build failure is the one thing that reliably breaks a deploy,
+      # so it gates every push.
+      - run: npm run build
+        working-directory: frontend
+
+  lint-budget:
+    name: Lint budget
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+        working-directory: frontend
+
+      # The frontend carries 61 pre-existing lint errors — 40 unused
+      # variables plus a set of react-hooks findings, none auto-fixable.
+      # Failing the build on them today would mean either a red pipeline
+      # forever or `continue-on-error`, which is the same as no gate at
+      # all while looking like one.
+      #
+      # Instead the count is capped. The pipeline stays green at the
+      # current number and fails the moment a change adds to it, so the
+      # debt can only shrink. Lower BUDGET as errors are fixed.
+      - name: Fail if lint errors exceed the budget
+        working-directory: frontend
+        run: |
+          BUDGET=61
+          COUNT=$(npx eslint src --format json \
+            | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{
+                console.log(JSON.parse(s).reduce((n,f)=>n+f.errorCount,0))})")
+          echo "eslint errors: $COUNT (budget $BUDGET)"
+          if [ "$COUNT" -gt "$BUDGET" ]; then
+            echo "::error::Lint errors rose to $COUNT, above the budget of $BUDGET. Fix the new ones."
+            exit 1
+          fi
+          if [ "$COUNT" -lt "$BUDGET" ]; then
+            echo "::notice::Lint errors down to $COUNT. Lower BUDGET in .github/workflows/ci.yml to lock the win in."
+          fi
+
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # Reported, not enforced. There are known highs in both trees today;
+      # a blocking gate would be red on arrival and get switched off.
+      # Raise to `--audit-level=high` once the tree is clean.
+      - name: Backend audit
+        working-directory: backend
+        run: npm audit --omit=dev || true
+
+      - name: Frontend audit
+        working-directory: frontend
+        run: npm audit || true

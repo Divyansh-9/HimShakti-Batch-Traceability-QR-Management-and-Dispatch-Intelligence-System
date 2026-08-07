@@ -6,6 +6,36 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2.9.0] — 2026-08-07
+
+### The engineering layer under the features
+
+The feature set was never the gap. 19,572 lines shipped with zero tests and zero CI, which is why the Vercel crash reached production with nothing to catch it. This release adds the floor.
+
+#### Added
+- **76 tests, and CI that runs them.** Vitest in both packages, `.github/workflows/ci.yml` gating every push and PR. Coverage is deliberately narrow — the pure logic whose failure mode is *silent*, where a wrong answer produces no error and no log entry:
+  - `getBatchStatus` tier boundaries, asserted exactly (0 days is EXPIRED, 7 is URGENT, 8 is WARNING, 30 is WARNING, 31 is READY). A wrong boundary here ships a batch a day late and nothing notices.
+  - `calculatePriorityScore`, pinning the actual `365 - days` formula. README and `docs/DATABASE.md` describe an older tiered 1000/500/200 scheme; the test locks in what the code really does so the discrepancy cannot be "fixed" in the wrong direction.
+  - The full RBAC matrix, asserted in both directions — every role that must pass each guard, and every role that must be refused. The dangerous failure is the permissive one, which never throws.
+  - `Message.expiresAtFor`, which alone decides whether a message is permanent audit evidence or expires in 90 days. Inverting it would silently delete the audit trail. Nothing else in the codebase enforced it.
+  - `deriveTraceToken` determinism and key-dependence, plus the refusal to derive under no key at all.
+  - `csvParser` against RFC 4180: quoted separators, doubled quotes, embedded newlines, CRLF, BOM, blank lines, short rows.
+
+- **Nightly database backup.** `.github/workflows/backup.yml` runs `mongodump` at 01:00 IST, encrypts with AES-256 when `BACKUP_PASSPHRASE` is set, and stores the archive as a 90-day artifact. Restore drill documented in `docs/DEPLOYMENT.md`.
+
+- **Optional shared store (`services/sharedStore.js`)** — Upstash Redis over HTTP, because a serverless function cannot hold a Redis socket open between invocations. Entirely optional: unconfigured or unreachable, every caller keeps its previous behaviour.
+
+#### Fixed
+- **Rate limiting did not work in production.** `express-rate-limit`'s default store is per-process, so on serverless each container kept its own counter and the configured 500-per-15-minutes was really 500 × N. The AI limiter mattered more: 5 per 15 minutes is what keeps the Gemini free tier (15 RPM / 1,500 RPD) from being burned through, and per-container it enforced nothing. Both now count in the shared store when one is configured, and fail *open* into the in-memory limiter when it is unreachable — a cache outage must not become an API outage.
+- **The AI report cache almost never survived to be used.** A module-level variable dies with the container, so the 4-hour TTL rarely applied and most requests paid for a fresh Gemini call. Now cached in the shared store as well, with the local tier re-seeded on a shared hit.
+- **README claimed the Atlas free tier provides "managed backups". It does not.** M0 has no automated backups at all — for a system built on an append-only audit trail and immutable snapshots, that was the single worst finding in the codebase. Claim corrected and a real backup added.
+
+#### Known debt, stated rather than hidden
+- The frontend carries **61 pre-existing lint errors** (40 unused variables, the rest react-hooks findings, none auto-fixable). CI gates them with a *budget* rather than pretending they are fixed: the build fails if the count rises above 61, and prints a notice to lower the cap when it falls. `continue-on-error` was rejected — it looks like a gate while being none.
+- `npm audit` runs in CI but reports rather than blocks. There are known highs in both trees; a blocking gate would be red on arrival and get switched off within a week.
+
+---
+
 ## [2.8.0] — 2026-08-07
 
 ### The public trace flow stops leaking the production record

@@ -1,0 +1,115 @@
+name: Database backup
+
+# Atlas M0 (free tier) has NO automated backups. This project is food
+# traceability: `noteHistory` is append-only, batch snapshots are
+# immutable, and nothing is ever hard-deleted — an audit trail with no
+# recoverable copy is a contradiction. One dropped collection today
+# means total, unrecoverable loss.
+#
+# This is the stopgap until the cluster moves to M10, where Atlas runs
+# continuous backups properly. It is not as good as that. It is very
+# much better than nothing.
+
+on:
+  schedule:
+    # 19:30 UTC = 01:00 IST daily, outside Indian working hours.
+    - cron: '30 19 * * *'
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Why this manual backup is being taken'
+        required: false
+        default: 'manual'
+
+# Ubuntu 22.04 is pinned, not `latest`: the MongoDB tools package below
+# is built per Ubuntu release, so `latest` silently breaks the download
+# the day GitHub moves the runner to a new LTS.
+jobs:
+  dump:
+    name: Dump and archive
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Verify the connection string is configured
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+        run: |
+          if [ -z "$MONGODB_URI" ]; then
+            echo "::error::Repository secret MONGODB_URI is not set. Backups are NOT running."
+            exit 1
+          fi
+
+      - name: Install mongodb-database-tools
+        run: |
+          VER=100.10.0
+          curl -fsSL -o tools.deb \
+            "https://fastdl.mongodb.org/tools/db/mongodb-database-tools-ubuntu2204-x86_64-${VER}.deb"
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ./tools.deb
+          mongodump --version | head -1
+
+      - name: Dump the database
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+        run: |
+          STAMP=$(date -u +%Y-%m-%dT%H-%M-%SZ)
+          echo "STAMP=$STAMP" >> "$GITHUB_ENV"
+          # --gzip and --archive give one compressed file that
+          # `mongorestore --archive` reads back directly.
+          mongodump --uri="$MONGODB_URI" --gzip --archive="himshakti-$STAMP.archive.gz"
+          ls -lh "himshakti-$STAMP.archive.gz"
+
+      - name: Encrypt the archive
+        env:
+          PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          # The dump contains user records, hashed passwords and the full
+          # production history. GitHub artifacts are private to repo
+          # collaborators, which is not the same as encrypted — anyone
+          # who gains repo access gains every backup.
+          #
+          # Encryption is skipped rather than failed when no passphrase is
+          # set, so a missing secret never costs you the backup itself.
+          if [ -z "$PASSPHRASE" ]; then
+            echo "::warning::BACKUP_PASSPHRASE not set — archive stored unencrypted. Set the secret to fix this."
+            exit 0
+          fi
+          openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt \
+            -in "himshakti-$STAMP.archive.gz" \
+            -out "himshakti-$STAMP.archive.gz.enc" \
+            -pass env:PASSPHRASE
+          rm "himshakti-$STAMP.archive.gz"
+          ls -lh "himshakti-$STAMP.archive.gz.enc"
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: himshakti-backup-${{ env.STAMP }}
+          path: himshakti-${{ env.STAMP }}.archive.gz*
+          # 90 days is the maximum GitHub retains. Anything older must be
+          # copied somewhere durable — see docs/DEPLOYMENT.md.
+          retention-days: 90
+          if-no-files-found: error
+
+      - name: Report
+        run: |
+          echo "### Backup complete" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Archive: \`himshakti-$STAMP\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "Retention: 90 days" >> "$GITHUB_STEP_SUMMARY"
+          echo "Restore instructions: \`docs/DEPLOYMENT.md\`" >> "$GITHUB_STEP_SUMMARY"
+
+  # A backup nobody notices failing is not a backup. GitHub emails the
+  # repo owner on a failed scheduled run, and this job makes the failure
+  # explicit in the run summary too.
+  notify-failure:
+    name: Report failure
+    runs-on: ubuntu-latest
+    needs: dump
+    if: failure()
+    steps:
+      - run: |
+          echo "::error::Nightly database backup FAILED. The database is currently unprotected."
+          echo "### ⚠ Backup failed" >> "$GITHUB_STEP_SUMMARY"
+          echo "The nightly dump did not complete. Check the \`dump\` job log." >> "$GITHUB_STEP_SUMMARY"

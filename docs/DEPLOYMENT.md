@@ -101,6 +101,65 @@ outside production.
 
 ---
 
+## Backups and restore
+
+**Atlas M0 has no automated backups.** That is a contradiction for a
+system whose whole value is an append-only audit trail, so
+[`.github/workflows/backup.yml`](../.github/workflows/backup.yml) runs a
+nightly `mongodump` at 19:30 UTC (01:00 IST) and stores the archive as a
+GitHub Actions artifact.
+
+This is a stopgap, and worth being honest about its limits:
+
+- **90-day retention maximum.** GitHub does not keep artifacts longer.
+  Anything you need beyond that must be copied somewhere durable.
+- **Same-provider risk.** Losing access to the GitHub account loses the
+  backups with it.
+- **Untested restores are not backups.** Do the drill below at least
+  once, against a scratch cluster, before you need it for real.
+
+The real fix is Atlas M10, which runs continuous backups with
+point-in-time recovery. Until then, this is the floor.
+
+### Required secrets
+
+| Secret | Required | Purpose |
+| --- | --- | --- |
+| `MONGODB_URI` | yes | Source cluster. The workflow fails loudly if unset, rather than appearing to succeed. |
+| `BACKUP_PASSPHRASE` | strongly recommended | Encrypts the archive with AES-256. Without it the dump is stored unencrypted — readable by anyone with repo access, and it contains user records and password hashes. |
+
+Set both under **Settings → Secrets and variables → Actions**.
+
+### Restoring
+
+Download the artifact from the workflow run, then:
+
+```bash
+# If encrypted (BACKUP_PASSPHRASE was set)
+openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 \
+  -in himshakti-<stamp>.archive.gz.enc \
+  -out himshakti-<stamp>.archive.gz \
+  -pass env:PASSPHRASE
+
+# Restore into a SCRATCH cluster first — never straight over production
+mongorestore --uri="<scratch-cluster-uri>" \
+  --gzip --archive=himshakti-<stamp>.archive.gz
+```
+
+Verify the restored data before pointing anything at it:
+
+```bash
+mongosh "<scratch-cluster-uri>" --eval '
+  db.batches.countDocuments({});
+  db.batches.findOne({}, { batchCode: 1, traceToken: 1 });
+'
+```
+
+`--drop` replaces existing collections. Do not pass it against
+production unless you have consciously decided to discard what is there.
+
+---
+
 ## Deploying the frontend
 
 ```bash

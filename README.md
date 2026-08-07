@@ -710,8 +710,8 @@ POST /api/batches  ─────► MongoDB insert
 |---|---|
 | **Immutable audit trail** | Denormalize product snapshot into each batch document — no JOIN drift |
 | **Schema flexibility** | Different product types carry different attributes without sparse SQL columns |
-| **QR storage** | 8–12 KB base64 PNG per batch — fits comfortably in a 16 MB document |
-| **Operational simplicity** | Atlas free tier: managed backups, auto-scaling, connection pooling |
+| **QR storage** | 8–12 KB base64 PNG per batch — fits comfortably in a 16 MB document. Note this scales into the M0 512 MB cap at roughly 50k batches; move to object storage before then |
+| **Operational simplicity** | Atlas free tier: auto-scaling and connection pooling. **Not backups** — M0 has none. A nightly `mongodump` runs via [`.github/workflows/backup.yml`](.github/workflows/backup.yml); see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for restore |
 
 ### Schema Diagram
 
