@@ -34,9 +34,17 @@ const TOKEN_LENGTH = 22;
  * Resolve the signing key.
  *
  * Falls back to JWT_SECRET so the feature works on an existing
- * deployment without a new environment variable. Setting a dedicated
- * TRACE_TOKEN_SECRET is preferred: rotating JWT_SECRET would otherwise
- * invalidate every QR code already printed on a physical crate.
+ * deployment without a new environment variable. A dedicated
+ * TRACE_TOKEN_SECRET is still preferred, because the two keys want
+ * opposite lifecycles: JWT_SECRET should be rotatable, this one should
+ * not be.
+ *
+ * Rotating the key does NOT break QR codes already issued — tokens are
+ * stored on the batch and resolved by lookup, not re-derived per
+ * request. What it does change is derivation for batches created after
+ * the rotation, and, critically, what backfillTraceTokens.js would
+ * compute: re-running that script under a new key overwrites stored
+ * tokens and orphans every label already printed on a crate.
  */
 function getSecret() {
   const secret = process.env.TRACE_TOKEN_SECRET || process.env.JWT_SECRET;

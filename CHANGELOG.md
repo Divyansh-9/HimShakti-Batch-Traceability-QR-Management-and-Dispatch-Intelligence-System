@@ -29,7 +29,10 @@ Three changes to the QR scan path, all on the same seam: the endpoint was writte
 
 - **`src/scripts/backfillTraceTokens.js`** — idempotent migration that derives tokens, regenerates stored QR images, and recovers `qualityCheck` from surviving inspections. Supports `--dry-run`. Run against 28 existing batches: 28 tokens, 1 recoverable verdict (the rest had already expired under the TTL and cannot be recovered).
 
-- **`TRACE_TOKEN_SECRET`** in `.env.example`. Optional — falls back to `JWT_SECRET` so existing deployments keep working — but set separately in production, because rotating `JWT_SECRET` would otherwise invalidate every QR already printed on a crate.
+- **`TRACE_TOKEN_SECRET`** in `.env.example`. Optional — falls back to `JWT_SECRET` so existing deployments keep working — but set separately in production, because the two keys want opposite lifecycles: `JWT_SECRET` should be rotatable, this one should not be. Rotating alone does not break issued QR codes, since tokens are stored and resolved by lookup rather than re-derived per request; re-running the backfill under a new key is what would overwrite stored tokens and orphan printed labels.
+
+#### Fixed (pre-existing, found during migration)
+- **Every QR code in the database encoded `http://localhost:5001`.** `PUBLIC_BASE_URL` had never been set to a real host, so all 28 batches carried a QR that resolves to the scanning phone itself — unusable by any consumer. The regenerated codes now point at the Firebase frontend host, where the trace page actually lives. Pointing them at the API host would have returned raw JSON to someone scanning a crate.
 
 #### Changed
 - `useTrace` derives `loading` from whether state matches the requested identifier instead of flipping it via `setState` in the effect body, and cancels in-flight requests. Switching identifiers can no longer briefly render the previous batch's data as though it were the new one.
