@@ -1,6 +1,6 @@
 # Role-Based Access Control (RBAC) Reference
 
-**HimShakti Batch Traceability System — v2.3.0**
+**HimShakti Batch Traceability System — v2.10.0**
 
 ---
 

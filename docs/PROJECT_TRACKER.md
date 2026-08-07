@@ -3,7 +3,7 @@
 > Living document. Updated after every development session.
 > Organized by: **Epic → Story → Task** (Jira-style).
 > Status key: `✅ Done` · `🔄 In Progress` · `⏳ Planned` · `❌ Blocked` · `🚫 Descoped`
-> **Last updated:** 2026-08-07 · v2.8.0
+> **Last updated:** 2026-08-07 · v2.10.0
 
 ---
 
@@ -428,6 +428,15 @@
 
 | Date | Decision | Why |
 |---|---|---|
+| 2026-08-07 | Authorization reads the user from the DB on every request | A signed JWT proves who logged in, not that they should still be logged in. Deletion, deactivation and demotion previously took up to 8h to apply. Costs one indexed lookup per request; there is no version of "revocable" that avoids reading current state |
+| 2026-08-07 | Revocation via `tokenVersion` counter, not a denylist | A denylist needs shared storage that must be available or auth fails open. A counter on the user document is checked by a lookup already being made |
+| 2026-08-07 | Reactivating a user does not bump `tokenVersion` | Only bump on the way out. Killing the session of someone you just re-permitted is punishment without purpose |
+| 2026-08-07 | Password change reissues the caller's own token | Ending other sessions should not sign you out of the tab you are standing in |
+| 2026-08-07 | Tests cover silent-failure logic only, not breadth | A route that 500s reports itself. An off-by-one expiry tier does not. Coverage percentage would reward testing the loud paths |
+| 2026-08-07 | CI gates lint with a budget, not pass/fail | 61 pre-existing errors, none auto-fixable. A hard gate means red forever or `continue-on-error`, which looks like a gate while being none. The budget only ratchets down |
+| 2026-08-07 | Shared store (Upstash) is optional with in-memory fallback | Local dev and the long-lived process need no Redis, and an Upstash outage degrades to previous behaviour rather than failing requests |
+| 2026-08-07 | Rate limiter fails **open** when the store is unreachable | A cache outage must not become an API outage; the in-memory limiter still catches the worst of a flood |
+| 2026-08-07 | `react-router` advisory accepted, not patched | Only fix is a semver-major migration; the advisory is an RSC-mode CSRF bypass and this app does not use RSC mode, so exposure is nil against real upgrade risk |
 | 2026-08-07 | QR encodes an HMAC trace token, not the batch code | Batch codes are sequential and the trace endpoint is unauthenticated by design; a readable code let anyone walk the sequence and harvest the whole production record |
 | 2026-08-07 | Token derived (HMAC), not random | Deterministic, so existing batches backfill by recomputation and the migration is idempotent. Still stored and indexed because HMAC cannot be inverted |
 | 2026-08-07 | Legacy `/trace/:batchCode` kept, at reduced detail | Labels already printed on physical stock must keep resolving. Returning only what is on the package makes enumeration pointless without breaking them |
@@ -454,4 +463,4 @@
 
 ---
 
-*Last updated: 2026-08-07 · v2.8.0 · Update this file at the end of every development session.*
+*Last updated: 2026-08-07 · v2.10.0 · Update this file at the end of every development session.*

@@ -7,7 +7,7 @@
   <img src="https://img.shields.io/badge/ODM-Mongoose%207-880000?style=for-the-badge&logo=mongoose&logoColor=white" />
   <img src="https://img.shields.io/badge/Cluster-M0%20Free%20Tier-47A248?style=for-the-badge&logo=mongodb&logoColor=white" />
   <img src="https://img.shields.io/badge/Collections-5-blue?style=for-the-badge" />
-  <img src="https://img.shields.io/badge/Schema-v2.1.0-22c55e?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/Schema-v2.10.0-22c55e?style=for-the-badge" />
 </p>
 
 *Batch Traceability · QR Management · Dispatch Intelligence*
@@ -63,10 +63,16 @@ Each batch generates a 300×300 PNG QR code stored as a `base64` Data URL (~8–
 ### 4. Operational Simplicity
 
 MongoDB Atlas free tier provides:
-- Managed backups
 - Auto-scaling
 - Connection pooling
 - Built-in monitoring
+
+> **It does not provide backups.** The M0 free tier has no automated
+> backup at all — this document previously claimed otherwise. For a
+> system built on an append-only audit trail that is a contradiction, so
+> a nightly `mongodump` runs via
+> [`.github/workflows/backup.yml`](../.github/workflows/backup.yml).
+> Restore procedure and its limits: [`DEPLOYMENT.md`](./DEPLOYMENT.md#backups-and-restore).
 
 vs. the operational overhead of running PostgreSQL on a VPS for a single-intern prototype.
 
@@ -144,10 +150,26 @@ Stores all platform users. Created either by the seed script (admin/manager) or 
   ],
 
   isActive:   Boolean,    // Soft-delete: false = login denied
+
+  // ── Session revocation (v2.10.0) ──────────────────────────
+  tokenVersion: Number,   // default 0
+  // Carried inside the JWT as `tv` and compared on EVERY authenticated
+  // request. A JWT is a bearer credential — once issued it cannot be
+  // recalled — so this counter is what makes sessions revocable without
+  // giving up stateless auth. Bumped on: password change, password
+  // reset, deactivation, soft delete, POST /auth/me/logout-all.
+  //
+  // Tokens minted before this field existed carry no `tv`, read as 0, so
+  // introducing it did not sign every user out.
+
   createdAt:  Date,       // Auto (Mongoose timestamps)
   updatedAt:  Date        // Auto (Mongoose timestamps)
 }
 ```
+
+> `protect` reads role, name and Super Admin status from this document,
+> not from the token, so a role change applies on the next request rather
+> than at next login. See [`RBAC.md`](./RBAC.md#session-validity-v2100).
 
 **Indexes:**
 - `username: 1` — unique, primary login lookup
@@ -208,6 +230,33 @@ The **core collection**. Each document represents one production batch from farm
   // ── QR Code ──────────────────────────────────────────────
   qrCodeDataUrl: String,   // base64 PNG Data URL (300×300)
   qrAbsoluteUrl: String,   // Public trace URL — embedded in every QR
+                           // Points at the FRONTEND host (the trace page
+                           // is a React route); the API host would serve
+                           // a scanning consumer raw JSON.
+
+  // ── Public trace token (v2.8.0) ───────────────────────────
+  traceToken: String | null,
+  // 22-char HMAC of batchCode, indexed + sparse. The QR encodes
+  // /trace/t/<token>, never the batch code: codes are sequential
+  // (HS-YYYY-MM-NNN) and the trace endpoint is unauthenticated by
+  // design, so a readable code let anyone walk the sequence and harvest
+  // the whole production record. Derived, not random, so existing rows
+  // backfill by recomputation and the migration is idempotent. Stored
+  // anyway because HMAC cannot be inverted — resolution is a lookup.
+
+  // ── Quality snapshot (v2.8.0) ─────────────────────────────
+  qualityCheck: {
+    status:        'PASSED' | 'FAILED' | 'FLAGGED' | null,
+    rating:        Number | null,   // 1–5
+    inspectedAt:   Date   | null,
+    inspectorName: String | null,
+  },
+  // Denormalized from the latest Inspection when it is filed, inside the
+  // same transaction. Inspection documents carry a 30-day TTL, so reading
+  // through to that collection would erase a batch's quality history one
+  // month after verification — while the product is still on a shelf with
+  // a scannable QR. Same reasoning as productName/farmerName above.
+  // Only PASSED is ever exposed publicly.
 
   // ── Dispatch ─────────────────────────────────────────────
   dispatchDate: Date   | null,   // Set when status -> DISPATCHED
@@ -402,27 +451,53 @@ The QR PNG is ~8–12 KB. At 500 batches, that's ~5 MB total — well within Atl
 
 **FEFO = First Expired, First Out**
 
-The `priorityScore` field is computed in [`backend/src/services/expiryCalculator.js`](../backend/src/services/expiryCalculator.js) at batch creation time:
+> **Corrected in v2.10.0.** This section previously documented a tiered
+> `1000 / 500 / 200` scheme that the code has never implemented. The
+> real formula is below, and it is now pinned by a test
+> (`backend/tests/expiryCalculator.test.js`) so the two cannot drift
+> apart again. Relative ordering was always correct; only the absolute
+> numbers here were wrong.
+
+`priorityScore` is computed in [`backend/src/services/expiryCalculator.js`](../backend/src/services/expiryCalculator.js) at batch creation:
 
 ```javascript
 // Higher priorityScore = dispatch this batch sooner
-
-function computePriorityScore(daysToExpiry) {
-  if (daysToExpiry <= 0)  return 1000;  // Already expired — maximum urgency
-  if (daysToExpiry <= 7)  return 500 + (7 - daysToExpiry) * 10;  // URGENT
-  if (daysToExpiry <= 30) return 200 + (30 - daysToExpiry) * 5;  // WARNING
-  return Math.max(0, 100 - daysToExpiry);                         // READY
+function calculatePriorityScore(daysUntilExpiry, riskLevel) {
+  let score = Math.max(0, 365 - daysUntilExpiry);  // sooner expiry ranks higher
+  if (riskLevel === 'HIGH')   score += 100;
+  if (riskLevel === 'MEDIUM') score += 50;
+  return score;
 }
 ```
 
-**Status tiers:**
+A linear countdown rather than tiers, with a risk bonus large enough to
+lift a high-risk batch above a low-risk one expiring somewhat sooner —
+a 100-point bonus outranks roughly 100 days of shelf life.
 
-| Status | Days to Expiry | Priority Range | Dashboard Treatment |
+**Worked examples:**
+
+| Days to expiry | Risk | Score | Notes |
 |---|---|---|---|
-| `URGENT` | ≤ 7 days | 500–570 | 🔴 Red row tint, top of FEFO queue |
-| `WARNING` | 8–30 days | 200–310 | 🟡 Yellow, mid-queue |
-| `READY` | > 30 days | 0–70 | 🟢 Green, bottom of queue |
-| `DISPATCHED` | — | 0 (frozen) | ✅ Removed from FEFO queue |
+| 0 (expired) | LOW | 365 | Maximum for a low-risk batch |
+| 5 | LOW | 360 | |
+| 40 | HIGH | 425 | Outranks the 35-day LOW batch below |
+| 35 | LOW | 330 | |
+| 365+ | any | 0 (+ bonus) | Floored at 0 — never negative |
+
+**Status tiers** are computed separately by `getBatchStatus()`, from days
+alone. They drive display; `priorityScore` drives queue order.
+
+| Status | Days to Expiry | Dashboard Treatment |
+|---|---|---|
+| `EXPIRED` | ≤ 0 | ⚫ Past expiry |
+| `URGENT` | 1–7 | 🔴 Red row tint, top of FEFO queue |
+| `WARNING` | 8–30 | 🟡 Yellow, mid-queue |
+| `READY` | > 30 | 🟢 Green, bottom of queue |
+| `DISPATCHED` | — | ✅ Removed from FEFO queue |
+
+Both are **recomputed on every read** — the persisted values are stale by
+design. Any new batch read path must enrich the same way, or the UI
+shows yesterday's urgency.
 | `EXPIRED` | < 0 days | 1000 | 🚨 Emergency — past expiry |
 
 ---

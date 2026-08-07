@@ -3,9 +3,11 @@
 # 🌿 HimShakti — Batch Traceability & Dispatch Intelligence System
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-2.6.0-6366f1?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/Version-2.10.0-6366f1?style=for-the-badge" />
+  <img src="https://github.com/Divyansh-9/HimShakti-Batch-Traceability-QR-Management-and-Dispatch-Intelligence-System/actions/workflows/ci.yml/badge.svg" alt="CI" />
+  <img src="https://img.shields.io/badge/Tests-96%20passing-22c55e?style=for-the-badge" />
   <img src="https://img.shields.io/badge/Status-Live%20%26%20Deployed-22c55e?style=for-the-badge&logo=checkmarx&logoColor=white" />
-  <img src="https://img.shields.io/badge/React-18%20%2B%20Vite-61DAFB?style=for-the-badge&logo=react&logoColor=black" />
+  <img src="https://img.shields.io/badge/React-19%20%2B%20Vite-61DAFB?style=for-the-badge&logo=react&logoColor=black" />
   <img src="https://img.shields.io/badge/Node.js-Express%205-339933?style=for-the-badge&logo=node.js&logoColor=white" />
   <img src="https://img.shields.io/badge/MongoDB-Atlas-47A248?style=for-the-badge&logo=mongodb&logoColor=white" />
   <img src="https://img.shields.io/badge/AI-Gemini%202.5%20Flash-FF6F00?style=for-the-badge&logo=google&logoColor=white" />
@@ -63,18 +65,19 @@
 
 | Category | Technology | Why chosen |
 |---|---|---|
-| **Frontend** | React 18 + Vite | Fast HMR in dev, optimised production bundle |
+| **Frontend** | React 19 + Vite | Fast HMR in dev; route-level code splitting keeps the entry chunk at 459 KB |
 | **Styling** | Vanilla CSS + CSS Variables | Zero runtime overhead, full design system control |
-| **State / Data** | Custom hooks (`useBatches`, `useAuth`, `useAIAudit`) | Lightweight — no Redux overhead |
+| **State / Data** | TanStack Query + custom hooks (`useBatches`, `useAuth`, `useAIAudit`) | Lightweight — no Redux overhead |
 | **Real-time** | Socket.IO | Bi-directional events for live batch updates |
 | **Backend** | Node.js + Express 5 | Familiar, flexible, great ecosystem |
 | **Database** | MongoDB Atlas (M0 free tier) | Document model fits batch schema; managed hosting |
-| **Authentication** | JWT HS256 + bcrypt | Stateless tokens, role-based access control |
+| **Authentication** | JWT HS256 + bcrypt, revocable via `tokenVersion` | Stateless tokens that can still be revoked — see [SECURITY.md](./SECURITY.md) |
 | **AI** | Google Gemini 2.5 Flash | Best cost/quality ratio for structured advisory output |
 | **QR Generation** | `qrcode` npm library | Offline, no third-party API dependency |
 | **Frontend Deploy** | Firebase Hosting | Global CDN, zero cold-start, free SSL |
 | **Backend Deploy** | Vercel Serverless Functions | Always-on free tier, zero cold-start on hobby plan |
-| **Email (future)** | Gmail SMTP via `nodemailer` | SMTP credentials stored in Vercel env vars |
+| **Email** | Resend HTTP API, Gmail SMTP fallback | Silent no-op when unconfigured, so approval flows never hard-fail |
+| **Testing / CI** | Vitest + GitHub Actions | 96 tests gating every push — see [docs/TESTING.md](./docs/TESTING.md) |
 
 ---
 
@@ -106,7 +109,7 @@ The backend originally deployed to **Render (free tier)**. During integration te
 | **Vercel Serverless — function timeout** | Any request that outlives the limit is killed by the platform mid-flight, and the caller gets an opaque `FUNCTION_INVOCATION_FAILED` page rather than an error. `maxDuration` is set to 30s in `backend/vercel.json`, and the Mongo connect aborts at 8s so a database problem surfaces as a readable 503 instead of a crash. Gemini AI audits are cached (4hr) to avoid repeated slow calls. | Configured, not merely mitigated — see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). |
 | **Vercel Serverless — No persistent Socket.IO** | Serverless functions are stateless, so there is no long-lived process to hold a WebSocket open. Socket.IO is therefore **not initialised at all** under Vercel — every emit site guards with `if (io)` and the API degrades to REST-only. The frontend polls (React Query, 15s) so no view depends on sockets. | Real-time is a dev/demo affordance. For live sockets in production, run the backend as a process, or add Ably/Pusher. |
 | **Firebase Hosting — 10 GB/month egress** | Free Spark plan allows 10 GB/month data transfer. | Sufficient for demo; upgrade to Blaze (pay-as-you-go) for production. |
-| **Gemini API — free tier rate limits** | Google AI Studio free tier: 15 RPM, 1,500 RPD. The 4-hour in-memory cache on the backend prevents hitting this limit under normal usage. | Cache is the primary mitigation. |
+| **Gemini API — free tier rate limits** | Google AI Studio free tier: 15 RPM, 1,500 RPD. The 4-hour cache and a 5-per-15-min limiter protect it — but both are per-container unless `UPSTASH_*` is configured, and per-container they enforce far less than they appear to. | Configure the shared store; see `backend/.env.example`. |
 
 ---
 
@@ -123,6 +126,7 @@ The backend originally deployed to **Render (free tier)**. During integration te
 - [Dashboard Features](#-dashboard-features)
 - [API Reference](#-api-reference)
 - [Architecture](#-architecture)
+- [Testing & CI](#-testing--ci)
 - [Security](#-security)
 - [Database Design](#-database-design)
 - [Frontend Structure](#-frontend-structure)
@@ -677,7 +681,50 @@ POST /api/batches  ─────► MongoDB insert
 
 ---
 
+## 🧪 Testing & CI
+
+```bash
+cd backend  && npm test     # 75 tests
+cd frontend && npm test     # 21 tests
+```
+
+Vitest in both packages. No database, no network — the whole suite runs
+in under two seconds, because a suite you wait for is a suite you stop
+running.
+
+**CI** ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) gates
+every push and PR on backend tests, frontend tests, the frontend build,
+and a lint budget. `npm audit` reports but does not block.
+
+**96 tests is not broad coverage of 19,572 lines, and is not trying to
+be.** It targets one category: logic whose failure mode is *silent*. A
+route that 500s tells you it is broken; an expiry boundary that is off by
+one does not — it ships a batch a day late and every log line looks
+normal.
+
+| Covered | Because getting it wrong is invisible |
+|---|---|
+| Expiry tiers, FEFO priority | Wrong dispatch order, no error |
+| RBAC matrix, both directions | A role silently gaining a capability |
+| `Message.expiresAtFor` | Inverting it deletes the audit trail |
+| Trace token derivation | Non-determinism orphans printed QR labels |
+| Session revocation | A deleted user keeping access |
+| CSV parsing (RFC 4180) | A mis-split field writes a wrong farmer name into a permanent record |
+
+Gaps are listed explicitly in [`docs/TESTING.md`](./docs/TESTING.md) —
+no route/integration tests, no component tests, Google OAuth uncovered.
+
+**Nightly backups** run via
+[`.github/workflows/backup.yml`](.github/workflows/backup.yml). Atlas M0
+has no automated backup; restore procedure and its limits are in
+[`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md#backups-and-restore).
+
+---
+
 ## 🔒 Security
+
+> Full model, and an explicit list of **known weaknesses**, in
+> [`SECURITY.md`](./SECURITY.md).
 
 | Layer | Mechanism | Detail |
 |---|---|---|
@@ -1127,12 +1174,17 @@ This was caused by a `u.name.split()` crash when any user in MongoDB had a null/
 
 | Document | Purpose | Status |
 |---|---|---|
-| [`README.md`](./README.md) | System overview, setup, API reference | ✅ v2.3.0 |
-| [`CHANGELOG.md`](./CHANGELOG.md) | Full version history | ✅ v2.3.0 |
-| [`docs/RBAC.md`](./docs/RBAC.md) | Role hierarchy, permission matrix, promotion rules | ✅ **v2.3.0 New** |
-| [`docs/USER_GUIDE.md`](./docs/USER_GUIDE.md) | End-user onboarding guide | ✅ **v2.3.0 Updated** |
+| [`README.md`](./README.md) | System overview, setup, API reference | ✅ v2.10.0 |
+| [`CHANGELOG.md`](./CHANGELOG.md) | Full version history | ✅ v2.10.0 |
+| [`CONTRIBUTING.md`](./CONTRIBUTING.md) | Setup, house rules, commit conventions | ✅ **v2.10.0 New** |
+| [`SECURITY.md`](./SECURITY.md) | Security model, reporting, **known weaknesses** | ✅ **v2.10.0 New** |
+| [`docs/TESTING.md`](./docs/TESTING.md) | What is tested and why only that; lint budget | ✅ **v2.10.0 New** |
+| [`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md) | Deploy runbook, symptom→cause table, backup & restore | ✅ **v2.9.0 New** |
+| [`docs/RBAC.md`](./docs/RBAC.md) | Role hierarchy, permission matrix, session validity | ✅ v2.10.0 |
+| [`docs/USER_GUIDE.md`](./docs/USER_GUIDE.md) | End-user onboarding guide | ✅ v2.3.0 |
 | [`docs/BATCH_MANAGEMENT.md`](./docs/BATCH_MANAGEMENT.md) | Batch management workflow, drawer UI, RBAC, soft delete, API | ✅ v2.0.0 |
-| [`docs/DATABASE.md`](./docs/DATABASE.md) | Full database design, schema reference & Atlas setup | ✅ v2.1.0 |
+| [`docs/DATABASE.md`](./docs/DATABASE.md) | Full database design, schema reference & Atlas setup | ✅ v2.10.0 |
+| [`docs/PROJECT_TRACKER.md`](./docs/PROJECT_TRACKER.md) | Epic/Story/Task tracker + architectural decision log | ✅ v2.10.0 |
 | [`docs/schema-diagram.png`](./docs/schema-diagram.png) | Visual ER diagram — all collections & relationships | ✅ Current |
 | [`frontend/README.md`](./frontend/README.md) | Frontend architecture & component guide | ✅ v2.2.0 |
 | [`intern-2/srs.md`](./intern-2/srs.md) | Software Requirements Specification | ✅ v2.1.0 Final |
