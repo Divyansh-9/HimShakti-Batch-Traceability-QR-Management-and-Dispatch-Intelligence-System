@@ -1,0 +1,49 @@
+version: 2
+
+# Both package trees carry known vulnerabilities and nothing was
+# watching them. Grouping keeps this from becoming fifteen PRs a week
+# that nobody reads — an ignored bot is the same as no bot.
+updates:
+  - package-ecosystem: npm
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+      time: '04:00'
+      timezone: Asia/Kolkata
+    open-pull-requests-limit: 5
+    groups:
+      # Patch and minor bumps are routine and safe to review together.
+      routine:
+        patterns: ['*']
+        update-types: [minor, patch]
+    labels: [dependencies, backend]
+    commit-message:
+      prefix: 'chore(deps)'
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: monday
+      time: '04:00'
+      timezone: Asia/Kolkata
+    open-pull-requests-limit: 5
+    groups:
+      routine:
+        patterns: ['*']
+        update-types: [minor, patch]
+    labels: [dependencies, frontend]
+    commit-message:
+      prefix: 'chore(deps)'
+
+  # The workflows added in v2.9.0 pin third-party actions by major tag.
+  # Those go stale silently, and a stale action is a supply-chain risk
+  # nobody gets an alert about.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    labels: [dependencies, ci]
+    commit-message:
+      prefix: 'chore(ci)'

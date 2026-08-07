@@ -81,10 +81,15 @@ async function googleLogin(req, res, next) {
     }
 
     // ── 3. Issue JWT ───────────────────────────────────────────────
-    const token = generateToken({ 
-      _id: user._id, 
-      username: user.username, 
-      role: user.role 
+    const token = generateToken({
+      _id:      user._id,
+      username: user.username,
+      name:     user.name,
+      role:     user.role,
+      // Pins this token to the account's current revocation counter, so
+      // a Google-issued session is revocable on the same terms as a
+      // password one.
+      tv:       user.tokenVersion || 0,
     });
 
     res.json({

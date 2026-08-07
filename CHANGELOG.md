@@ -6,6 +6,32 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2.10.0] — 2026-08-07
+
+### Sessions can finally be revoked
+
+`protect` verified the JWT's signature and then trusted every claim inside it, with no lookup against the account. A signed token proves who logged in; it does not prove they should still be logged in. Three consequences, each silent and each lasting up to the full 8-hour token life:
+
+#### Fixed
+- **Removing a user did not remove their access.** A soft-deleted or deactivated account kept working until its token expired. Firing someone, or locking a compromised account, bought you nothing for eight hours.
+- **Role changes did not take effect.** Demoting an admin left them an admin until they happened to log in again. Authorization now reads role, identity and Super Admin status from the database, so a change applies on the very next request — a token claiming `role: 'admin'` gets whatever the account actually holds.
+- **A stolen token could not be revoked by anyone, including its owner.** Changing your password did not end the attacker's session, which is precisely the case people change passwords for.
+
+#### Added
+- **`User.tokenVersion`** — a counter carried inside the token and compared on each request. Bumped on password change, password reset, deactivation and soft delete. Tokens minted before the field existed carry no version, read as `0`, so deploying this does not sign everybody out.
+- **`POST /auth/me/logout-all`** — ends every session for the calling account. This pairs with the login history the Settings panel already shows: a user who spotted a login they did not recognise could previously see it and do nothing about it.
+- **Password change reissues the caller's token**, so ending your other sessions does not sign you out of the tab you are standing in.
+- **`.github/dependabot.yml`** — weekly grouped npm updates for both packages, monthly for GitHub Actions. The workflows added in 2.9.0 pin actions by major tag, and a stale action is a supply-chain risk that raises no alert.
+- **20 tests** covering the revocation matrix: forged and expired tokens, deleted and deactivated accounts, version mismatch, legacy tokens without a version, database failure (must not read as authenticated), and the guarantee that `passwordHash` and `resetToken` never reach `req.user`.
+
+#### Changed
+- **Route-level code splitting.** `Dashboard` (~3,400 lines, every tab plus the admin panel) and `ComponentShowcase` are now lazy. The entry chunk drops from **734 KB to 459 KB** (gzip 200 KB → 138 KB) — a consumer scanning a jar on a village 3G connection no longer downloads the entire factory application to read four lines of provenance.
+
+#### Cost, stated honestly
+Authorization now performs one indexed user lookup per authenticated request. That is a real cost on serverless. It buys an authorization system that is correct on the next request instead of one that can be wrong for eight hours with no way to shorten the window — and there is no version of "revocable" that avoids reading current state.
+
+---
+
 ## [2.9.0] — 2026-08-07
 
 ### The engineering layer under the features

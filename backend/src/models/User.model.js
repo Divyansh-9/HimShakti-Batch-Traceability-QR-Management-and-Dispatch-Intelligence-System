@@ -52,6 +52,21 @@ const userSchema = new mongoose.Schema({
   // Password-reset token (short-lived JWT id stored here for single-use invalidation)
   resetToken:       { type: String, default: null },
   resetTokenExpiry: { type: Date,   default: null },
+
+  // ── Session revocation ────────────────────────────────────────────
+  // Bumped whenever every existing session for this user must stop
+  // working: password change, password reset, deactivation, deletion,
+  // or an explicit "log out everywhere".
+  //
+  // A JWT is a bearer token — once issued it is valid until it expires,
+  // and there is no way to take it back. Carrying this counter inside
+  // the token and comparing it against the stored value on each request
+  // turns that into revocable state without giving up stateless auth.
+  //
+  // Defaults to 0, and tokens minted before this field existed carry no
+  // version at all, which is read as 0 — so existing sessions keep
+  // working rather than every user being logged out on deploy.
+  tokenVersion: { type: Number, default: 0 },
 }, { timestamps: true });
 
 // Compare plain password against stored hash

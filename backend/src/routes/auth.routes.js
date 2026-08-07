@@ -49,6 +49,10 @@ router.get(  '/me',                 protect, ctrl.getMe);
 router.patch('/me',                 protect, ctrl.updateProfile);
 router.patch('/me/settings',        protect, ctrl.updateSettings);
 router.post( '/me/change-password', protect, ctrl.changePassword);
+// Ends every session for the calling account, including the current one.
+// Pairs with /me/login-history: a user who spots a login they do not
+// recognise could previously see it and do nothing about it.
+router.post( '/me/logout-all',      protect, ctrl.logoutAll);
 router.get(  '/me/login-history',   protect, ctrl.getLoginHistory);
 
 module.exports = router;

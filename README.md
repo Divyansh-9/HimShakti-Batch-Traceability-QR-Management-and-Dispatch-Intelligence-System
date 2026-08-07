@@ -565,8 +565,9 @@ Authorization: Bearer <token>
 | 11 | `GET` | `/auth/me` | ✅ | Fetch own profile + preferences |
 | 12 | `PATCH` | `/auth/me` | ✅ | Update own name / phone |
 | 13 | `PATCH` | `/auth/me/settings` | ✅ | Save theme/font/density preferences |
-| 14 | `POST` | `/auth/me/change-password` | ✅ | Change password (bcrypt-guarded) |
+| 14 | `POST` | `/auth/me/change-password` | ✅ | Change password (bcrypt-guarded). Ends all other sessions and reissues the caller's token |
 | 15 | `GET` | `/auth/me/login-history` | ✅ | Last 10 login events |
+| 15b | `POST` | `/auth/me/logout-all` | ✅ | End every session for this account, including the current one |
 | 16 | `GET` | `/api/products` | — | List all products |
 | 17 | `GET` | `/api/products/:id` | — | Single product |
 | 18 | `POST` | `/api/batches` | ✅ | Create batch (auto-generates QR + expiry) |

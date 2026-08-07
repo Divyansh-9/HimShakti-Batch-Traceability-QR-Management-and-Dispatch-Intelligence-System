@@ -87,6 +87,8 @@ async function login(req, res, next) {
       name:         user.name,
       role:         user.role,
       isSuperAdmin: isSA,
+      // Pins this token to the account's current revocation counter.
+      tv:           user.tokenVersion || 0,
     };
     const token = generateToken(tokenPayload);
     res.json({
@@ -531,6 +533,10 @@ async function toggleUserStatus(req, res, next) {
     }
 
     user.isActive = !user.isActive;
+    // Deactivating must take effect immediately. Only bump on the way
+    // out — reactivating someone should not punish them by killing the
+    // session they are about to be allowed to use again.
+    if (!user.isActive) user.tokenVersion = (user.tokenVersion || 0) + 1;
     await user.save();
     return res.json({
       success:  true,
@@ -824,6 +830,10 @@ async function resetPassword(req, res, next) {
     user.passwordHash    = await bcrypt.hash(newPassword, 12);
     user.resetToken      = null;
     user.resetTokenExpiry = null;
+    // A reset is the account-recovery path — the one flow most likely to
+    // be running because an account is already compromised. Any session
+    // the attacker holds dies here.
+    user.tokenVersion    = (user.tokenVersion || 0) + 1;
     await user.save();
 
     return res.json({ success: true, message: 'Password reset successfully. You can now sign in.' });
@@ -968,6 +978,11 @@ async function deleteUser(req, res, next) {
       target.deletedBy  = req.user.username;
       target.deletedAt  = new Date();
       target.deleteNote = deleteNote || null;
+      // Removing someone must remove their access now, not whenever
+      // their token happens to expire. `protect` also refuses deleted
+      // and inactive accounts outright; this closes the window belt and
+      // braces, and covers a later restore leaving old tokens live.
+      target.tokenVersion = (target.tokenVersion || 0) + 1;
       await target.save();
 
       // Notify Super Admin about the soft delete
@@ -1153,8 +1168,51 @@ async function changePassword(req, res, next) {
     if (!valid) return res.status(401).json({ success: false, error: 'Incorrect current password' });
     
     user.passwordHash = await bcrypt.hash(newPassword, 10);
+    // Changing a password must end every other session. Otherwise the
+    // most common reason for changing it — "someone may have my
+    // password" — is exactly the case it fails to address.
+    user.tokenVersion = (user.tokenVersion || 0) + 1;
     await user.save();
-    return res.json({ success: true, message: 'Password updated successfully' });
+
+    // The caller's own token is now stale too, so hand back a fresh one
+    // rather than logging them out of the tab they are standing in.
+    const reissued = generateToken({
+      _id:          user._id,
+      username:     user.username,
+      name:         user.name,
+      role:         user.role,
+      isSuperAdmin: !!user.isSuperAdmin,
+      tv:           user.tokenVersion,
+    });
+
+    return res.json({
+      success: true,
+      message: 'Password updated. Other devices have been signed out.',
+      token:   reissued,
+    });
+  } catch (err) { next(err); }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// POST /auth/me/logout-all  [any authenticated user]
+// Ends every session for the calling account, including this one.
+//
+// This is the control a user needs when they see something they do not
+// recognise in their own login history — which they can already view,
+// and until now could do nothing about.
+// ─────────────────────────────────────────────────────────────────
+async function logoutAll(req, res, next) {
+  try {
+    const user = await User.findById(req.user._id).select('tokenVersion');
+    if (!user) return res.status(404).json({ success: false, error: 'Account not found' });
+
+    user.tokenVersion = (user.tokenVersion || 0) + 1;
+    await user.save();
+
+    return res.json({
+      success: true,
+      message: 'Signed out of all devices. Please log in again.',
+    });
   } catch (err) { next(err); }
 }
 
@@ -1175,6 +1233,6 @@ module.exports = {
   forgotPassword, verifyResetOtp, resetPassword,
   // New RBAC management
   changeRole, deleteUser, listDeletedUsers, restoreUser, getDirectory,
-  getMe, updateProfile, updateSettings, changePassword, getLoginHistory,
+  getMe, updateProfile, updateSettings, changePassword, getLoginHistory, logoutAll,
 };
 

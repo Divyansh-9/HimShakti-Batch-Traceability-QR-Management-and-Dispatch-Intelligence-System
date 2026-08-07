@@ -167,3 +167,56 @@ Attempting to POST `role: 'admin'` to `/auth/request-access` returns:
 | `deletedAt`    | Date     | Timestamp of soft-delete                         |
 | `deleteNote`   | String   | Optional reason entered at delete time           |
 | `isSuperAdmin` | Boolean  | Set by migration script — immutable via API      |
+
+---
+
+## Session validity (v2.10.0)
+
+Authorization is not decided by the token alone. `protect` verifies the
+signature, then checks the token against the stored account on every
+request. A signed JWT proves who logged in; it does not prove they
+should still be logged in.
+
+Each authenticated request confirms:
+
+| Check | Failure | Why it exists |
+| --- | --- | --- |
+| Account still exists and is not soft-deleted | `401` | Removing a user must remove their access now, not when their token happens to expire |
+| Account is active | `403` | Deactivation takes effect immediately; distinct status so the client can say *why* |
+| `tokenVersion` in the token matches the account | `401` | The revocation mechanism — see below |
+
+**Role, name and Super Admin status come from the database, not the
+token.** A token minted before a demotion still carries the old role;
+it is ignored. Role changes therefore apply on the next request rather
+than at next login.
+
+### tokenVersion
+
+A JWT is a bearer credential: once issued it is valid until it expires,
+and it cannot be recalled. `User.tokenVersion` is a counter embedded in
+the token (`tv`) and compared against the stored value on each request.
+Bumping the stored counter invalidates every token issued before it.
+
+It is bumped on:
+
+- password change (also reissues the caller's own token, so the current
+  tab is not signed out)
+- password reset — the account-recovery path, most likely to be running
+  because an account is already compromised
+- deactivation (on the way out only; reactivating does not punish the
+  user by killing the session they are about to be allowed to use)
+- soft delete
+- `POST /auth/me/logout-all`
+
+Tokens minted before this field existed carry no `tv`, which is read as
+`0`. They keep working against an account whose counter has never been
+bumped, so introducing the mechanism did not sign everybody out — and
+they are revoked the moment that account's counter moves.
+
+### What this does not do
+
+Access tokens still live 8 hours and there is no refresh-token rotation.
+Revocation is immediate when someone *acts* — changes a password, is
+deactivated, presses log out everywhere. A stolen token that nobody
+notices remains valid until it expires. Shortening that window means
+refresh tokens, which is a larger change than this one.
