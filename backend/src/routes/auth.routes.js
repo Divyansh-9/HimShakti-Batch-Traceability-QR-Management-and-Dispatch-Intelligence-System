@@ -42,7 +42,12 @@ router.patch('/users/:id/restore',    protect, requireSuperAdmin,     ctrl.resto
 router.delete('/users/:id',           protect, requireAdminOrAbove,   ctrl.deleteUser);
 
 // Any authenticated user — link/unlink Google account email
-router.patch('/me/google-link', protect, ctrl.linkGoogle);
+// Linking proves ownership via a real Google credential, verified
+// server-side. PATCH is the deprecated shape — it only unlinks now; see
+// legacyGoogleLink().
+router.post(  '/me/google-link', protect, ctrl.linkGoogle);
+router.delete('/me/google-link', protect, ctrl.unlinkGoogle);
+router.patch( '/me/google-link', protect, ctrl.legacyGoogleLink);
 
 // ── Self-service — any authenticated user ──────────────────────────
 router.get(  '/me',                 protect, ctrl.getMe);

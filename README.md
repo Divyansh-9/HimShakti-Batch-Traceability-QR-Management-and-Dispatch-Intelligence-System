@@ -3,9 +3,9 @@
 # 🌿 HimShakti — Batch Traceability & Dispatch Intelligence System
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-2.10.0-6366f1?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/Version-2.11.0-6366f1?style=for-the-badge" />
   <img src="https://github.com/Divyansh-9/HimShakti-Batch-Traceability-QR-Management-and-Dispatch-Intelligence-System/actions/workflows/ci.yml/badge.svg" alt="CI" />
-  <img src="https://img.shields.io/badge/Tests-96%20passing-22c55e?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/Tests-107%20passing-22c55e?style=for-the-badge" />
   <img src="https://img.shields.io/badge/Status-Live%20%26%20Deployed-22c55e?style=for-the-badge&logo=checkmarx&logoColor=white" />
   <img src="https://img.shields.io/badge/React-19%20%2B%20Vite-61DAFB?style=for-the-badge&logo=react&logoColor=black" />
   <img src="https://img.shields.io/badge/Node.js-Express%205-339933?style=for-the-badge&logo=node.js&logoColor=white" />
@@ -77,7 +77,7 @@
 | **Frontend Deploy** | Firebase Hosting | Global CDN, zero cold-start, free SSL |
 | **Backend Deploy** | Vercel Serverless Functions | Always-on free tier, zero cold-start on hobby plan |
 | **Email** | Resend HTTP API, Gmail SMTP fallback | Silent no-op when unconfigured, so approval flows never hard-fail |
-| **Testing / CI** | Vitest + GitHub Actions | 96 tests gating every push — see [docs/TESTING.md](./docs/TESTING.md) |
+| **Testing / CI** | Vitest + GitHub Actions | 107 tests gating every push — see [docs/TESTING.md](./docs/TESTING.md) |
 
 ---
 
@@ -572,6 +572,8 @@ Authorization: Bearer <token>
 | 14 | `POST` | `/auth/me/change-password` | ✅ | Change password (bcrypt-guarded). Ends all other sessions and reissues the caller's token |
 | 15 | `GET` | `/auth/me/login-history` | ✅ | Last 10 login events |
 | 15b | `POST` | `/auth/me/logout-all` | ✅ | End every session for this account, including the current one |
+| 15c | `POST` | `/auth/me/google-link` | ✅ | Link a Google account — requires a Google credential, verified server-side |
+| 15d | `DELETE` | `/auth/me/google-link` | ✅ | Unlink the Google account |
 | 16 | `GET` | `/api/products` | — | List all products |
 | 17 | `GET` | `/api/products/:id` | — | Single product |
 | 18 | `POST` | `/api/batches` | ✅ | Create batch (auto-generates QR + expiry) |
@@ -684,7 +686,7 @@ POST /api/batches  ─────► MongoDB insert
 ## 🧪 Testing & CI
 
 ```bash
-cd backend  && npm test     # 75 tests
+cd backend  && npm test     # 86 tests
 cd frontend && npm test     # 21 tests
 ```
 
@@ -696,7 +698,7 @@ running.
 every push and PR on backend tests, frontend tests, the frontend build,
 and a lint budget. `npm audit` reports but does not block.
 
-**96 tests is not broad coverage of 19,572 lines, and is not trying to
+**107 tests is not broad coverage of 19,572 lines, and is not trying to
 be.** It targets one category: logic whose failure mode is *silent*. A
 route that 500s tells you it is broken; an expiry boundary that is off by
 one does not — it ships a batch a day late and every log line looks

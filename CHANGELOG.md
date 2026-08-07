@@ -6,6 +6,34 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2.11.0] — 2026-08-07
+
+### Google account linking now proves you own the account
+
+#### Fixed
+- **Linking accepted any email you typed, with no proof of ownership.** `PATCH /auth/me/google-link` took a `googleEmail` string straight from the request body. Because `googleAuth.controller` resolves logins by matching that field, one user could link somebody else's Gmail to their own account — the victim would click "Sign in with Google", Google would authenticate them correctly, and the server would drop them into the attacker's account. It also allowed silent squatting: once claimed, the real owner could never link their own address.
+
+  Linking now requires a Google credential, verified server-side against Google's userinfo endpoint through the same path used for signing in. The email is taken from Google's verified response and never from the client. `POST /auth/me/google-link` replaces the old shape; `DELETE /auth/me/google-link` unlinks.
+
+- **Two accounts could claim the same Google identity.** There was no uniqueness constraint, so `findOne({ googleEmail })` at login returned whichever document Mongo found first — nondeterministically signing someone into the wrong account. Now enforced by a unique index, and by an explicit 409 with a readable message rather than a raw duplicate-key error.
+
+  The index is **partial**, not sparse. `googleEmail` defaults to `null`, and sparse only skips documents where a field is *absent* — so `sparse + unique` would have rejected the second unlinked user. Filtering on `$type: 'string'` indexes only genuinely linked accounts. Verified against live data: 5 linked, 5 unlinked, index accepted all ten.
+
+- **The dropdown read link state from `localStorage`.** A genuinely linked account showed "Link Google account" on any new browser or device, and a stale cache showed a link that no longer existed. State now comes from `/auth/me`, fetched when the menu opens rather than on every page load.
+
+- **Rejected an unverified Google email.** Google returns `email_verified: false` for some workspace and alias cases; linking one would defeat the point of verifying. A missing field still counts as verified — Google omits it for ordinary consumer accounts, and refusing those would break the common case.
+
+#### Added
+- **`services/googleIdentity.js`** — one place that turns a browser token into an email this server will believe, shared by sign-in and linking. 16 tests, every one guarding a way the hole could reopen, including that the email comes from Google's response and never from the caller.
+- **Unlink now confirms before removing.** Password sign-in always remains, so unlinking can never lock anyone out — but a credential vanishing on a single misclick is still worth one question.
+- **Honest disabled state** when `VITE_GOOGLE_CLIENT_ID` is unconfigured, instead of a button that opens a popup which immediately fails.
+- **Loading skeleton** while link state is in flight. Rendering the unlinked state before the answer arrives tells an already-linked user something false.
+
+#### Deprecated
+- `PATCH /auth/me/google-link` still unlinks, so a browser running a cached older bundle keeps working, but **refuses to link** with a message asking the user to refresh. Continuing to honour the old path would leave the vulnerability open for as long as any stale tab survives.
+
+---
+
 ## [2.10.0] — 2026-08-07
 
 ### Sessions can finally be revoked

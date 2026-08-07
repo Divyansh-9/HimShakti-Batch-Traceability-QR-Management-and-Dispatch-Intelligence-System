@@ -31,6 +31,19 @@ What the system does, so a reviewer can check whether it still holds.
 - Residual risk: a stolen token that nobody notices stays valid until it
   expires. Revocation is immediate only when someone acts.
 
+### Google account linking
+
+Sign-in resolves a user by matching `googleEmail`, so that field is a
+credential, not a label. Linking therefore requires a Google token
+verified server-side ([`googleIdentity.js`](./backend/src/services/googleIdentity.js));
+the address is taken from Google's verified response, never from the
+client. A unique partial index enforces one Google identity per account.
+
+Until v2.11.0 this endpoint accepted any email string the client sent.
+One user could claim another person's address, and that person's Google
+sign-in would then land in the attacker's account. Fixed, and the
+deprecated `PATCH` shape now refuses to link.
+
 ### Authorization
 
 Four tiers, enforced by middleware in

@@ -3,6 +3,7 @@ import ThemePicker from './ThemePicker';
 import NotificationPanel from './NotificationPanel';
 import { Menu, X, LayoutDashboard, LogIn, LogOut, ChevronDown, User, Settings, Shield, Link2, LinkIcon, Unlink } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
+import { useGoogleLogin } from '@react-oauth/google';
 import client from '../api/client';
 import toast from 'react-hot-toast';
 
@@ -59,46 +60,66 @@ export default function Navbar({ onMenuClick, isSidebarOpen }) {
     catch { return null; }
   })();
 
-  // Google link state — persisted in localStorage so it survives nav
-  const [googleEmail,    setGoogleEmail]    = useState(() => localStorage.getItem('hs_google_email') || '');
-  const [googleLinking,  setGoogleLinking]  = useState(false); // loading state
-  const [showGoogleForm, setShowGoogleForm] = useState(false); // inline form visible
-  const [googleInput,    setGoogleInput]    = useState('');    // controlled input value
+  // ── Google account link ──────────────────────────────────────────
+  // State comes from the server, not localStorage. The previous version
+  // cached the linked address per browser, so a genuinely linked account
+  // showed "Link Google account" on any new device — and a stale cache
+  // showed a link that no longer existed.
+  const [googleEmail,   setGoogleEmail]   = useState(null);
+  const [googleLoaded,  setGoogleLoaded]  = useState(false);
+  const [googleBusy,    setGoogleBusy]    = useState(false);
+  const [confirmUnlink, setConfirmUnlink] = useState(false);
 
-  async function handleGoogleLink() {
-    if (!googleInput.trim()) return;
-    setGoogleLinking(true);
-    try {
-      const data = await client('/auth/me/google-link', {
-        method: 'PATCH',
-        body:   JSON.stringify({ googleEmail: googleInput.trim() }),
-      });
-      localStorage.setItem('hs_google_email', data.googleEmail);
-      setGoogleEmail(data.googleEmail);
-      setShowGoogleForm(false);
-      setGoogleInput('');
-      toast.success('Google account linked successfully!');
-    } catch (err) {
-      toast.error(err.message || 'Failed to link Google account');
-    } finally {
-      setGoogleLinking(false);
-    }
-  }
+  const hasGoogleClientId = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID);
+
+  // Fetch once the menu is actually opened — no request on every page
+  // load for a panel most visits never expand.
+  useEffect(() => {
+    if (!userMenuOpen || !isLoggedIn || googleLoaded) return;
+    let cancelled = false;
+    client('/auth/me', { skipAuthRedirect: true })
+      .then((res) => {
+        if (cancelled) return;
+        setGoogleEmail(res?.data?.googleEmail ?? null);
+        setGoogleLoaded(true);
+      })
+      .catch(() => { if (!cancelled) setGoogleLoaded(true); });
+    return () => { cancelled = true; };
+  }, [userMenuOpen, isLoggedIn, googleLoaded]);
+
+  // Linking requires a real Google credential. The server verifies it
+  // and takes the email from Google, never from us — see
+  // backend/src/services/googleIdentity.js for why.
+  const startGoogleLink = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      setGoogleBusy(true);
+      try {
+        const data = await client('/auth/me/google-link', {
+          method: 'POST',
+          body:   JSON.stringify({ credential: tokenResponse.access_token }),
+        });
+        setGoogleEmail(data.googleEmail);
+        toast.success(data.message || 'Google account linked.');
+      } catch (err) {
+        toast.error(err.message || 'Could not link that Google account.');
+      } finally {
+        setGoogleBusy(false);
+      }
+    },
+    onError: () => toast.error('Google sign-in was cancelled.'),
+  });
 
   async function handleGoogleUnlink() {
-    setGoogleLinking(true);
+    setGoogleBusy(true);
     try {
-      await client('/auth/me/google-link', {
-        method: 'PATCH',
-        body:   JSON.stringify({ googleEmail: null }),
-      });
-      localStorage.removeItem('hs_google_email');
-      setGoogleEmail('');
-      toast.success('Google account unlinked.');
+      const data = await client('/auth/me/google-link', { method: 'DELETE' });
+      setGoogleEmail(null);
+      setConfirmUnlink(false);
+      toast.success(data.message || 'Google account unlinked.');
     } catch (err) {
-      toast.error(err.message || 'Failed to unlink');
+      toast.error(err.message || 'Could not unlink.');
     } finally {
-      setGoogleLinking(false);
+      setGoogleBusy(false);
     }
   }
 
@@ -295,60 +316,82 @@ export default function Navbar({ onMenuClick, isSidebarOpen }) {
                   <div className="px-3 py-2.5 border-t border-border">
                     <p className="text-[10px] font-bold text-text-muted uppercase tracking-widest mb-2">Google Account</p>
 
-                    {googleEmail ? (
-                      // Already linked — show email + unlink option
-                      <div className="bg-surface-2 rounded-xl px-3 py-2.5 flex items-center gap-2">
-                        <GoogleSVG />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[10px] text-text-muted font-medium">Linked</p>
-                          <p className="text-xs text-text-primary font-semibold truncate">{googleEmail}</p>
+                    {!googleLoaded ? (
+                      // Skeleton, not "Link Google account". Showing the
+                      // unlinked state before the answer arrives tells an
+                      // already-linked user something false.
+                      <div className="h-[52px] rounded-xl bg-surface-2 animate-pulse" />
+                    ) : googleEmail ? (
+                      <div className="bg-surface-2 rounded-xl px-3 py-2.5">
+                        <div className="flex items-center gap-2">
+                          <GoogleSVG />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[10px] text-text-muted font-medium">Linked · sign-in enabled</p>
+                            <p className="text-xs text-text-primary font-semibold truncate" title={googleEmail}>
+                              {googleEmail}
+                            </p>
+                          </div>
+                          {!confirmUnlink && (
+                            <button
+                              onClick={() => setConfirmUnlink(true)}
+                              disabled={googleBusy}
+                              title="Unlink Google account"
+                              aria-label="Unlink Google account"
+                              className="p-1.5 rounded-lg text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-40"
+                            >
+                              <Unlink className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
-                        <button
-                          onClick={handleGoogleUnlink}
-                          disabled={googleLinking}
-                          title="Unlink Google account"
-                          className="p-1.5 rounded-lg text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-40"
-                        >
-                          <Unlink className="w-3.5 h-3.5" />
-                        </button>
+
+                        {/* Confirm before removing a sign-in method.
+                            Password login always remains, so this can
+                            never lock anyone out — but it is still a
+                            credential disappearing on one click. */}
+                        {confirmUnlink && (
+                          <div className="mt-2.5 pt-2.5 border-t border-border">
+                            <p className="text-[11px] text-text-muted mb-2">
+                              Remove Google sign-in? You will still sign in with your username and password.
+                            </p>
+                            <div className="flex gap-1.5">
+                              <button
+                                onClick={handleGoogleUnlink}
+                                disabled={googleBusy}
+                                className="flex-1 py-1.5 bg-red-500/90 hover:bg-red-500 text-white text-[11px] font-bold rounded-lg transition-all disabled:opacity-40"
+                              >
+                                {googleBusy ? 'Unlinking…' : 'Unlink'}
+                              </button>
+                              <button
+                                onClick={() => setConfirmUnlink(false)}
+                                disabled={googleBusy}
+                                className="px-2.5 py-1.5 text-text-muted text-[11px] border border-border rounded-lg hover:bg-surface-2 transition-colors"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    ) : showGoogleForm ? (
-                      // Inline input — no window.prompt
-                      <div className="space-y-2">
-                        <input
-                          type="email"
-                          value={googleInput}
-                          onChange={e => setGoogleInput(e.target.value)}
-                          onKeyDown={e => e.key === 'Enter' && handleGoogleLink()}
-                          placeholder="your@gmail.com"
-                          autoFocus
-                          className="w-full px-3 py-2 text-xs bg-surface-2 border border-border rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand/30"
-                        />
-                        <div className="flex gap-1.5">
-                          <button
-                            onClick={handleGoogleLink}
-                            disabled={googleLinking || !googleInput.trim()}
-                            className="flex-1 py-1.5 bg-brand hover:bg-brand-hover text-white text-[11px] font-bold rounded-lg transition-all disabled:opacity-40"
-                          >
-                            {googleLinking ? 'Linking…' : 'Link Account'}
-                          </button>
-                          <button
-                            onClick={() => { setShowGoogleForm(false); setGoogleInput(''); }}
-                            className="px-2.5 py-1.5 text-text-muted text-[11px] border border-border rounded-lg hover:bg-surface-2 transition-colors"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
+                    ) : !hasGoogleClientId ? (
+                      // Honest disabled state rather than a button that
+                      // opens a popup which immediately fails.
+                      <p className="text-[11px] text-text-muted px-1 py-2">
+                        Google sign-in is not configured on this deployment.
+                      </p>
                     ) : (
-                      // Unlinked state — invite to link
-                      <button
-                        onClick={() => setShowGoogleForm(true)}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-text-muted hover:bg-surface-2 hover:text-text-primary transition-colors border border-dashed border-border"
-                      >
-                        <GoogleSVG />
-                        Link Google account
-                      </button>
+                      <>
+                        <button
+                          onClick={() => startGoogleLink()}
+                          disabled={googleBusy}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-text-muted hover:bg-surface-2 hover:text-text-primary transition-colors border border-dashed border-border disabled:opacity-40"
+                        >
+                          <GoogleSVG />
+                          {googleBusy ? 'Linking…' : 'Link Google account'}
+                        </button>
+                        <p className="text-[10px] text-text-muted mt-1.5 px-1 leading-relaxed">
+                          Opens Google to confirm it is your account, then lets you sign in with it.
+                        </p>
+                      </>
                     )}
                   </div>
 

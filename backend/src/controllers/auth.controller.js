@@ -8,6 +8,7 @@ const jwt = require('jsonwebtoken');
 const { sendApprovalEmail, sendRejectionEmail, sendOtpEmail, sendPasswordResetOtpEmail } = require('../services/emailService');
 const { appendLoginEvent } = require('../services/loginHistory.service');
 const { notify, notifyRoles } = require('../services/notificationService');
+const { verifyGoogleToken } = require('../services/googleIdentity');
 
 /**
  * Fields any multi-user read path is allowed to return.
@@ -549,40 +550,113 @@ async function toggleUserStatus(req, res, next) {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// PATCH /auth/me/google-link  [any authenticated user]
-// Saves or removes the user's linked Google email on their own account.
-// No real OAuth flow — stores email for display / future SSO readiness.
+// POST /auth/me/google-link  [any authenticated user]
+// Links a Google account to the caller, proving ownership first.
+//
+// This endpoint used to accept `{ googleEmail }` — any string the client
+// typed, with no verification. Because googleAuth.controller logs users
+// in by matching `googleEmail`, that let anyone link somebody else's
+// address to their own account: the victim would click "Sign in with
+// Google", Google would authenticate them correctly, and the server
+// would drop them into the attacker's account. It also allowed silent
+// squatting on an address the real owner could then never link.
+//
+// Linking now requires a Google credential, verified server-side through
+// the same path used for signing in.
 // ─────────────────────────────────────────────────────────────────
 async function linkGoogle(req, res, next) {
   try {
-    const { googleEmail } = req.body;
-    // req.user is set by protect() middleware
-    const user = await User.findOne({ username: req.user.username });
+    const { credential } = req.body;
+
+    // verifyGoogleToken throws with .statusCode already set.
+    const { email, name } = await verifyGoogleToken(credential);
+
+    const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ success: false, error: 'User not found' });
 
-    if (!googleEmail) {
-      // Unlink
-      user.googleEmail = null;
-      user.googleLinkedAt = null;
-    } else {
-      // Basic email format check
-      const emailRx = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRx.test(googleEmail)) {
-        return res.status(400).json({ success: false, error: 'Invalid email address' });
-      }
-      user.googleEmail    = googleEmail.toLowerCase().trim();
-      user.googleLinkedAt = new Date();
+    // One Google identity, one account. Without this two users can claim
+    // the same address and the login lookup picks whichever it finds
+    // first — which is nondeterministic, and a login landing in the wrong
+    // account is about the worst failure this system could have.
+    const taken = await User.findOne({ googleEmail: email, _id: { $ne: user._id } })
+      .select('_id')
+      .lean();
+    if (taken) {
+      return res.status(409).json({
+        success: false,
+        error:   `${email} is already linked to another HimShakti account.`,
+      });
     }
+
+    if (user.googleEmail === email) {
+      return res.json({
+        success:     true,
+        googleEmail: user.googleEmail,
+        linkedAt:    user.googleLinkedAt,
+        message:     'That Google account is already linked.',
+      });
+    }
+
+    user.googleEmail    = email;
+    user.googleLinkedAt = new Date();
     await user.save();
+
     return res.json({
-      success:      true,
-      googleEmail:  user.googleEmail,
-      linkedAt:     user.googleLinkedAt,
-      message:      user.googleEmail ? 'Google account linked' : 'Google account unlinked',
+      success:     true,
+      googleEmail: user.googleEmail,
+      googleName:  name,
+      linkedAt:    user.googleLinkedAt,
+      message:     'Google account linked. You can now sign in with Google.',
     });
   } catch (err) {
+    if (err.statusCode) {
+      return res.status(err.statusCode).json({ success: false, error: err.message });
+    }
     next(err);
   }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// DELETE /auth/me/google-link  [any authenticated user]
+// Removes the link. Safe unconditionally: every account has a password
+// (`passwordHash` is required), so unlinking can never lock anyone out.
+// ─────────────────────────────────────────────────────────────────
+async function unlinkGoogle(req, res, next) {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+
+    if (!user.googleEmail) {
+      return res.json({ success: true, googleEmail: null, message: 'No Google account was linked.' });
+    }
+
+    user.googleEmail    = null;
+    user.googleLinkedAt = null;
+    await user.save();
+
+    return res.json({
+      success:     true,
+      googleEmail: null,
+      message:     'Google account unlinked. Sign in with your username and password.',
+    });
+  } catch (err) { next(err); }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// PATCH /auth/me/google-link  [deprecated]
+// Kept only so a browser running a cached older bundle can still
+// UNLINK. Linking through it is refused — that path was the
+// vulnerability described above, and silently continuing to honour it
+// would leave the hole open for as long as any stale tab survives.
+// ─────────────────────────────────────────────────────────────────
+async function legacyGoogleLink(req, res, next) {
+  if (req.body?.googleEmail) {
+    return res.status(400).json({
+      success: false,
+      error:   'Linking now requires signing in with Google. Please refresh the page and try again.',
+    });
+  }
+  return unlinkGoogle(req, res, next);
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -1229,7 +1303,7 @@ async function getLoginHistory(req, res, next) {
 module.exports = {
   login, requestAccess, listRequests, approve, reject,
   activate, verifyOtp, resendOtp, resendInvite, removeRequest,
-  listUsers, toggleUserStatus, linkGoogle,
+  listUsers, toggleUserStatus, linkGoogle, unlinkGoogle, legacyGoogleLink,
   forgotPassword, verifyResetOtp, resetPassword,
   // New RBAC management
   changeRole, deleteUser, listDeletedUsers, restoreUser, getDirectory,

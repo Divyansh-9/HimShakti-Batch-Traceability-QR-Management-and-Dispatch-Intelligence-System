@@ -12,8 +12,12 @@ const userSchema = new mongoose.Schema({
     palette: { type: String, default: 'default' },
     accent:  { type: String, default: 'auto' },
   },
-  // Linked Google account email — optional, set via 'Link Google Account' in dashboard
-  googleEmail:  { type: String, default: null, lowercase: true, trim: true, sparse: true },
+  // Linked Google account email — set only after verifying a real Google
+  // credential server-side (services/googleIdentity.js). Never trust a
+  // client-supplied address here: googleAuth logs users in by matching
+  // this field, so an unverified value lets one account capture another
+  // person's Google sign-in.
+  googleEmail:  { type: String, default: null, lowercase: true, trim: true },
   googleLinkedAt: { type: Date, default: null },
   role: {
     type:    String,
@@ -73,5 +77,23 @@ const userSchema = new mongoose.Schema({
 userSchema.methods.comparePassword = function (plain) {
   return bcrypt.compare(plain, this.passwordHash);
 };
+
+/**
+ * One Google identity, one account.
+ *
+ * A PARTIAL index, not a sparse one. Sparse only skips documents where
+ * the field is absent — and `googleEmail` defaults to `null`, so every
+ * unlinked user stores an actual null. Under `sparse + unique` the
+ * second unlinked user would collide and the write would fail. Filtering
+ * on `$type: 'string'` indexes only genuinely linked accounts.
+ *
+ * Without this, two users can hold the same googleEmail and the login
+ * lookup in googleAuth.controller returns whichever it finds first —
+ * nondeterministically dropping someone into the wrong account.
+ */
+userSchema.index(
+  { googleEmail: 1 },
+  { unique: true, partialFilterExpression: { googleEmail: { $type: 'string' } } }
+);
 
 module.exports = mongoose.model('User', userSchema);

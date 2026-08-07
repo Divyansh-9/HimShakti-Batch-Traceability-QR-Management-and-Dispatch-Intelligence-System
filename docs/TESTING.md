@@ -3,7 +3,7 @@
 ## Running
 
 ```bash
-cd backend  && npm test        # 75 tests
+cd backend  && npm test        # 86 tests
 cd frontend && npm test        # 21 tests
 npm run test:watch             # backend only, watch mode
 ```
@@ -19,7 +19,7 @@ CI runs both on every push and pull request
 
 ## What is tested, and why only this
 
-96 tests is not broad coverage of 19,572 lines, and it is not trying to
+107 tests is not broad coverage of 19,572 lines, and it is not trying to
 be. The suite targets one specific category: **logic whose failure mode
 is silent.**
 
@@ -36,6 +36,7 @@ paying for tests, because they are the ones nothing else will catch.
 | Message retention | `backend/tests/messageRetention.test.js` | `expiresAtFor` alone decides permanent audit evidence vs 90-day expiry. Inverting it deletes the audit trail with no error. Nothing else enforced it. |
 | Trace tokens | `backend/tests/traceToken.test.js` | Non-determinism breaks the backfill's idempotency and orphans printed labels. A missing key would produce guessable tokens that look fine. |
 | Session revocation | `backend/tests/sessionRevocation.test.js` | A deleted user keeping access; a demotion not applying; a stolen token surviving a password change. Includes: database failure must **not** read as authenticated, and `passwordHash`/`resetToken` must never reach `req.user`. |
+| Google identity | `backend/tests/googleIdentity.test.js` | Linking an address nobody proved they own. Sign-in resolves users by `googleEmail`, so an unverified value lets one account capture another person's Google sign-in. |
 | Shared store | `backend/tests/sharedStore.test.js` | Every branch is a failure branch, because those are the ones that run locally, in CI, and during any Upstash outage. |
 | CSV parsing | `frontend/src/utils/csvParser.test.js` | A mis-split quoted field does not error — it writes a wrong farmer name into a permanent, append-only production record. |
 
