@@ -83,7 +83,7 @@ jobs:
           ls -lh "himshakti-$STAMP.archive.gz.enc"
 
       - name: Upload
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: himshakti-backup-${{ env.STAMP }}
           path: himshakti-${{ env.STAMP }}.archive.gz*
